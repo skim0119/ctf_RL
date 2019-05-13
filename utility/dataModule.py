@@ -109,7 +109,7 @@ def state_processor(state, agents=None, vision_radius=19, full_state=None, flatt
     return oh_state, indv_status, shared_status
 
 
-def one_hot_encoder(state, agents=None, vision_radius=9, reverse=False,
+def one_hot_encoder(state, agents=None, vision_radius=9,
                     flatten=False, locs=None):
     """Encoding pipeline for CtF state to one-hot representation
 
@@ -136,20 +136,12 @@ def one_hot_encoder(state, agents=None, vision_radius=9, reverse=False,
 
     # team 1 : (1), team 2 : (-1), map elements: (0)
     map_channel = SIX_MAP_CHANNEL
-    if not reverse:
-        map_color = {UNKNOWN: 1, DEAD: 0,
-                     TEAM1_BG: 0, TEAM2_BG: 1,
-                     TEAM1_GV: 1, TEAM2_GV: -1,
-                     TEAM1_UAV: 1, TEAM2_UAV: -1,
-                     TEAM1_FL: 1, TEAM2_FL: -1,
-                     OBSTACLE: 1}
-    else:  # reverse color
-        map_color = {UNKNOWN: 1, DEAD: 0,
-                     TEAM1_BG: 1, TEAM2_BG: 0,
-                     TEAM1_GV: -1, TEAM2_GV: 1,
-                     TEAM1_UAV: -1, TEAM2_UAV: 1,
-                     TEAM1_FL: -1, TEAM2_FL: 1,
-                     OBSTACLE: 1}
+    map_color = {UNKNOWN: 1, DEAD: 0,
+                 TEAM1_BG: 0, TEAM2_BG: 1,
+                 TEAM1_GV: 1, TEAM2_GV: -1,
+                 TEAM1_UAV: 1, TEAM2_UAV: -1,
+                 TEAM1_FL: 1, TEAM2_FL: -1,
+                 OBSTACLE: 1}
 
     # Expand the observation with wall to avoid dealing with the boundary
     sx, sy = state.shape
@@ -170,58 +162,6 @@ def one_hot_encoder(state, agents=None, vision_radius=9, reverse=False,
                 oh_state[idx, :, :, map_channel[channel]] += (vision == channel).astype(np.int32)
             elif val == -1:
                 oh_state[idx, :, :, map_channel[channel]] -= (vision == channel).astype(np.int32)
-
-    if flatten:
-        return np.reshape(oh_state, (len(agents), -1))
-    else:
-        return oh_state
-
-
-def one_hot_encoder_v2(state, agents, vision_radius=9, reverse=False, flatten=False):
-    """ Encoding pipeline for CtF state to one-hot representation
-    11-channel one-hot representation of state.
-    State is binary.
-    Some optimization is included.
-
-    :param state: CtF state in raw format
-    :param agents: Agent list of CtF environment
-    :param vision_radius: Size of the vision range (default=9)`
-    :param reverse:Reverse the color. Used for red-perspective (default=False)
-
-    :return oh_state: One-hot encoded state
-    """
-
-    num_channel = 11
-
-    # Map channel for each elements
-    if not reverse:
-        order = [UNKNOWN, OBSTACLE, TEAM1_BG, TEAM2_BG, TEAM1_GV, TEAM2_GV,
-                 TEAM1_UAV, TEAM2_UAV, TEAM1_FL, TEAM2_FL, DEAD]
-    else:
-        order = [UNKNOWN, OBSTACLE, TEAM2_BG, TEAM1_BG, TEAM2_GV, TEAM1_GV,
-                 TEAM2_UAV, TEAM1_UAV, TEAM2_FL, TEAM1_FL, DEAD]
-    map_channel = dict(zip(order, range(num_channel)))
-
-    # Padding Boundary
-    sx, sy = state.shape
-    _state = np.full((sx + 2 * vision_radius, sy + 2 * vision_radius), OBSTACLE)
-    _state[vision_radius:vision_radius + sx, vision_radius:vision_radius + sy] = state
-    state = _state
-
-    each_agent = []
-    for idx, agent in enumerate(agents):
-        # Initialize Variables
-        x, y = agent.get_loc()
-        x += vision_radius
-        y += vision_radius
-        vision = state[x - vision_radius:x + vision_radius + 1, y - vision_radius:y + vision_radius + 1]  # extract view
-
-        # operation
-        each_channel = []
-        for element, channel in map_channel.items():
-            each_channel.append(vision == element)
-        each_agent.append(np.stack(each_channel, axis=-1))
-    oh_state = np.stack(each_agent, axis=0)
 
     if flatten:
         return np.reshape(oh_state, (len(agents), -1))
