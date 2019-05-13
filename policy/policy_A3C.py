@@ -40,8 +40,8 @@ class PolicyGen:
                  model_dir='./policy/A3C_model/',
                  input_name='global/state:0',
                  output_name='global/actor/fully_connected_1/Softmax:0',
-                 color='blue',
                  import_scope=None,
+                 vision_radius=19,
                  *args,
                  **kwargs
              ):
@@ -55,11 +55,8 @@ class PolicyGen:
         Initiate session
         """
 
-        self.input_shape = 19
-
         # Switches
         self.full_observation = True
-        self.is_blue = color == 'blue'
 
         self._reset_done = False
 
@@ -84,7 +81,8 @@ class PolicyGen:
         if not self._reset_done:
             self.reset_network_weight()
 
-        obs = one_hot_encoder(observation, agent_list, self.input_shape, reverse=not self.is_blue)
+        obs = one_hot_encoder(state=observation,
+                agents=agent_list, vision_radius=self.vision_radius)
         logit = self.sess.run(self.action, feed_dict={self.state: obs})  # Action Probability
         action_out = [np.random.choice(5, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
 
