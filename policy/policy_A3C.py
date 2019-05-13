@@ -44,7 +44,7 @@ class PolicyGen:
                  import_scope=None,
                  *args,
                  **kwargs
-                 ):
+             ):
         """Constuctor for policy class.
 
         Args:
@@ -55,7 +55,7 @@ class PolicyGen:
         Initiate session
         """
 
-        self.input_shape = 9
+        self.input_shape = 19
 
         # Switches
         self.full_observation = True
@@ -85,9 +85,8 @@ class PolicyGen:
             self.reset_network_weight()
 
         obs = one_hot_encoder(observation, agent_list, self.input_shape, reverse=not self.is_blue)
-        action_prob = self.sess.run(self.action, feed_dict={self.state: obs})  # Action Probability
-
-        action_out = [np.random.choice(5, p=action_prob[x] / sum(action_prob[x])) for x in range(len(agent_list))]
+        logit = self.sess.run(self.action, feed_dict={self.state: obs})  # Action Probability
+        action_out = [np.random.choice(5, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
 
         return action_out
 
@@ -101,10 +100,12 @@ class PolicyGen:
             if output_name is None:
                 output_name = self.output_name
             ckpt = tf.train.get_checkpoint_state(self.model_dir)
-            if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-            else:
-                raise AssertionError
+            with self.sess.graph.as_default():
+                if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+                    saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', import_scope=None, clear_devices=True)
+                    saver.restore(self.sess, ckpt.model_checkpoint_path)
+                else:
+                    raise AssertionError
 
     def reset_network(self, input_name=None, output_name=None, scope=None):
         """reset_network
@@ -116,6 +117,10 @@ class PolicyGen:
         if output_name is None:
             output_name = self.output_name
 
+        config = tf.ConfigProto(
+            device_count = {'GPU': 0}
+        )
+
         # Reset the weight to the newest saved weight.
         print(f'policy initialization : path {self.model_dir}')
         ckpt = tf.train.get_checkpoint_state(self.model_dir)
@@ -124,9 +129,9 @@ class PolicyGen:
             print(f'path exist : {ckpt.model_checkpoint_path}')
             self.graph = tf.Graph()
             with self.graph.as_default():
-                self.sess = tf.Session()
-                self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', import_scope=scope, clear_devices=True)
-                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+                self.sess = tf.Session(config=config)
+                saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', import_scope=scope, clear_devices=True)
+                saver.restore(self.sess, ckpt.model_checkpoint_path)
                 #print([n.name for n in self.graph.as_graph_def().node])
 
                 self.state = self.graph.get_tensor_by_name(input_name)
