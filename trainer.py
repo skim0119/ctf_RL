@@ -12,6 +12,7 @@ TODO:
 """
 
 import os
+import stat
 import shutil
 import configparser
 
@@ -32,7 +33,6 @@ import math
 # the modules that you can use to generate the policy. 
 import policy.random
 import policy.roomba
-import policy.policy_A3C
 import policy.zeros
 
 # Data Processing Module
@@ -45,8 +45,8 @@ from network.a3c import ActorCritic as AC
 
 from network.base import initialize_uninitialized_vars as iuv
 
-OVERRIDE = False;
-TRAIN_NAME='baseline'
+OVERRIDE = True;
+TRAIN_NAME='partial'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.5 # gpu capacity in percentage
@@ -79,15 +79,14 @@ config.read('config.ini')
 ## Environment
 action_space = 5 
 num_blue = 4
+num_uav = 2
 map_size = 20
 vision_range = 19 
 
 ## Training
 total_episodes = 2e5
-max_ep = config.getint('TRAINING','MAX_STEP')
-critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
-entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
-gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
+max_ep = 150
+gamma = 0.98
 
 lr_a = 5e-5
 lr_c = 2e-4
@@ -127,22 +126,29 @@ progbar = tf.keras.utils.Progbar(total_episodes,interval=1)
 
 # ## Worker
 class Worker(object):
-    def __init__(self, name, globalAC, sess, global_step=0):
+    def __init__(self, name, global_ac, global_av, sess, global_step=0):
         # Initialize Environment worker
         self.env = gym.make("cap-v0").unwrapped
-        self.env.num_blue_ugv = num_blue
-        self.env.num_red_ugv = 4
-        self.env.sparse_reward = False
-        self.env.red_partial_visibility = False
+        self.env.red_partial_visibility = True
         self.env.reset(
             map_size=map_size,
             policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
         )
         self.env.reset()
-        # self.env()
         self.name = name
         
         # Create AC Network for Worker
+        self.AC_av = AC(
+            in_size=in_size,
+            action_size=action_space,
+            lr_actor=lr_a,
+            lr_critic=lr_c,
+            scope=self.name+'_av',
+            entropy_beta = 0.01,
+            sess=sess,
+            global_network=global_av
+        )
+
         self.AC = AC(
             in_size=in_size,
             action_size=action_space,
@@ -157,14 +163,15 @@ class Worker(object):
         self.sess=sess
 
     def get_action(self, states):
-        actions, values = self.AC.run_network(states)
-        return actions, values
+        uav_states, ugv_states = states[:num_uav,:], states[num_uav:,:]
+        actions_ugv, values_ugv = self.AC.run_network(ugv_states)
+        actions_uav, values_uav = self.AC_av.run_network(uav_states)
+        return np.concatenate([actions_uav, actions_ugv],axis=None), np.concatenate([values_uav, values_ugv],axis=None)
 
     def work(self, saver, writer, coord):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
                 
-        policy_red_a3c = policy.policy_A3C.PolicyGen(self.env.get_map, self.env.get_team_red, color='red', model_dir=MODEL_PATH)
         policy_red_roomba = policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
         policy_red_zeros = policy.zeros.PolicyGen(self.env.get_map, self.env.get_team_red)
 
@@ -177,28 +184,30 @@ class Worker(object):
                     policy_red = policy_red_zeros
                 elif global_episodes < 5e4:
                     policy_red = policy_red_roomba
-                else:
+                '''else:
                     policy_red = policy_red_a3c
                     if total_step % 500*150:
                         policy_red_a3c.reset_network_weight()
+                        '''
 
                 s0 = self.env.reset(policy_red=policy_red)
-                s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
+                s0 = one_hot_encoder(s0, self.env.get_team_blue, vision_range)
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
                 prev_r = 0
                 was_alive = [ag.isAlive for ag in self.env.get_team_blue]
 
-                trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                trajs_av = [Trajectory(depth=4) for _ in range(num_uav)]
+                trajs_gv = [Trajectory(depth=4) for _ in range(num_blue)]
                 
                 # Bootstrap
                 a1, v1 = self.get_action(s0)
                 for step in range(max_ep+1):
                     a, v0 = a1, v1
                     
-                    s1, rc, d, info = self.env.step(a)
-                    s1 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
+                    s1, rc, d, info = self.env.step(a.tolist())
+                    s1 = one_hot_encoder(s1, self.env.get_team_blue, vision_range)
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
                     r = (rc - prev_r - 0.5)
 
@@ -211,22 +220,23 @@ class Worker(object):
                     ep_r += r
 
                     if d:
-                        v1 = [0.0 for _ in range(num_blue)]
+                        v1 = [0.0 for _ in range(num_blue+num_uav)]
                     else:
                         a1, v1 = self.get_action(s1)
 
                     # push to buffer
                     for idx, agent in enumerate(self.env.get_team_blue):
                         if was_alive[idx]:
-                            trajs[idx].append([s0[idx],
-                                               a[idx],
-                                               r,
-                                               v0[idx]
-                                              ])
+                            if idx < num_uav:
+                                trajs_av[idx].append([s0[idx], a[idx], r, v0[idx]])
+                            else:
+                                trajs_gv[idx-num_uav].append([s0[idx], a[idx], r, v0[idx]])
 
                     if total_step % update_frequency == 0 or d:
-                        self.train(trajs, v1)
-                        trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                        self.train(trajs_av, v1[:num_uav], self.AC_av)
+                        self.train(trajs_gv, v1[num_uav:], self.AC)
+                        trajs_av = [Trajectory(depth=4) for _ in range(num_uav)]
+                        trajs_gv = [Trajectory(depth=4) for _ in range(num_blue)]
 
                     # Iteration
                     prev_r = rc
@@ -263,7 +273,7 @@ class Worker(object):
         writer.add_summary(summary,global_episodes)
         writer.flush()
 
-    def train(self, trajs, bootstrap=0.0):
+    def train(self, trajs, bootstrap=0.0, network=None):
         buffer_s, buffer_a, buffer_tdtarget, buffer_adv = [], [], [], []
         for idx, traj in enumerate(trajs):
             if len(traj) == 0:
@@ -287,14 +297,14 @@ class Worker(object):
             return
 
         feed_dict = {
-            self.AC.state_input : np.stack(buffer_s),
-            self.AC.action_ : np.array(buffer_a),
-            self.AC.td_target_ : np.array(buffer_tdtarget),
-            self.AC.advantage_ : np.array(buffer_adv),
+            network.state_input : np.stack(buffer_s),
+            network.action_ : np.array(buffer_a),
+            network.td_target_ : np.array(buffer_tdtarget),
+            network.advantage_ : np.array(buffer_adv),
         }
 
         # Update Buffer
-        aloss, closs, etrpy = self.AC.update_global(
+        aloss, closs, etrpy = network.update_global(
             buffer_s,
             buffer_a,
             buffer_tdtarget,
@@ -302,7 +312,7 @@ class Worker(object):
         )
 
         # get global parameters to local ActorCritic 
-        self.AC.pull_global()
+        network.pull_global()
 
         return# aloss, closs, etrpy
 
@@ -311,17 +321,18 @@ class Worker(object):
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, 1)
 global_ac = AC(in_size=in_size, action_size=action_space, scope=global_scope, sess=sess)
+global_av = AC(in_size=in_size, action_size=action_space, scope=global_scope+'_av', sess=sess)
 
 # Local workers
 workers = []
 # loop for each workers
 for idx in range(nenv):
     name = 'W_%i' % idx
-    workers.append(Worker(name, global_ac, sess, global_step=global_step))
+    workers.append(Worker(name, global_ac, global_av, sess, global_step=global_step))
     print(f'worker: {name} initiated')
 
 # Resotre / Initialize
-saver = tf.train.Saver(max_to_keep=3, var_list=global_ac.get_vars+[global_step])
+saver = tf.train.Saver(max_to_keep=3, var_list=global_ac.get_vars+[global_step]+global_av.get_vars)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
     
 ckpt = tf.train.get_checkpoint_state(MODEL_PATH)
