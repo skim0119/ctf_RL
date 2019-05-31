@@ -1,3 +1,16 @@
+archive
+archive_*
+logs/
+model/
+render/
+model_archives/
+notebook_archives/
+reference/
+clips/
+test_
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
