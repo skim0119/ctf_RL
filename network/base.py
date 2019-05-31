@@ -119,7 +119,7 @@ class Deep_layer:
         net = input_layer
 
         if return_summary:
-            grid = put_channels_on_grid(net[0], 1, 6)
+            grid = put_channels_on_grid(net[0], -1, 8)
             kernel_summary.append(tf.summary.image('input_image', grid, max_outputs=1))
 
         for idx, (ch, kern, pool, stride) in enumerate(zip(channels, kernels, pools, strides)):

@@ -167,7 +167,7 @@ class a3c:
         feed_dict = {self.state_input: states}
         return self.sess.run([self.actor, self.critic], feed_dict)
 
-    def update_global(self, state_input, action, td_target, advantage, writer=None, log=False, return_kl=False):
+    def update_global(self, state_input, action, td_target, advantage, global_episodes, writer=None, log=False):
         """ update_global
 
         Run all update and back-propagation sequence given the necessary inputs.
@@ -177,11 +177,6 @@ class a3c:
         log : [bool]
              logging option
 
-        Returns
-        ----------------
-        aloss : [Double]
-        closs : [Double]
-        entropy : [Double]
         """
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
@@ -201,16 +196,19 @@ class a3c:
                          self.global_network.action_: action,
                          self.global_network.td_target_: td_target,
                          self.global_network.advantage_: advantage}
-            log_ops = [self.global_network.cnn_summary]
-            summary = self.sess.run(log_ops, feed_dict_global)
-            writer.add_summary(summary[0])
-            writer.flush()
+            log_ops = [self.global_network.cnn_summary, self.global_network.merged_grad_summary_op,
+                    self.global_network.merged_summary_op]
+            summaries = self.sess.run(log_ops, feed_dict_global)
+            for summary in summaries:
+                writer.add_summary(summary, global_episodes)
+            summary = tf.Summary()
+            summary.value.add(tag='summary/actor_loss', simple_value=aloss)
+            summary.value.add(tag='summary/critic_loss', simple_value=closs)
+            summary.value.add(tag='summary/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/kl', simple_value=kl)
+            writer.add_summary(summary,global_episodes)
 
-        # Returns
-        if return_kl:
-            return aloss, closs, entropy, kl
-        else:
-            return aloss, closs, entropy
+            writer.flush()
 
     def pull_global(self):
         self.sess.run(self.pull_op)
@@ -249,11 +247,17 @@ class ActorCritic(a3c):
         critic_name = self.scope + '/critic'
 
         with tf.variable_scope('actor'):
+            net = tf.contrib.layers.separable_conv2d(
+                inputs=input_hold,
+                num_outputs=32,
+                kernel_size=5,
+                depth_multiplier=4,
+            )
             net, self.cnn_summary = Deep_layer.conv2d_pool(
-                input_layer=input_hold,
-                channels=[32, 64, 64],
-                kernels=[5, 3, 2],
-                pools=[2, 2, 1],
+                input_layer=net,
+                channels=[64, 64],
+                kernels=[3, 2],
+                pools=[2, 1],
                 flatten=True,
                 return_summary=True
             )

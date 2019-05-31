@@ -27,6 +27,7 @@ from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
+from utility.gae import gae
 
 from network.a3c import ActorCritic as AC
 
@@ -70,18 +71,19 @@ map_size = 20
 vision_range = 19 
 
 ## Training
-total_episodes = 2e5
+total_episodes = 1e6
 max_ep = config.getint('TRAINING','MAX_STEP')
 critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
 gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
+lambd = 0.98
 
 lr_a = 5e-5
 lr_c = 2e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')*4
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
@@ -117,15 +119,11 @@ class Worker(object):
     def __init__(self, name, globalAC, sess, global_step=0):
         # Initialize Environment worker
         self.env = gym.make("cap-v0").unwrapped
-        self.env.num_blue_ugv = num_blue
-        self.env.num_red_ugv = 4
-        self.env.sparse_reward = False
-        self.env.red_partial_visibility = False
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
+            policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red),
+            config_path='setting1.ini'
         )
-        self.env.reset()
         # self.env()
         self.name = name
         
@@ -151,26 +149,13 @@ class Worker(object):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
                 
-        policy_red_a3c = policy.policy_A3C.PolicyGen(self.env.get_map, self.env.get_team_red, color='red', model_dir=MODEL_PATH)
-        policy_red_roomba = policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
-        policy_red_zeros = policy.zeros.PolicyGen(self.env.get_map, self.env.get_team_red)
-
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                # select red
-                if global_episodes < 2e4:
-                    policy_red = policy_red_zeros
-                elif global_episodes < 5e4:
-                    policy_red = policy_red_roomba
-                else:
-                    policy_red = policy_red_a3c
-                    if total_step % 500*150:
-                        policy_red_a3c.reset_network_weight()
-
-                s0 = self.env.reset(policy_red=policy_red)
-                s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
+                log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
+                s0 = self.env.reset()
+                s0 = one_hot_encoder(self.env.get_obs_blue, self.env.get_team_blue, vision_range)
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
@@ -212,7 +197,7 @@ class Worker(object):
                                               ])
 
                     if total_step % update_frequency == 0 or d:
-                        self.train(trajs, v1)
+                        self.train(trajs, v1, writer, log_on)
                         trajs = [Trajectory(depth=4) for _ in range(num_blue)]
 
                     # Iteration
@@ -232,7 +217,7 @@ class Worker(object):
                 self.sess.run(global_step_next)
                 progbar.update(global_episodes)
 
-                if global_episodes % save_stat_frequency == 0 and global_episodes != 0:
+                if log_on:
                     self.record({
                         'Records/mean_reward': global_rewards(),
                         'Records/mean_length': global_length(),
@@ -250,48 +235,41 @@ class Worker(object):
         writer.add_summary(summary,global_episodes)
         writer.flush()
 
-    def train(self, trajs, bootstrap=0.0):
+    def train(self, trajs, bootstrap=0.0, writer=None, log=False):
+        global global_episodes
         buffer_s, buffer_a, buffer_tdtarget, buffer_adv = [], [], [], []
         for idx, traj in enumerate(trajs):
             if len(traj) == 0:
                 continue
             observations = traj[0]
             actions = traj[1]
-            rewards = np.array(traj[2])
-            values = np.array(traj[3])
-            
-            value_ext = np.append(values, [bootstrap[idx]])
-            td_target  = rewards + gamma * value_ext[1:]
-            advantages = rewards + gamma * value_ext[1:] - value_ext[:-1]
-            advantages = discount_rewards(advantages,gamma)
+
+            td_target, advantages = gae(traj[2], traj[3], bootstrap[idx],
+                    gamma, lambd, normalize=False)
             
             buffer_s.extend(observations)
             buffer_a.extend(actions)
-            buffer_tdtarget.extend(td_target.tolist())
-            buffer_adv.extend(advantages.tolist())
+            buffer_tdtarget.extend(td_target)
+            buffer_adv.extend(advantages)
 
         if len(buffer_s) == 0:
             return
 
-        feed_dict = {
-            self.AC.state_input : np.stack(buffer_s),
-            self.AC.action_ : np.array(buffer_a),
-            self.AC.td_target_ : np.array(buffer_tdtarget),
-            self.AC.advantage_ : np.array(buffer_adv),
-        }
-
         # Update Buffer
-        aloss, closs, etrpy, kl = self.AC.update_global(
+        self.AC.update_global(
             buffer_s,
             buffer_a,
             buffer_tdtarget,
-            buffer_adv
+            buffer_adv,
+            global_episodes,
+            writer,
+            log
         )
 
         # get global parameters to local ActorCritic 
         self.AC.pull_global()
 
-        return# aloss, closs, etrpy
+        return
 
 # ## Run
 # Global Network

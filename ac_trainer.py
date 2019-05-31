@@ -32,7 +32,7 @@ from network.a3c import ActorCritic as AC
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = True;
-TRAIN_NAME='ActorCritic'
+TRAIN_NAME='sepCNN_test'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.5 # gpu capacity in percentage
