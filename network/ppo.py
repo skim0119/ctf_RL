@@ -14,10 +14,10 @@ from utility.utils import store_args
 from network.base import Deep_layer
 from network.pg import Loss, Backpropagation
 
-from network.a3c import ActorCritic
+from network.a3c import ActorCritic, a3c
 
 
-class PPO(ActorCritic):
+class PPO(a3c):
     """Actor Critic Network Implementation for A3C (Tensorflow)
 
     This module provides simplest template for using a3c module prescribed above.

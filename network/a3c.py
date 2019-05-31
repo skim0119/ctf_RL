@@ -36,14 +36,15 @@ class a3c:
         scope,
         lr_actor=1e-4,
         lr_critic=1e-4,
-        entropy_beta=0.001,
+        entropy_beta=0.01,
         sess=None,
         global_network=None,
+        tau=None,
         **kwargs
     ):
         assert sess is not None, "TF Session is not given."
         if global_network is None: # For primary graph, pipe to self
-            global_network = self
+            self.global_network = self
 
         with self.sess.as_default(), self.sess.graph.as_default():
             loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
@@ -53,21 +54,43 @@ class a3c:
                 self._build_placeholder(in_size)
 
                 # get the parameters of actor and critic networks
-                self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
+                self.logits, self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
+
+                self.kl = self._kl_entropy()
 
                 # Local Network
                 train_args = (self.action_, self.advantage_, self.td_target_)
-                loss = loss(self.actor, *train_args, self.critic)
+                loss = loss(self.actor, *train_args, self.critic, entropy_beta=entropy_beta)
                 self.actor_loss, self.critic_loss, self.entropy = loss
 
-                self.pull_op, self.update_ops = backprop(
+                self.pull_op, self.update_ops, gradients = backprop(
                     self.actor_loss, self.critic_loss,
                     self.a_vars, self.c_vars,
-                    global_network.a_vars, global_network.c_vars,
-                    lr_actor, lr_critic
+                    self.global_network.a_vars, self.global_network.c_vars,
+                    lr_actor, lr_critic,
+                    tau,
+                    return_gradient=True
                 )
 
+            # Summary
+            grad_summary = []
+            for tensor, grad in zip(self.a_vars+self.c_vars, gradients):
+                grad_summary.append(tf.summary.histogram("%s-grad" % tensor.name, grad))
+            self.merged_grad_summary_op = tf.summary.merge(grad_summary)
             self.merged_summary_op = self._build_summary(self.a_vars + self.c_vars)
+
+    def _kl_entropy(self):
+        with tf.name_scope('kl_divergence'):
+            target_logits = self.global_network.logits
+
+            a0 = self.logits - tf.reduce_max(self.logits, axis=-1, keepdims=True)
+            a1 = target_logits - tf.reduce_max(target_logits, axis=-1, keepdims=True)
+            ea0 = tf.exp(a0)
+            ea1 = tf.exp(a1)
+            z0 = tf.reduce_sum(ea0, keepdims=True)
+            z1 = tf.reduce_sum(ea1, keepdims=True)
+            p0 = ea0 / z0
+            return tf.reduce_sum(p0 * (a0 - tf.log(z0) - a1 + tf.log(z1)))
 
     def _build_placeholder(self, input_shape):
         self.state_input = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state')
@@ -136,8 +159,7 @@ class a3c:
             critic : [List]
         """
 
-        feed_dict = {self.state_input: states}
-        a_probs, critics = self.sess.run([self.actor, self.critic], feed_dict=feed_dict)
+        a_probs, critics = self.run_sample(states)
         actions = [np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs]
         return actions, critics
 
@@ -145,7 +167,7 @@ class a3c:
         feed_dict = {self.state_input: states}
         return self.sess.run([self.actor, self.critic], feed_dict)
 
-    def update_global(self, state_input, action, td_target, advantage, log=False):
+    def update_global(self, state_input, action, td_target, advantage, writer=None, log=False, return_kl=False):
         """ update_global
 
         Run all update and back-propagation sequence given the necessary inputs.
@@ -170,10 +192,25 @@ class a3c:
         ops = [self.actor_loss, self.critic_loss, self.entropy]
         aloss, closs, entropy = self.sess.run(ops, feed_dict)
 
-        if log:
-            raise NotImplementedError
+        # KL divergence
+        target_feed_dict = {self.global_network.state_input: state_input}
+        kl = self.sess.run(self.kl, {**feed_dict, **target_feed_dict})
 
-        return aloss, closs, entropy
+        if log:
+            feed_dict_global = {self.global_network.state_input: state_input,
+                         self.global_network.action_: action,
+                         self.global_network.td_target_: td_target,
+                         self.global_network.advantage_: advantage}
+            log_ops = [self.global_network.cnn_summary]
+            summary = self.sess.run(log_ops, feed_dict_global)
+            writer.add_summary(summary[0])
+            writer.flush()
+
+        # Returns
+        if return_kl:
+            return aloss, closs, entropy, kl
+        else:
+            return aloss, closs, entropy
 
     def pull_global(self):
         self.sess.run(self.pull_op)
@@ -212,26 +249,29 @@ class ActorCritic(a3c):
         critic_name = self.scope + '/critic'
 
         with tf.variable_scope('actor'):
-            net = Deep_layer.conv2d_pool(
+            net, self.cnn_summary = Deep_layer.conv2d_pool(
                 input_layer=input_hold,
                 channels=[32, 64, 64],
                 kernels=[5, 3, 2],
-                pools=[2, 2, 2],
-                flatten=True
+                pools=[2, 2, 1],
+                flatten=True,
+                return_summary=True
             )
             net = layers.fully_connected(net, 128)
-            actor = layers.fully_connected(
+            logits = layers.fully_connected(
                 net, self.action_size,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
-                activation_fn=tf.nn.softmax)
+                activation_fn=None)
+            actor = tf.nn.softmax(logits)
+
 
         with tf.variable_scope('critic'):
             net = Deep_layer.conv2d_pool(
                 input_layer=input_hold,
                 channels=[32, 64, 64],
                 kernels=[5, 3, 2],
-                pools=[2, 2, 2],
+                pools=[2, 2, 1],
                 flatten=True
             )
             critic = layers.fully_connected(
@@ -244,4 +284,4 @@ class ActorCritic(a3c):
         a_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
-        return actor, critic, a_vars, c_vars
+        return logits, actor, critic, a_vars, c_vars

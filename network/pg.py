@@ -31,14 +31,14 @@ class Loss:
     """
 
     @staticmethod
-    def softmax_cross_entropy_selection(logits, action, reward,
+    def softmax_cross_entropy_selection(policy, action, reward,
                                         td_target, critic,
                                         entropy_beta=0, critic_beta=0,
                                         actor_weight=None, critic_weight=None,
                                         name_scope='loss'):
         with tf.name_scope(name_scope):
             # Entropy
-            entropy = -tf.reduce_mean(logits * Loss._log(logits), name='entropy')
+            entropy = -tf.reduce_mean(policy * Loss._log(policy), name='entropy')
 
             # Critic Loss
             if critic_weight is None:
@@ -49,17 +49,16 @@ class Loss:
 
             # Actor Loss
             if actor_weight is None:
-                action_size = tf.shape(logits)[1]
+                action_size = tf.shape(policy)[1]
                 action_OH = tf.one_hot(action, action_size, dtype=tf.float32)
-                obj_func = Loss._log(tf.reduce_sum(logits * action_OH, 1))
+                obj_func = Loss._log(tf.reduce_sum(policy * action_OH, 1))
                 exp_v = obj_func * reward
                 actor_loss = tf.reduce_mean(-exp_v, name='actor_loss')
             else:
                 raise NotImplementedError
 
             if entropy_beta != 0:
-                raise NotImplementedError
-                # actor_loss += tf.stop_gradient(entropy_beta * entropy)
+                actor_loss = actor_loss - entropy * entropy_beta
             if critic_beta != 0:
                 raise NotImplementedError
                 # actor_loss += tf.stop_gradient(critic_beta * critic_loss)
@@ -68,7 +67,8 @@ class Loss:
 
     @staticmethod
     def _log(val):
-        return tf.log(tf.clip_by_value(val, 1e-10, 100))
+        #return tf.debugging.check_numerics(tf.log(val),'log nan found')
+        return tf.log(tf.clip_by_value(val, 1e-10, 1.0))
 
 
 class Backpropagation:
@@ -78,7 +78,9 @@ class Backpropagation:
                         a_vars, c_vars,
                         a_targ_vars, c_targ_vars,
                         lr_actor, lr_critic,
-                        name_scope='sync'):
+                        tau=None,
+                        name_scope='sync',
+                        return_gradient=False):
         # Sync with Global Network
         with tf.name_scope(name_scope):
             critic_optimizer = tf.train.AdamOptimizer(lr_critic)
@@ -87,6 +89,9 @@ class Backpropagation:
             with tf.name_scope('local_grad'):
                 a_grads = tf.gradients(actor_loss, a_vars)
                 c_grads = tf.gradients(critic_loss, c_vars)
+                if tau is not None:
+                    for val in a_grads + c_grads:
+                        val *= tau
 
             with tf.name_scope('pull'):
                 pull_a_vars_op = [var.assign(value) for var, value in zip(a_vars, a_targ_vars)]
@@ -98,4 +103,6 @@ class Backpropagation:
                 update_c_op = critic_optimizer.apply_gradients(zip(c_grads, c_targ_vars))
                 update_ops = tf.group(update_a_op, update_c_op)
 
+        if return_gradient:
+            return pull_op, update_ops, a_grads+c_grads
         return pull_op, update_ops
