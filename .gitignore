@@ -12,6 +12,7 @@ test_
 eval*
 
 *.swp
+.*.swp
 
 
 # Byte-compiled / optimized / DLL files
