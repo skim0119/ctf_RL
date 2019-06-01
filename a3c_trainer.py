@@ -34,7 +34,7 @@ from network.a3c import ActorCritic as AC
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='a3c_sepCNN_reduced'
+TRAIN_NAME='a3c_ppo'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.5 # gpu capacity in percentage

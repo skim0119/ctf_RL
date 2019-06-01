@@ -17,7 +17,8 @@ import numpy as np
 from utility.utils import store_args
 
 from network.base import Deep_layer
-from network.pg import Loss, Backpropagation
+from network.pg import Backpropagation # , Loss
+from network.ppo import Loss
 
 from network.base import Tensorboard_utility as TB
 
@@ -47,7 +48,8 @@ class a3c:
             self.global_network = self
 
         with self.sess.as_default(), self.sess.graph.as_default():
-            loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
+            #loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
+            loss = kwargs.get('loss', Loss.ppo)
             backprop = kwargs.get('back_prop', Backpropagation.asynch_pipeline)
 
             with tf.variable_scope(scope):
@@ -60,7 +62,8 @@ class a3c:
 
                 # Local Network
                 train_args = (self.action_, self.advantage_, self.td_target_)
-                loss = loss(self.actor, *train_args, self.critic, entropy_beta=entropy_beta)
+                loss = loss(self.actor, self.log_prob, self.global_network.log_prob,
+                        *train_args, self.critic, entropy_beta=entropy_beta)
                 self.actor_loss, self.critic_loss, self.entropy = loss
 
                 self.pull_op, self.update_ops, gradients = backprop(
@@ -181,24 +184,24 @@ class a3c:
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
-                     self.advantage_: advantage}
+                     self.advantage_: advantage,
+                     self.global_network.state_input: state_input,
+                     self.global_network.action_: action,
+                     self.global_network.td_target_: td_target,
+                     self.global_network.advantage_: advantage}
         self.sess.run(self.update_ops, feed_dict)
 
         ops = [self.actor_loss, self.critic_loss, self.entropy]
         aloss, closs, entropy = self.sess.run(ops, feed_dict)
 
         # KL divergence
-        target_feed_dict = {self.global_network.state_input: state_input}
-        kl = self.sess.run(self.kl, {**feed_dict, **target_feed_dict})
+        kl = self.sess.run(self.kl, feed_dict)
 
         if log:
-            feed_dict_global = {self.global_network.state_input: state_input,
-                         self.global_network.action_: action,
-                         self.global_network.td_target_: td_target,
-                         self.global_network.advantage_: advantage}
-            log_ops = [self.global_network.cnn_summary, self.global_network.merged_grad_summary_op,
-                    self.global_network.merged_summary_op]
-            summaries = self.sess.run(log_ops, feed_dict_global)
+            log_ops = [self.global_network.cnn_summary,
+                       self.global_network.merged_grad_summary_op,
+                       self.global_network.merged_summary_op]
+            summaries = self.sess.run(log_ops, feed_dict)
             for summary in summaries:
                 writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
@@ -249,33 +252,34 @@ class ActorCritic(a3c):
         with tf.variable_scope('actor'):
             net = tf.contrib.layers.separable_conv2d(
                 inputs=input_hold,
-                num_outputs=16,
+                num_outputs=32,
                 kernel_size=5,
                 depth_multiplier=1,
             )
             net, self.cnn_summary = Deep_layer.conv2d_pool(
                 input_layer=net,
-                channels=[32, 32],
+                channels=[64, 64],
                 kernels=[3, 2],
-                pools=[1, 1],
+                pools=[2, 2],
                 flatten=True,
                 return_summary=True
             )
-            net = layers.fully_connected(net, 64)
+            net = layers.fully_connected(net, 128)
             logits = layers.fully_connected(
                 net, self.action_size,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
                 activation_fn=None)
             actor = tf.nn.softmax(logits)
+            self.log_prob = tf.nn.log_softmax(logits)
 
 
         with tf.variable_scope('critic'):
             net = Deep_layer.conv2d_pool(
                 input_layer=input_hold,
-                channels=[16, 32, 32],
+                channels=[32, 64, 64],
                 kernels=[5, 3, 2],
-                pools=[1, 1, 1],
+                pools=[2, 2, 2],
                 flatten=True
             )
             critic = layers.fully_connected(
