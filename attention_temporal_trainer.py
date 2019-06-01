@@ -30,7 +30,7 @@ from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 
-from network.a3c_attention import A3C_attention as AC
+from network.a3c_temporal_attention import A3C_attention as AC
 
 from network.base import initialize_uninitialized_vars as iuv
 

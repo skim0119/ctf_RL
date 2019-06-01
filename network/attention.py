@@ -52,6 +52,51 @@ def self_attention(data, hidden_dim, output_dim, residual=True):
 
     return output
 
+def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', summary_adder=None):
+    # data shape : [Batch, H, W, Channel]
+    # output dim : [Batch, H, W, Channel]
+    with tf.variable_scope(name):
+        def scaled_dot_product(Q, K, scaled_=True, masked_=False):
+            # Scaled-dot product
+            attention = tf.matmul(Q, K, transpose_b=True)  # [batch_size, sequence_length, sequence_length]
+
+            if scaled_:
+                d_k = tf.cast(tf.shape(K)[-1], dtype=tf.float32)
+                attention = tf.divide(attention, tf.sqrt(d_k))  # [batch_size, sequence_length, sequence_length]
+
+            if masked_:
+                raise NotImplementedError
+
+            attention = tf.nn.softmax(attention, axis=-1)  # [batch_size, sequence_length, sequence_length]
+            return attention
+
+        nbatch, h, w, output_dim = data.get_shape().as_list()
+        Q = tf.contrib.layers.convolution(data, hidden_dim, 1)
+        Q = tf.reshape(Q, [-1, h*w, hidden_dim])
+
+        if pool:
+            K = tf.contrib.layers.convolution(data, hidden_dim, 1)
+            K = tf.contrib.layers.max_pool2d(K, 2)
+            K = tf.reshape(K, [-1, (h//2)*(w//2), hidden_dim])
+
+            V = tf.contrib.layers.convolution(data, hidden_dim, 1)
+            V = tf.contrib.layers.max_pool2d(V, 2)
+            V = tf.reshape(V, [-1, (h//2)*(w//2), hidden_dim])
+        else:
+            K = tf.contrib.layers.convolution(data, hidden_dim, 1)
+            K = tf.reshape(K, [-1, h*w, hidden_dim])
+
+            V = tf.contrib.layers.convolution(data, hidden_dim, 1)
+            V = tf.reshape(V, [-1, h*w, hidden_dim])
+
+        dot = scaled_dot_product(Q, K)
+        output = tf.matmul(dot, V)  # [batch_size, sequence_length, output_dim]
+        output = tf.reshape(output, [-1,h,w,hidden_dim])
+        output = tf.contrib.layers.convolution(output, output_dim, 1)
+        output = output + data  # Residual
+
+        return output
+
 def non_local_nn(data, hidden_dim, pool=False, name='non_local'):
     # data shape : [Batch, T, H, W, Channel]
     # output dim : [Batch, T, H, W, Channel]

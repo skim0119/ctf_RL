@@ -20,8 +20,9 @@ from network.base import Deep_layer
 from network.pg import Loss, Backpropagation
 
 from network.base import Tensorboard_utility as TB
+from network.base import put_channels_on_grid
 from network.a3c import a3c
-from network.attention import non_local_nn
+from network.attention import non_local_nn_2d
 
 
 class A3C_attention(a3c):
@@ -57,61 +58,56 @@ class A3C_attention(a3c):
             critics.append(critic[0])
         return actions, critics
 
-    def update_global(self, state_input, action, td_target, advantage):
-        """ update_global
-
-        Run all update and back-propagation sequence given the necessary inputs.
-
-        Parameters
-        ----------------
-        log : [bool]
-             logging option
-
-        Returns
-        ----------------
-        aloss : [Double]
-        closs : [Double]
-        entropy : [Double]
-        """
-        # Update main network
-        feed_dict = {self.state_input: state_input,
-                     self.action_: action,
-                     self.td_target_: td_target,
-                     self.advantage_: advantage}
-        self.sess.run(self.update_ops, feed_dict)
-
-        ops = [self.actor_loss, self.critic_loss, self.entropy]
-        aloss, closs, entropy = self.sess.run(ops, feed_dict)
-
-        return aloss, closs, entropy
-
-    def log_all(self, writer, state_input, action, td_target, advantage, global_episodes):
-        feed_dict = {self.state_input: state_input,
-                     self.action_: action,
-                     self.td_target_: td_target,
-                     self.advantage_: advantage}
-        ops = [self.merged_grad_summary_op, self.merged_summary_op]
-        grad_sum, val_sum = self.sess.run(ops, feed_dict)
-
-        writer.add_summary(grad_sum, global_episodes)
-        writer.add_summary(val_sum, global_episodes)
-
     def _build_network(self, input_hold):
         actor_name = self.scope + '/actor'
         critic_name = self.scope + '/critic'
 
+        image_summary = [] 
+        def add_image(net, name):
+            grid = put_channels_on_grid(net[0], -1, 8)
+            image_summary.append(tf.summary.image(name, grid, max_outputs=1))
+
         with tf.variable_scope('actor'):
             net = input_hold
-            net = tf.contrib.layers.convolution(inputs=net, num_outputs=32, kernel_size=(3,3,1))
-            net = non_local_nn(net, 16, pool=True, name='non_local')
+            add_image(net, 'input')
 
-            num_batch, w, t, h, ch = net.get_shape().as_list()  # h as sequence
-            net = tf.reshape(net, [-1, w, t, h*ch])
-
-            net = tf.contrib.layers.convolution(inputs=net, num_outputs=32, stride = 2, kernel_size=3)
+            # Block 1 : Separable CNN
+            net_static = tf.contrib.layers.separable_conv2d(
+                    inputs=net[:,:,:,:3],
+                    num_outputs=24,
+                    kernel_size=3,
+                    depth_multiplier=8,
+                )
+            net_dynamic = tf.contrib.layers.separable_conv2d(
+                    inputs=net[:,:,:,3:],
+                    num_outputs=8,
+                    kernel_size=3,
+                    depth_multiplier=1,
+                )
+            net = tf.stack([net_static, net_dynamic], axis=-1)
+            add_image(net, 'sep_cnn')
             net = tf.contrib.layers.max_pool2d(net, 2)
-            net = tf.contrib.layers.convolution(inputs=net, num_outputs=32, kernel_size=2)
+
+            # Block 2 : Self Attention (with residual connection)
+            net = non_local_nn(net, 16, pool=True, name='non_local', summary_adder=add_image)
+            add_image(net, 'attention')
+
+            # Block 3 : Convolution
+            net = tf.contrib.layers.convolution(inputs=net, num_outputs=64, kernel_size=3)
+            net = tf.contrib.layers.max_pool2d(net, 2)
+            add_image(net, 'conv1')
+
+            net = tf.contrib.layers.convolution(inputs=net, num_outputs=64, kernel_size=2)
+            net = tf.contrib.layers.max_pool2d(net, 2)
+            add_image(net, 'conv2')
+
+            # Block 4 : Softmax Classifier
             net = tf.layers.flatten(net) 
+
+            net= layers.fully_connected(
+                net, 128,
+                weights_initializer=layers.xavier_initializer(),
+                biases_initializer=tf.zeros_initializer())
 
             logits = layers.fully_connected(
                 net, self.action_size,
@@ -122,7 +118,7 @@ class A3C_attention(a3c):
 
         with tf.variable_scope('critic'):
             net = Deep_layer.conv2d_pool(
-                input_layer=input_hold[:,:,:,-1,:],
+                input_layer=input_hold,
                 channels=[32, 64, 64],
                 kernels=[5, 3, 2],
                 pools=[2, 2, 2],
@@ -138,5 +134,7 @@ class A3C_attention(a3c):
 
         a_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
+
+        self.cnn_summary = tf.summary.merge(image_summary)
 
         return logits, actor, critic, a_vars, c_vars

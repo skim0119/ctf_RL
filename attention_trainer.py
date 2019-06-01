@@ -35,10 +35,10 @@ from network.a3c_attention import A3C_attention as AC
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='Temporal_attention'
+TRAIN_NAME='self_att_v1'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.5 # gpu capacity in percentage
+GPU_CAPACITY=0.75 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -74,7 +74,7 @@ config.read('config.ini')
 action_space = 5 
 num_blue = 4
 map_size = 20
-vision_range = 9 
+vision_range = 19 
 
 ## Training
 total_episodes = 1e6
@@ -89,7 +89,7 @@ lr_c = 2e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ') * 4
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
@@ -99,9 +99,8 @@ update_frequency = 64
 # Env Settings
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
-num_sequence = 4
-in_size = [None, vision_dx, vision_dy, num_sequence, nchannel]
-nenv = 8
+in_size = [None, vision_dx, vision_dy, nchannel]
+nenv = 16
 
 # Asynch Settings
 global_scope = 'global'
@@ -130,7 +129,6 @@ class Worker(object):
             map_size=map_size,
             policy_red=policy.zeros.PolicyGen(self.env.get_map, self.env.get_team_red),
             config_path='setting1.ini'
-            #custom_board='board.txt'
         )
         self.name = name
         
@@ -148,35 +146,25 @@ class Worker(object):
 
         self.sess=sess
 
-    def get_action(self, sequence):
-        state = []
-        for seq in sequence:
-            state.append(np.stack(seq[-num_sequence:], axis=-2))
-        stacked_states = np.stack(state)
-        actions, values = self.AC.run_network(stacked_states)
+    def get_action(self, states):
+        actions, values = self.AC.run_network(states)
         return actions, values
 
     def work(self, saver, writer, coord):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
-                
-        #policy_red_a3c = policy.policy_A3C.PolicyGen(self.env.get_map, self.env.get_team_red, color='red', model_dir=MODEL_PATH)
 
+        channel_roll = np.array([0,1,5,2,3,4])
+                
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                # select red
-                #else:
-                #    policy_red = policy_red_a3c
-                #    if total_step % 500*150:
-                #        policy_red_a3c.reset_network_weight()
+                log_on = global_episodes % save_stat_frequency == 0 and global_episode > 0
 
-                state_sequence = [[np.zeros((vision_dx, vision_dy, nchannel)) for _ in range(num_sequence-1)] for _ in range(num_blue)]
                 s0 = self.env.reset()
                 s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
-                for idx, state in enumerate(s0):
-                    state_sequence[idx].append(state)
+                s0 = s0[:,:,:,channel_roll]
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
@@ -188,14 +176,13 @@ class Worker(object):
                 #self.AC.reset_rnn(num_memory=num_blue)
                 
                 # Bootstrap
-                a1, v1 = self.get_action(state_sequence)
+                a1, v1 = self.get_action(s0)
                 for step in range(max_ep+1):
                     a, v0 = a1, v1
                     
                     s1, rc, d, info = self.env.step(a)
                     s1 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
-                    for idx, state in enumerate(s1):
-                        state_sequence[idx].append(state)
+                    s1 = s1[:,:,:,channel_roll]
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
                     r = (rc - prev_r - 0.5)
 
@@ -210,19 +197,19 @@ class Worker(object):
                     if d:
                         v1 = [0.0 for _ in range(num_blue)]
                     else:
-                        a1, v1 = self.get_action(state_sequence)
+                        a1, v1 = self.get_action(s1)
 
                     # push to buffer
                     for idx, agent in enumerate(self.env.get_team_blue):
                         if was_alive[idx]:
-                            trajs[idx].append([np.stack(state_sequence[idx][-num_sequence:], axis=-2),
+                            trajs[idx].append([s0[idx],
                                                a[idx],
                                                r,
                                                v0[idx]
                                               ])
 
                     if total_step % update_frequency == 0 or d:
-                        aloss, closs, entropy = self.train(trajs, v1, writer, global_episodes%save_stat_frequency == 0)
+                        self.train(trajs, v1, writer, log_on)
                         trajs = [Trajectory(depth=4) for _ in range(num_blue)]
 
                     # Iteration
@@ -242,15 +229,12 @@ class Worker(object):
                 self.sess.run(global_step_next)
                 progbar.update(global_episodes)
 
-                if global_episodes % save_stat_frequency == 0 and global_episodes != 0:
+                if log_on:
                     self.record({
                         'Records/mean_reward': global_rewards(),
                         'Records/mean_length': global_length(),
                         'Records/mean_succeed': global_succeed(),
                         'Records/mean_episode_reward': global_ep_rewards(),
-                        'summary/entropy': entropy,
-                        'summary/actor_loss': aloss,
-                        'summary/critic_loss': closs
                     }, writer, ignore_nan=True)
 
                 if global_episodes % save_network_frequency == 0 and global_episodes != 0:
@@ -266,7 +250,7 @@ class Worker(object):
         writer.flush()
 
     def train(self, trajs, bootstrap=0.0, writer=None, log=False):
-        alosses, closses, entropys = [], [], []
+        global global_episodes
         train_counter = 0
         for idx, traj in enumerate(trajs):
             if len(traj) <= 1:
@@ -280,27 +264,22 @@ class Worker(object):
             td_target, advantages = gae(traj[2], traj[3], bootstrap[idx], gamma, lambd, False)
             
             # Update Buffer
-            aloss, closs, entropy = self.AC.update_global(
+            self.AC.update_global(
                     observations,
                     actions,
                     td_target,
-                    advantages
+                    advantages,
+                    global_episodes,
+                    writer,
+                    log=log
                 )
 
             alosses.append(aloss)
             closses.append(closs)
             entropys.append(entropy)
 
-        if log and train_counter > 0:
-            self.AC.log_all(writer, observations, actions, td_target, advantages, global_episodes)
-
         # get global parameters to local ActorCritic 
         self.AC.pull_global()
-
-        if alosses == []:
-            return float('nan'), float('nan'), float('nan')
-        else:
-            return np.mean(alosses), np.mean(closses), np.mean(entropys)
 
 # ## Run
 # Global Network
