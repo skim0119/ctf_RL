@@ -11,6 +11,7 @@ clips/
 test_
 eval*
 
+*.swp
 
 
 # Byte-compiled / optimized / DLL files

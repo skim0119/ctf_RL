@@ -249,19 +249,19 @@ class ActorCritic(a3c):
         with tf.variable_scope('actor'):
             net = tf.contrib.layers.separable_conv2d(
                 inputs=input_hold,
-                num_outputs=32,
+                num_outputs=16,
                 kernel_size=5,
-                depth_multiplier=4,
+                depth_multiplier=1,
             )
             net, self.cnn_summary = Deep_layer.conv2d_pool(
                 input_layer=net,
-                channels=[64, 64],
+                channels=[32, 32],
                 kernels=[3, 2],
-                pools=[2, 1],
+                pools=[1, 1],
                 flatten=True,
                 return_summary=True
             )
-            net = layers.fully_connected(net, 128)
+            net = layers.fully_connected(net, 64)
             logits = layers.fully_connected(
                 net, self.action_size,
                 weights_initializer=layers.xavier_initializer(),
@@ -273,9 +273,9 @@ class ActorCritic(a3c):
         with tf.variable_scope('critic'):
             net = Deep_layer.conv2d_pool(
                 input_layer=input_hold,
-                channels=[32, 64, 64],
+                channels=[16, 32, 32],
                 kernels=[5, 3, 2],
-                pools=[2, 2, 1],
+                pools=[1, 1, 1],
                 flatten=True
             )
             critic = layers.fully_connected(
