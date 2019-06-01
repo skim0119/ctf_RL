@@ -160,7 +160,7 @@ class Worker(object):
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                log_on = global_episodes % save_stat_frequency == 0 and global_episode > 0
+                log_on = global_episodes % save_stat_frequency == 0 and global_episodes > 0
 
                 s0 = self.env.reset()
                 s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
@@ -273,10 +273,6 @@ class Worker(object):
                     writer,
                     log=log
                 )
-
-            alosses.append(aloss)
-            closses.append(closs)
-            entropys.append(entropy)
 
         # get global parameters to local ActorCritic 
         self.AC.pull_global()

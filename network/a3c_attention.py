@@ -63,13 +63,13 @@ class A3C_attention(a3c):
         critic_name = self.scope + '/critic'
 
         image_summary = [] 
-        def add_image(net, name):
-            grid = put_channels_on_grid(net[0], -1, 8)
+        def add_image(net, name, Y=-1, X=8):
+            grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
 
         with tf.variable_scope('actor'):
             net = input_hold
-            add_image(net, 'input')
+            add_image(net, 'input', X=6)
 
             # Block 1 : Separable CNN
             net_static = tf.contrib.layers.separable_conv2d(
@@ -84,12 +84,12 @@ class A3C_attention(a3c):
                     kernel_size=3,
                     depth_multiplier=1,
                 )
-            net = tf.stack([net_static, net_dynamic], axis=-1)
+            net = tf.concat([net_static, net_dynamic], axis=-1)
             add_image(net, 'sep_cnn')
             net = tf.contrib.layers.max_pool2d(net, 2)
 
             # Block 2 : Self Attention (with residual connection)
-            net = non_local_nn(net, 16, pool=True, name='non_local', summary_adder=add_image)
+            net = non_local_nn_2d(net, 16, pool=False, name='non_local', summary_adder=add_image)
             add_image(net, 'attention')
 
             # Block 3 : Convolution
@@ -103,11 +103,6 @@ class A3C_attention(a3c):
 
             # Block 4 : Softmax Classifier
             net = tf.layers.flatten(net) 
-
-            net= layers.fully_connected(
-                net, 128,
-                weights_initializer=layers.xavier_initializer(),
-                biases_initializer=tf.zeros_initializer())
 
             logits = layers.fully_connected(
                 net, self.action_size,

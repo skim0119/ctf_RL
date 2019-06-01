@@ -1,39 +1,70 @@
-""" Proximal Policy Gradient
+""" Policy Gradient Module
 
-Utilized Modules: a3c
+This module contains classes and definition to assist building policy graient model.
+
+Fuctions:
+    build_loss (list:Tensor, list:Tensor, list:Tensor):
+        Returns the actor loss, critic loss, and entropy.
+
+Todo:
+    * Try to use tf.nn.softmax_cross_entropy_with_logits(labels=y_,logits=y)
+    * Try to create general policy gradient module
+    * Autopep8
+    * Docstrings
 
 """
 
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
 
 import numpy as np
 
-from utility.utils import store_args
-
-from network.base import Deep_layer
-from network.pg import Loss, Backpropagation
-
-from network.a3c import ActorCritic, a3c
+from pg import _log
 
 
-class PPO(a3c):
-    """Actor Critic Network Implementation for A3C (Tensorflow)
+class Loss:
+    """Loss
 
-    This module provides simplest template for using a3c module prescribed above.
+    Build function for commonly used loss functions for Policy gradient
+
+    The default is the 'softmax cross-entropy selection' for actor loss and 'TD-difference' for critic error
 
     """
 
-    def __init__(self, in_size, action_size, scope,
-                 lr_actor=1e-4, lr_critic=1e-4,
-                 entropy_beta=0.001,
-                 sess=None, global_network=None):
-        """ Initialize AC network and required parameters """
-        super().__init__(
-            in_size, action_size, scope,
-            lr_actor, lr_critic,
-            entropy_beta, sess, global_network,
-            loss=self._ppo_loss)
+    @staticmethod
+    def ppo(policy, log_prob, old_log_prob,
+            action, advantage,
+            td_target, critic,
+            entropy_beta=0, critic_beta=0,
+            actor_weight=None, critic_weight=None,
+            name_scope='loss'):
+        with tf.name_scope(name_scope):
+            # Entropy
+            entropy = -tf.reduce_mean(policy * _log(policy), name='entropy')
+
+            # Critic Loss
+            if critic_weight is None:
+                td_error = td_target - critic
+                critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
+            else:
+                raise NotImplementedError
+
+            # Actor Loss
+            if actor_weight is None:
+                action_size = tf.shape(policy)[1]
+                action_OH = tf.one_hot(action, action_size, dtype=tf.float32)
+                obj_func = _log(tf.reduce_sum(policy * action_OH, 1))
+                exp_v = obj_func * advantage
+                actor_loss = tf.reduce_mean(-exp_v, name='actor_loss')
+            else:
+                raise NotImplementedError
+
+            if entropy_beta != 0:
+                actor_loss = actor_loss - entropy * entropy_beta
+            if critic_beta != 0:
+                raise NotImplementedError
+                # actor_loss += tf.stop_gradient(critic_beta * critic_loss)
+
+        return actor_loss, critic_loss, entropy
 
     def _ppo_loss(
         self,
@@ -64,21 +95,7 @@ class PPO(a3c):
 
         return actor_loss, critic_loss, entropy
 
-    def update_global(self, state_input, action, td_target, advantage, log=False):
-        feed_dict = {
-            self.state_input: state_input,
-            self.action_: action,
-            self.td_target_: td_target,
-            self.advantage_: advantage,
-            self.global_network.state_input: state_input
-        }
-        self.sess.run(self.update_ops, feed_dict)
-
-        ops = [self.actor_loss, self.critic_loss, self.entropy]
-        aloss, closs, entropy = self.sess.run(ops, feed_dict)
-
-        if log:
-            raise NotImplementedError
-
-        return aloss, closs, entropy
-
+    @staticmethod
+    def _log(val):
+        #return tf.debugging.check_numerics(tf.log(val),'log nan found')
+        return tf.log(tf.clip_by_value(val, 1e-10, 1.0))
