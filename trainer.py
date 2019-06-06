@@ -40,16 +40,17 @@ from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
+from utility.gae import gae
 
-from network.a3c import ActorCritic as AC
+from network.a3c import V1 as AC
 
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='partial'
+TRAIN_NAME='UAV_3v3'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.5 # gpu capacity in percentage
+GPU_CAPACITY=0.7 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -78,16 +79,17 @@ config.read('config.ini')
 
 ## Environment
 action_space = 5 
-num_blue = 4
-num_uav = 2
+num_blue = 2
+num_uav = 1
 map_size = 20
 vision_range = 19 
 
 ## Training
-total_episodes = 2e5
+total_episodes = 1e6
 transition = 5e4
 max_ep = 150
 gamma = 0.98
+lambd = 0.98
 
 lr_a = 5e-5
 lr_c = 2e-4
@@ -99,13 +101,13 @@ moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
 # Local configuration parameters
-update_frequency = 32
+update_frequency = 16
 
 # Env Settings
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
 in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 8
+nenv = 16
 
 # Asynch Settings
 global_scope = 'global'
@@ -130,12 +132,11 @@ class Worker(object):
     def __init__(self, name, global_ac, global_av, sess, global_step=0):
         # Initialize Environment worker
         self.env = gym.make("cap-v0").unwrapped
-        self.env.red_partial_visibility = True
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
+            policy_red=policy.roomba,
+            config_path='setting2.ini'
         )
-        self.env.reset()
         self.name = name
         
         # Create AC Network for Worker
@@ -177,6 +178,7 @@ class Worker(object):
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
+                log_on= global_episodes % save_stat_frequency == 0 and global_episodes != 0
                 # select red
                 s0 = self.env.reset()
                 s0 = one_hot_encoder(
@@ -197,7 +199,7 @@ class Worker(object):
                 for step in range(max_ep+1):
                     a, v0 = a1, v1
                     
-                    s1, rc, d, info = self.env.step(a.tolist())
+                    s1, rc, d, info = self.env.step(a)
                     s1 = one_hot_encoder(
                             self.env._env if global_episodes < transition else self.env.get_obs_blue,
                             self.env.get_team_blue,
@@ -227,8 +229,8 @@ class Worker(object):
                                 trajs_gv[idx-num_uav].append([s0[idx], a[idx], r, v0[idx]])
 
                     if total_step % update_frequency == 0 or d:
-                        self.train(trajs_av, v1[:num_uav], self.AC_av)
-                        self.train(trajs_gv, v1[num_uav:], self.AC)
+                        self.train(trajs_av, v1[:num_uav], self.AC_av, writer, log_on, '(air)')
+                        self.train(trajs_gv, v1[num_uav:], self.AC, writer, log_on, '(ground)')
                         trajs_av = [Trajectory(depth=4) for _ in range(num_uav)]
                         trajs_gv = [Trajectory(depth=4) for _ in range(num_blue)]
 
@@ -249,7 +251,7 @@ class Worker(object):
                 self.sess.run(global_step_next)
                 progbar.update(global_episodes)
 
-                if global_episodes % save_stat_frequency == 0 and global_episodes != 0:
+                if log_on:
                     self.record({
                         'Records/mean_reward': global_rewards(),
                         'Records/mean_length': global_length(),
@@ -267,7 +269,8 @@ class Worker(object):
         writer.add_summary(summary,global_episodes)
         writer.flush()
 
-    def train(self, trajs, bootstrap=0.0, network=None):
+    def train(self, trajs, bootstrap=0.0, network=None, writer=None, log=False, log_tag=''):
+        global global_episodes
         buffer_s, buffer_a, buffer_tdtarget, buffer_adv = [], [], [], []
         for idx, traj in enumerate(trajs):
             if len(traj) == 0:
@@ -290,25 +293,21 @@ class Worker(object):
         if len(buffer_s) == 0:
             return
 
-        feed_dict = {
-            network.state_input : np.stack(buffer_s),
-            network.action_ : np.array(buffer_a),
-            network.td_target_ : np.array(buffer_tdtarget),
-            network.advantage_ : np.array(buffer_adv),
-        }
-
         # Update Buffer
-        aloss, closs, etrpy = network.update_global(
+        network.update_global(
             buffer_s,
             buffer_a,
             buffer_tdtarget,
-            buffer_adv
+            buffer_adv,
+            global_episodes,
+            writer,
+            log,
+            log_tag
         )
 
         # get global parameters to local ActorCritic 
         network.pull_global()
 
-        return# aloss, closs, etrpy
 
 # ## Run
 # Global Network
