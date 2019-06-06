@@ -1,7 +1,10 @@
 import tensorflow as tf
 #import tensorflow.keras.layers as layers
 import tensorflow.contrib.layers as layers
+import tensorflow.keras as keras
 import numpy as np
+
+from math import sqrt
 
 from utility.utils import store_args
 
@@ -34,15 +37,91 @@ def initialize_uninitialized_vars(sess):
         sess.run(tf.variables_initializer(not_initialized_vars))
         print('Initialized all non-initialized variables')
 
+def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):
+
+    '''Visualize conv. features as an image (mostly for the 1st layer).
+    https://gist.github.com/kukuruza/03731dc494603ceab0c5
+    Place kernel into a grid, with some paddings between adjacent filters.
+
+    Args:
+      kernel:            tensor of shape [Y, X, NumChannels, NumKernels]
+      (grid_Y, grid_X):  shape of the grid. Require: NumKernels == grid_Y * grid_X
+                           User is responsible of how to break into two multiples.
+      pad:               number of black pixels around each filter (between them)
+
+    Return:
+      Tensor of shape [(Y+2*pad)*grid_Y, (X+2*pad)*grid_X, NumChannels, 1].
+    '''
+
+
+    kernel = tf.reduce_sum(kernel, axis=2, keepdims=True)
+    if grid_Y == -1:
+        grid_Y = kernel.get_shape()[3] // grid_X
+
+    x_min = tf.reduce_min(kernel)
+    x_max = tf.reduce_max(kernel)
+
+    kernel1 = (kernel - x_min) / (x_max - x_min)
+
+    # pad X and Y
+    x1 = tf.pad(kernel1, tf.constant( [[pad,pad],[pad, pad],[0,0],[0,0]] ), mode = 'CONSTANT')
+
+    # X and Y dimensions, w.r.t. padding
+    Y = kernel1.get_shape()[0] + 2 * pad
+    X = kernel1.get_shape()[1] + 2 * pad
+
+    channels = kernel1.get_shape()[2]
+
+    # put NumKernels to the 1st dimension
+    x2 = tf.transpose(x1, (3, 0, 1, 2))
+    # organize grid on Y axis
+    x3 = tf.reshape(x2, tf.stack([grid_X, Y * grid_Y, X, channels])) #3
+
+    # switch X and Y axes
+    x4 = tf.transpose(x3, (0, 2, 1, 3))
+    # organize grid on X axis
+    x5 = tf.reshape(x4, tf.stack([1, X * grid_X, Y * grid_Y, channels])) #3
+
+    # back to normal order (not combining with the next step for clarity)
+    x6 = tf.transpose(x5, (2, 1, 3, 0))
+
+    # to tf.image_summary order [batch_size, height, width, channels],
+    #   where in this case batch_size == 1
+    x7 = tf.transpose(x6, (3, 0, 1, 2))
+
+    # scale to [0, 255] and convert to uint8
+    return tf.image.convert_image_dtype(x7, dtype = tf.uint8) 
+
+def put_channels_on_grid (image, grid_Y, grid_X, pad = 1):
+    '''
+    Args:
+      image:            tensor of shape [Y, X, NumChannels]
+      (grid_Y, grid_X):  shape of the grid. Require: NumNumChannels == grid_Y * grid_X
+                           User is responsible of how to break into two multiples.
+      pad:               number of black pixels around each filter (between them)
+
+    Return:
+      Tensor of shape [1, (Y+2*pad)*grid_Y, (X+2*pad)*grid_X, 1].
+    '''
+
+    image = tf.expand_dims(image, 2)
+    return put_kernels_on_grid (image, grid_Y, grid_X, pad = pad)
 
 class Deep_layer:
     @staticmethod
     def conv2d_pool(input_layer, channels, kernels, pools=None, strides=None,
-                    activation=tf.nn.relu, padding='SAME', flatten=False, reuse=False):
+                    activation=tf.nn.relu, padding='SAME', flatten=False, reuse=False, return_summary=False):
         assert len(channels) == len(kernels)
         if strides is None:
             strides = [1] * len(channels)
+
+        kernel_summary = []
         net = input_layer
+
+        if return_summary:
+            grid = put_channels_on_grid(net[0], -1, 8)
+            kernel_summary.append(tf.summary.image('input_image', grid, max_outputs=1))
+
         for idx, (ch, kern, pool, stride) in enumerate(zip(channels, kernels, pools, strides)):
             net = layers.conv2d(
                 net, ch, kern, stride,
@@ -54,10 +133,25 @@ class Deep_layer:
                 scope=f'conv_{idx}')
             if pools is not None and pools[idx] > 1:
                 net = layers.max_pool2d(net, pool)
+
+            # kernel summary
+            if return_summary:
+                with tf.variable_scope(f'conv_{idx}'):
+                    tf.get_variable_scope().reuse_variables()
+                    weights = tf.get_variable('weights')
+                    grid = put_kernels_on_grid (weights, -1, 8)
+                    kernel_summary.append(tf.summary.image(f'conv_{idx}/kernels', grid, max_outputs=1))
+                grid = put_channels_on_grid (net[0], -1, 8)
+                kernel_summary.append(tf.summary.image(f'conv_image_{idx}', grid, max_outputs=1))
+
         if flatten:
             net = layers.flatten(net)
-        return net
 
+        if return_summary:
+            return net, tf.summary.merge(kernel_summary)
+
+        return net
+    
     @staticmethod
     def fc(input_layer, hidden_layers, dropout=1.0,
            activation=tf.nn.elu, reuse=False, scope=""):
