@@ -45,7 +45,7 @@ from network.a3c import ActorCritic as AC
 
 from network.base import initialize_uninitialized_vars as iuv
 
-OVERRIDE = True;
+OVERRIDE = False;
 TRAIN_NAME='partial'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
@@ -85,6 +85,7 @@ vision_range = 19
 
 ## Training
 total_episodes = 2e5
+transition = 5e4
 max_ep = 150
 gamma = 0.98
 
@@ -171,27 +172,17 @@ class Worker(object):
     def work(self, saver, writer, coord):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
-                
-        policy_red_roomba = policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
-        policy_red_zeros = policy.zeros.PolicyGen(self.env.get_map, self.env.get_team_red)
 
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
                 # select red
-                if global_episodes < 2e4:
-                    policy_red = policy_red_zeros
-                elif global_episodes < 5e4:
-                    policy_red = policy_red_roomba
-                '''else:
-                    policy_red = policy_red_a3c
-                    if total_step % 500*150:
-                        policy_red_a3c.reset_network_weight()
-                        '''
-
-                s0 = self.env.reset(policy_red=policy_red)
-                s0 = one_hot_encoder(s0, self.env.get_team_blue, vision_range)
+                s0 = self.env.reset()
+                s0 = one_hot_encoder(
+                        self.env._env if global_episodes < transition else self.env.get_obs_blue,
+                        self.env.get_team_blue,
+                        vision_range)
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
@@ -207,7 +198,10 @@ class Worker(object):
                     a, v0 = a1, v1
                     
                     s1, rc, d, info = self.env.step(a.tolist())
-                    s1 = one_hot_encoder(s1, self.env.get_team_blue, vision_range)
+                    s1 = one_hot_encoder(
+                            self.env._env if global_episodes < transition else self.env.get_obs_blue,
+                            self.env.get_team_blue,
+                            vision_range)
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
                     r = (rc - prev_r - 0.5)
 
