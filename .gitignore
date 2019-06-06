@@ -1,3 +1,20 @@
+archive
+archive_*
+logs/
+model/
+render/
+model_archives/
+notebook_archives/
+notebook_archive/
+reference/
+clips/
+test_
+eval*
+
+*.swp
+.*.swp
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
