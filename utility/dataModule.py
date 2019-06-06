@@ -1,6 +1,7 @@
 import numpy as np
 import collections
 import gym_cap.envs.const as CONST
+from gym_cap.envs.const import COLOR_DICT
 
 UNKNOWN = CONST.UNKNOWN            # -1
 TEAM1_BG = CONST.TEAM1_BACKGROUND  # 0
@@ -109,7 +110,7 @@ def state_processor(state, agents=None, vision_radius=19, full_state=None, flatt
     return oh_state, indv_status, shared_status
 
 
-def one_hot_encoder(state, agents=None, vision_radius=9,
+def one_hot_encoder(state, agents=None, vision_radius=19,
                     flatten=False, locs=None):
     """Encoding pipeline for CtF state to one-hot representation
 
@@ -216,61 +217,28 @@ def _decompose_full_state(full_state, reverse=False):
             oh_state[:, :, map_channel[channel]] -= (full_state == channel).astype(np.int32)
 
     return oh_state
-'''
-def no_com_encoder(state, agents=None, vision_radius=9, num_uav=0
-                    flatten=False, locs=None):
-    self.observation_space_blue = np.full_like(self._env, UNKNOWN)
-    for agent in agents[-num_uav:]:
-        # agent dies, loose vision
-        if not agent.isAlive:
-            continue
-        loc = agent.get_loc()
-        for i in range(-agent.range, agent.range + 1):
-            for j in range(-agent.range, agent.range + 1):
-                locx, locy = i + loc[0], j + loc[1]
-                if (i * i + j * j <= agent.range ** 2) and \
-                        not (locx < 0 or locx > self.map_size[0] - 1) and \
-                        not (locy < 0 or locy > self.map_size[1] - 1):
-                    self.observation_space_blue[locx][locy] = self._env[locx][locy]
 
-    vision_lx = 2 * vision_radius + 1
-    vision_ly = 2 * vision_radius + 1
-    oh_state = np.zeros((len(agents), vision_lx, vision_ly, 6), np.float64)
-
-    # team 1 : (1), team 2 : (-1), map elements: (0)
-    map_channel = SIX_MAP_CHANNEL
+def oh_to_rgb(state):
+    # input: [num_agent, width, height, channel]
+    n, w, h, ch = state.shape
+    image = np.full(shape=[n, w, h, 3], fill_value=0, dtype=int)
+    
+    elements = [UNKNOWN, DEAD, TEAM1_BG, TEAM2_BG,
+                 TEAM1_GV, TEAM2_GV, TEAM1_UAV, TEAM2_UAV,
+                 TEAM1_FL, TEAM2_FL, OBSTACLE]
     map_color = {UNKNOWN: 1, DEAD: 0,
                  TEAM1_BG: 0, TEAM2_BG: 1,
                  TEAM1_GV: 1, TEAM2_GV: -1,
                  TEAM1_UAV: 1, TEAM2_UAV: -1,
                  TEAM1_FL: 1, TEAM2_FL: -1,
                  OBSTACLE: 1}
-
-    # Expand the observation with wall to avoid dealing with the boundary
-    sx, sy = state.shape
-    _state = np.full((sx + 2 * vision_radius, sy + 2 * vision_radius), OBSTACLE)
-    _state[vision_radius:vision_radius + sx, vision_radius:vision_radius + sy] = state
-    state = _state
-
-    for idx, agent in enumerate(agents):
-        # Initialize Variables
-        x, y = agent.get_loc()
-        x += vision_radius
-        y += vision_radius
-        vision = state[x - vision_radius:x + vision_radius + 1, y - vision_radius:y + vision_radius + 1]  # extract view
-
-        # FULL MATRIX OPERATION
-        for channel, val in map_color.items():
-            if val == 1:
-                oh_state[idx, :, :, map_channel[channel]] += (vision == channel).astype(np.int32)
-            elif val == -1:
-                oh_state[idx, :, :, map_channel[channel]] -= (vision == channel).astype(np.int32)
-
-    if flatten:
-        return np.reshape(oh_state, (len(agents), -1))
-    else:
-        return oh_state
-        '''
+    
+    for element in elements:
+        channel = SIX_MAP_CHANNEL[element]
+        color = map_color[element]
+        image[state[:,:,:,channel]==color] = np.array(COLOR_DICT[element])
+        
+    return image
 
 def debug():
     """debug

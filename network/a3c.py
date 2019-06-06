@@ -17,11 +17,12 @@ import numpy as np
 from utility.utils import store_args
 
 from network.base import Deep_layer
-from network.pg import Backpropagation # , Loss
-from network.ppo import Loss
+from network.pg import Backpropagation, Loss
 
 from network.base import Tensorboard_utility as TB
 
+from network.base import put_channels_on_grid
+from network.attention import non_local_nn_2d
 
 class a3c:
     """ A3C Module
@@ -48,8 +49,7 @@ class a3c:
             self.global_network = self
 
         with self.sess.as_default(), self.sess.graph.as_default():
-            #loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
-            loss = kwargs.get('loss', Loss.ppo)
+            loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
             backprop = kwargs.get('back_prop', Backpropagation.asynch_pipeline)
 
             with tf.variable_scope(scope):
@@ -62,7 +62,7 @@ class a3c:
 
                 # Local Network
                 train_args = (self.action_, self.advantage_, self.td_target_)
-                loss = loss(self.actor, self.log_prob, self.global_network.log_prob,
+                loss = loss(self.actor,
                         *train_args, self.critic, entropy_beta=entropy_beta)
                 self.actor_loss, self.critic_loss, self.entropy = loss
 
@@ -225,7 +225,6 @@ class a3c:
     def get_vars(self):
         return self.a_vars + self.c_vars
 
-
 class ActorCritic(a3c):
     """Actor Critic Network Implementation for A3C (Tensorflow)
 
@@ -291,5 +290,98 @@ class ActorCritic(a3c):
 
         a_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
+
+        return logits, actor, critic, a_vars, c_vars
+
+class V1(a3c):
+    """Actor Critic Network Implementation for A3C (Tensorflow)
+
+    This module provides simplest template for using a3c module prescribed above.
+
+    """
+
+    def __init__(self, in_size, action_size, scope,
+                 lr_actor=1e-4, lr_critic=1e-4,
+                 entropy_beta=0.01,
+                 sess=None, global_network=None,
+                 **kwargs):
+        """ Initialize AC network and required parameters """
+        super(V1, self).__init__(
+            in_size, action_size, scope,
+            lr_actor, lr_critic,
+            entropy_beta, sess, global_network,
+            **kwargs)
+
+    def _build_network(self, input_hold):
+        actor_name = self.scope + '/actor'
+        critic_name = self.scope + '/critic'
+
+        image_summary = [] 
+        def add_image(net, name, Y=-1, X=8):
+            grid = put_channels_on_grid(net[0], Y, X)
+            image_summary.append(tf.summary.image(name, grid, max_outputs=1))
+
+        with tf.variable_scope('actor'):
+            net = input_hold
+            add_image(net, 'input', X=6)
+
+            # Block 1 : Separable CNN
+            net_static = tf.contrib.layers.separable_conv2d(
+                    inputs=net[:,:,:,:3],
+                    num_outputs=24,
+                    kernel_size=3,
+                    depth_multiplier=8,
+                )
+            net_dynamic = tf.contrib.layers.separable_conv2d(
+                    inputs=net[:,:,:,3:],
+                    num_outputs=8,
+                    kernel_size=3,
+                    depth_multiplier=1,
+                )
+            net = tf.concat([net_static, net_dynamic], axis=-1)
+            add_image(net, 'sep_cnn')
+            net = tf.contrib.layers.max_pool2d(net, 2)
+
+            # Block 3 : Convolution
+            net = tf.contrib.layers.separable_conv2d(inputs=net, num_outputs=64, kernel_size=3, depth_multiplier=2)
+            #net = tf.contrib.layers.convolution(inputs=net, num_outputs=64, kernel_size=3)
+            net = tf.contrib.layers.max_pool2d(net, 2)
+            add_image(net, 'conv1')
+
+            net = tf.contrib.layers.separable_conv2d(inputs=net, num_outputs=64, kernel_size=2)
+            #net = tf.contrib.layers.convolution(inputs=net, num_outputs=64, kernel_size=2)
+            net = tf.contrib.layers.max_pool2d(net, 2)
+            add_image(net, 'conv2')
+
+            # Block 4 : Softmax Classifier
+            net = tf.layers.flatten(net) 
+
+            logits = layers.fully_connected(
+                net, self.action_size,
+                weights_initializer=layers.xavier_initializer(),
+                biases_initializer=tf.zeros_initializer(),
+                activation_fn=None)
+            actor = tf.nn.softmax(logits)
+
+        with tf.variable_scope('critic'):
+            net = Deep_layer.conv2d_pool(
+                input_layer=input_hold,
+                channels=[32, 64, 64],
+                kernels=[5, 3, 2],
+                pools=[2, 2, 2],
+                flatten=True
+            )
+
+            critic = layers.fully_connected(
+                net, 1,
+                weights_initializer=layers.xavier_initializer(),
+                biases_initializer=tf.zeros_initializer(),
+                activation_fn=None)
+            critic = tf.reshape(critic, [-1])
+
+        a_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
+        c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
+
+        self.cnn_summary = tf.summary.merge(image_summary)
 
         return logits, actor, critic, a_vars, c_vars

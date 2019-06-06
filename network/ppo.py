@@ -18,7 +18,7 @@ import tensorflow as tf
 
 import numpy as np
 
-from pg import _log
+from network.pg import Loss as pgLoss
 
 
 class Loss:
@@ -36,10 +36,11 @@ class Loss:
             td_target, critic,
             entropy_beta=0.001, critic_beta=0,
             actor_weight=None, critic_weight=None,
+            eps=0.2,
             name_scope='loss'):
         with tf.name_scope(name_scope):
             # Entropy
-            entropy = -tf.reduce_mean(policy * _log(policy), name='entropy')
+            entropy = -tf.reduce_mean(policy * pgLoss._log(policy), name='entropy')
 
             # Critic Loss
             if critic_weight is None:
@@ -54,7 +55,7 @@ class Loss:
                 action_OH = tf.one_hot(action, action_size, dtype=tf.float32)
 
                 log_prob = tf.reduce_sum(log_prob * action_OH, 1)
-                old_log_prob = tf.reduce_sum(old_log_prob * action_OH, 1)
+                #old_log_prob = tf.reduce_sum(old_log_prob * action_OH, 1)
                 # Clipped surrogate function
                 ratio = log_prob / old_log_prob
                 surrogate = ratio * advantage

@@ -84,6 +84,8 @@ class A3C_attention(a3c):
                     kernel_size=3,
                     depth_multiplier=1,
                 )
+            self.feature_static = net_static
+            self.feature_dynamic = net_dynamic
             net = tf.concat([net_static, net_dynamic], axis=-1)
             add_image(net, 'sep_cnn')
             net = tf.contrib.layers.max_pool2d(net, 2)
@@ -91,6 +93,7 @@ class A3C_attention(a3c):
             # Block 2 : Self Attention (with residual connection)
             net = non_local_nn_2d(net, 16, pool=False, name='non_local', summary_adder=add_image)
             add_image(net, 'attention')
+            self.feature_attention = net
 
             # Block 3 : Convolution
             net = tf.contrib.layers.convolution(inputs=net, num_outputs=64, kernel_size=3)
@@ -131,5 +134,12 @@ class A3C_attention(a3c):
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
         self.cnn_summary = tf.summary.merge(image_summary)
-
+        
+        # Visualization
+        labels = tf.one_hot(self.action_, 5, dtype=tf.float32)
+        yc = tf.reduce_sum(logits * labels, axis=1)
+        self.conv_layer_grad_dynamic = tf.gradients(yc, self.feature_dynamic)[0]
+        self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
+        self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
+            
         return logits, actor, critic, a_vars, c_vars

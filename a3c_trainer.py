@@ -29,12 +29,12 @@ from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 
-from network.a3c import ActorCritic as AC
+from network.a3c import V1 as AC
 
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='a3c_ppo'
+TRAIN_NAME='v1_fullSep'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.5 # gpu capacity in percentage
@@ -88,7 +88,7 @@ moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
 # Local configuration parameters
-update_frequency = 32
+update_frequency = 16
 
 # Env Settings
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -121,7 +121,7 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red),
+            policy_red=policy.zeros,
             config_path='setting1.ini'
         )
         # self.env()
