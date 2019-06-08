@@ -35,7 +35,7 @@ from network.a3c_attention import A3C_attention as AC
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='self_att_v1'
+TRAIN_NAME='self_att_v1_roomba'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.75 # gpu capacity in percentage
@@ -94,7 +94,7 @@ moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
 # Local configuration parameters
-update_frequency = 64
+update_frequency = 32
 
 # Env Settings
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -127,7 +127,7 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.zeros.PolicyGen(self.env.get_map, self.env.get_team_red),
+            policy_red=policy.roomba,
             config_path='setting1.ini'
         )
         self.name = name
