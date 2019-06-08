@@ -35,10 +35,10 @@ from method.attention import A3C_attention as AC
 from method.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='ctf_model_roombaV2'
+TRAIN_NAME = 'golub_scout_a3c'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.75 # gpu capacity in percentage
+GPU_CAPACITY=0.9 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -72,7 +72,6 @@ config.read('config.ini')
 
 ## Environment
 action_space = 5 
-num_blue = 4
 map_size = 20
 vision_range = 19 
 
@@ -127,8 +126,8 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roombaV2,
-            config_path='setting1.ini'
+            policy_red=policy.policy_A3C,
+            config_path='config_scout.ini'
         )
         self.name = name
         
@@ -146,6 +145,12 @@ class Worker(object):
 
         self.sess=sess
 
+    def reward_shape(self, done):
+        if self.env.red_flag:
+            return 1
+        else:
+            return 0
+
     def get_action(self, states):
         actions, values = self.AC.run_network(states)
         return actions, values
@@ -154,48 +159,39 @@ class Worker(object):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
 
-        channel_roll = np.array([0,1,5,2,3,4])
-                
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                log_on = global_episodes % save_stat_frequency == 0 and global_episodes > 0
+                log_on = False # global_episodes % save_stat_frequency == 0 and global_episodes > 0
 
                 s0 = self.env.reset()
                 s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
-                s0 = s0[:,:,:,channel_roll]
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
-                prev_r = 0
                 was_alive = [ag.isAlive for ag in self.env.get_team_blue]
 
-                trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                trajs = [Trajectory(depth=4) for _ in range(self.env.NUM_BLUE)]
 
-                #self.AC.reset_rnn(num_memory=num_blue)
+                #self.AC.reset_rnn(num_memory=self.env.NUM_BLUE)
                 
                 # Bootstrap
                 a1, v1 = self.get_action(s0)
                 for step in range(max_ep+1):
                     a, v0 = a1, v1
                     
-                    s1, rc, d, info = self.env.step(a)
+                    s1, _, d, info = self.env.step(a)
                     s1 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
-                    s1 = s1[:,:,:,channel_roll]
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
-                    r = (rc - prev_r - 0.5)
-
-                    if step == max_ep and d == False:
-                        r = -100
-                        rc = -100
-                        d = True
-
-                    r /= 100.0
+                    r = self.reward_shape(done) - 0.01
                     ep_r += r
 
+                    if step == max_ep:
+                        d = True
+
                     if d:
-                        v1 = [0.0 for _ in range(num_blue)]
+                        v1 = [0.0 for _ in range(self.env.NUM_BLUE)]
                     else:
                         a1, v1 = self.get_action(s1)
 
@@ -210,19 +206,17 @@ class Worker(object):
 
                     if total_step % update_frequency == 0 or d:
                         self.train(trajs, v1, writer, log_on)
-                        trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                        trajs = [Trajectory(depth=4) for _ in range(self.env.NUM_BLUE)]
 
                     # Iteration
-                    prev_r = rc
                     was_alive = is_alive
-                    s0=s1
+                    s0 = s1
                     total_step += 1
 
                     if d:
                         break
                         
                 global_ep_rewards.append(ep_r)
-                global_rewards.append(rc)
                 global_length.append(step)
                 global_succeed.append(self.env.blue_win)
                 global_episodes += 1

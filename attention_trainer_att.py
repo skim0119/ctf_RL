@@ -1,5 +1,6 @@
 import os
 import shutil
+import stat
 import configparser
 
 import signal
@@ -18,7 +19,7 @@ import math
 
 # the modules that you can use to generate the policy. 
 import policy.random
-import policy.roomba
+import policy.roombaV2
 import policy.policy_A3C
 import policy.zeros
 
@@ -27,24 +28,30 @@ from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
+from utility.gae import gae
 
-from network.a3c_self_attention import A3C_attention as AC
+from method.attention import A3C_attention as AC
 
-from network.base import initialize_uninitialized_vars as iuv
+from method.base import initialize_uninitialized_vars as iuv
 
-OVERRIDE = True;
-TRAIN_NAME='self_attention'
+OVERRIDE = False;
+TRAIN_NAME = 'golub_attacker_a3c'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.5 # gpu capacity in percentage
+GPU_CAPACITY=0.75 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
     #  !rm -rf logs/A3C_benchmark/ model/A3C_benchmark
     if os.path.exists(LOG_PATH):
         shutil.rmtree(LOG_PATH,ignore_errors=True)
+        if os.path.exists(LOG_PATH):
+            print('not deleted')
+
     if os.path.exists(MODEL_PATH):
         shutil.rmtree(MODEL_PATH,ignore_errors=True)
+        if os.path.exists(MODEL_PATH):
+            print('not deleted')
 
 # Create model and log directory
 if not os.path.exists(MODEL_PATH):
@@ -65,23 +72,23 @@ config.read('config.ini')
 
 ## Environment
 action_space = 5 
-num_blue = 4
 map_size = 20
 vision_range = 19 
 
 ## Training
-total_episodes = 2e5
+total_episodes = 1e6
 max_ep = config.getint('TRAINING','MAX_STEP')
 critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
 gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
+lambd = 0.98 # GAE constant
 
 lr_a = 5e-5
 lr_c = 2e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ') * 4
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
@@ -92,7 +99,7 @@ update_frequency = 32
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
 in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 8
+nenv = 16
 
 # Asynch Settings
 global_scope = 'global'
@@ -110,7 +117,14 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options, inter_op_parallelism_threads=nenv)
 
 sess = tf.Session(config=config)
-progbar = tf.keras.utils.Progbar(total_episodes,interval=1)
+progbar = tf.keras.utils.Progbar(total_episodes,interval=5)
+
+def reward_shape(prev_red_alive, red_alive, done):
+    # Attack (C/max enemy)
+    num_prev_enemy = sum(prev_red_alive)
+    num_enemy = sum(red_alive)
+    reward = (num_prev_enemy - num_enemy) / 4.0
+    return reward
 
 # ## Worker
 class Worker(object):
@@ -119,9 +133,8 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red),
-            config_path='setting1.ini',
-            custom_board='board.txt'
+            policy_red=policy.policy_A3C,
+            config_path='config_attacker.ini'
         )
         self.name = name
         
@@ -146,51 +159,42 @@ class Worker(object):
     def work(self, saver, writer, coord):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
-                
-        #policy_red_a3c = policy.policy_A3C.PolicyGen(self.env.get_map, self.env.get_team_red, color='red', model_dir=MODEL_PATH)
-        policy_red_roomba = policy.roomba.PolicyGen(self.env.get_map, self.env.get_team_red)
 
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                # select red
-                policy_red = policy_red_roomba
-                #else:
-                #    policy_red = policy_red_a3c
-                #    if total_step % 500*150:
-                #        policy_red_a3c.reset_network_weight()
+                log_on = False # global_episodes % save_stat_frequency == 0 and global_episodes > 0
 
-                s0 = self.env.reset(policy_red=policy_red, custom_board='board.txt')
+                s0 = self.env.reset()
                 s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
-                prev_r = 0
                 was_alive = [ag.isAlive for ag in self.env.get_team_blue]
+                was_alive_red = [ag.isAlive for ag in self.env.get_team_red]
 
-                trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                trajs = [Trajectory(depth=4) for _ in range(self.env.NUM_BLUE)]
 
+                #self.AC.reset_rnn(num_memory=self.env.NUM_BLUE)
+                
                 # Bootstrap
                 a1, v1 = self.get_action(s0)
                 for step in range(max_ep+1):
                     a, v0 = a1, v1
                     
-                    s1, rc, d, info = self.env.step(a)
+                    s1, _, d, info = self.env.step(a)
                     s1 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
-                    r = (rc - prev_r - 0.5)
-
-                    if step == max_ep and d == False:
-                        r = -100
-                        rc = -100
-                        d = True
-
-                    r /= 100.0
+                    is_alive_red = [ag.isAlive for ag in self.env.get_team_red]
+                    r = reward_shape(was_alive_red, is_alive_red, d) - 0.01
                     ep_r += r
 
+                    if step == max_ep:
+                        d = True
+
                     if d:
-                        v1 = [0.0 for _ in range(num_blue)]
+                        v1 = [0.0 for _ in range(self.env.NUM_BLUE)]
                     else:
                         a1, v1 = self.get_action(s1)
 
@@ -204,57 +208,58 @@ class Worker(object):
                                               ])
 
                     if total_step % update_frequency == 0 or d:
-                        self.train(trajs, v1)
-                        trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+                        self.train(trajs, v1, writer, log_on)
+                        trajs = [Trajectory(depth=4) for _ in range(self.env.NUM_BLUE)]
 
                     # Iteration
-                    prev_r = rc
                     was_alive = is_alive
-                    s0=s1
+                    was_alive_red = is_alive_red
+                    s0 = s1
                     total_step += 1
 
                     if d:
                         break
                         
                 global_ep_rewards.append(ep_r)
-                global_rewards.append(rc)
                 global_length.append(step)
                 global_succeed.append(self.env.blue_win)
                 global_episodes += 1
                 self.sess.run(global_step_next)
                 progbar.update(global_episodes)
 
-                if global_episodes % save_stat_frequency == 0 and global_episodes != 0:
+                if log_on:
                     self.record({
                         'Records/mean_reward': global_rewards(),
                         'Records/mean_length': global_length(),
                         'Records/mean_succeed': global_succeed(),
                         'Records/mean_episode_reward': global_ep_rewards(),
-                    }, writer)
-                    
+                    }, writer, ignore_nan=True)
+
                 if global_episodes % save_network_frequency == 0 and global_episodes != 0:
                     saver.save(self.sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
 
-    def record(self, item, writer):
+    def record(self, item, writer, ignore_nan=False):
         summary = tf.Summary()
         for key, value in item.items():
+            if ignore_nan and math.isnan(value):
+                continue
             summary.value.add(tag=key, simple_value=value)
         writer.add_summary(summary,global_episodes)
         writer.flush()
 
-    def train(self, trajs, bootstrap=0.0):
+    def train(self, trajs, bootstrap=0.0, writer=None, log=False):
+        global global_episodes
+        train_counter = 0
         for idx, traj in enumerate(trajs):
             if len(traj) <= 1:
                 continue
+            train_counter += 1
+
             observations = np.stack(traj[0])
             actions = np.array(traj[1])
-            rewards = np.array(traj[2])
-            values = np.array(traj[3])
             
-            value_ext = np.append(values, [bootstrap[idx]])
-            td_target  = rewards + gamma * value_ext[1:]
-            advantages = rewards + gamma * value_ext[1:] - value_ext[:-1]
-            advantages = discount_rewards(advantages,gamma)
+            # GAE
+            td_target, advantages = gae(traj[2], traj[3], bootstrap[idx], gamma, lambd, False)
             
             # Update Buffer
             self.AC.update_global(
@@ -262,13 +267,13 @@ class Worker(object):
                     actions,
                     td_target,
                     advantages,
-                    idx
+                    global_episodes,
+                    writer,
+                    log=log
                 )
 
         # get global parameters to local ActorCritic 
         self.AC.pull_global()
-
-        return# aloss, closs, etrpy
 
 # ## Run
 # Global Network

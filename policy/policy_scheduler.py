@@ -19,6 +19,8 @@ Last Modified:
 import numpy as np
 import tensorflow as tf
 
+import policy.policy_A3C
+
 from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import store_args
 
@@ -40,9 +42,9 @@ class PolicyGen:
     def __init__(self,
                  free_map=None,
                  agent_list=None,
-                 model_dir='./policy/A3C_model/',
+                 model_dir='./model/meta/',
                  input_name='global/state:0',
-                 output_name='global/actor/fully_connected_1/Softmax:0',
+                 output_name='global/actor/Softmax:0',
                  import_scope=None,
                  vision_radius=19,
                  trainable=False,
@@ -80,6 +82,27 @@ class PolicyGen:
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
+        # Subpolicy
+        subpol1 = policy.policy_A3C.PolicyGen(
+                model_dir='./model/golub_attacker_a3c',
+                input_name='global/state:0',
+                output_name='global/actor/Softmax:0',
+                name='attacker'
+            )
+        subpol2 = policy.policy_A3C.PolicyGen(
+                model_dir='./model/golub_scout_a3c',
+                input_name='global/state:0',
+                output_name='global/actor/Softmax:0',
+                name='scout'
+            )
+        subpol3 = policy.policy_A3C.PolicyGen(
+                model_dir='./model/golub_defense_a3c',
+                input_name='global/state:0',
+                output_name='global/actor/Softmax:0',
+                name='defense'
+            )
+        self.subpol = [subpol1, subpol2, subpol3]
+
     def gen_action(self, agent_list, observation, free_map=None, centered_obs=False):
         """Action generation method.
 
@@ -102,17 +125,24 @@ class PolicyGen:
         if not centered_obs:
             observation = one_hot_encoder(state=observation,
                     agents=agent_list, vision_radius=self.vision_radius)
-        logit = self.sess.run(self.action, feed_dict={self.state: observation})  # Action Probability
-        action_out = [np.random.choice(5, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
+        with self.graph.as_default():
+            logit = self.sess.run(self.action, feed_dict={self.state: observation})  # Action Probability
+        option = [np.random.choice(3, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
 
-        return action_out
+        action = []
+        for opt, agent, state in zip(o1, envs.get_team_blue(), states):
+            action = subpol[opt].gen_action([agent], state[np.newaxis,:], centered_obs=True)[0]
 
-    def reset_network_weight(self):
+        return np.array(action)
+
+    def reset_network_weight(self, input_name=None, output_name=None):
         """
         Reload the weight from the TF meta data
         """
-        input_name = self.input_name
-        output_name = self.output_name
+        if input_name is None:
+            input_name = self.input_name
+        if output_name is None:
+            output_name = self.output_name
         with self.sess.graph.as_default():
             ckpt = tf.train.get_checkpoint_state(self.model_dir)
             self.saver.restore(self.sess, ckpt.model_checkpoint_path)

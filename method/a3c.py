@@ -16,12 +16,12 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.base import Deep_layer
-from network.pg import Backpropagation, Loss
+from method.base import Deep_layer
+from method.pg import Backpropagation, Loss
 
-from network.base import Tensorboard_utility as TB
-
-from network.base import put_channels_on_grid
+from method.base import Tensorboard_utility as TB
+from method.base import put_channels_on_grid
+from method.base import initialize_uninitialized_vars as iuv
 from network.attention import non_local_nn_2d
 
 class a3c:
@@ -220,6 +220,20 @@ class a3c:
         var_list = self.get_vars
         init = tf.initializers.variables(var_list)
         self.sess.run(init)
+
+    def initiate(self, saver, model_path):
+        # Restore if savepoint exist. Initialize everything else
+        ckpt = tf.train.get_checkpoint_state(model_path)
+        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+            saver.restore(self.sess, ckpt.model_checkpoint_path)
+            print("Load Model : ", ckpt.model_checkpoint_path)
+            iuv(self.sess)
+        else:
+            self.sess.run(tf.global_variables_initializer())
+            print("Initialized Variables")
+
+    def save(self, saver, model_path, global_step):
+        saver.save(self.sess, model_path, global_step=global_step)
 
     @property
     def get_vars(self):

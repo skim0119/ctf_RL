@@ -52,9 +52,10 @@ def self_attention(data, hidden_dim, output_dim, residual=True):
 
     return output
 
-def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', summary_adder=None):
+def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', return_layers=False):
     # data shape : [Batch, H, W, Channel]
     # output dim : [Batch, H, W, Channel]
+    _layers = {'input': data} # monitoring layer (input, attention, output)
     with tf.variable_scope(name):
         def scaled_dot_product(Q, K, scaled_=True, masked_=False):
             # Scaled-dot product
@@ -93,8 +94,14 @@ def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', summary_adde
         output = tf.matmul(dot, V)  # [batch_size, sequence_length, output_dim]
         output = tf.reshape(output, [-1,h,w,hidden_dim])
         output = tf.contrib.layers.convolution(output, output_dim, 1)
-        output = output + data  # Residual
+        _layers['attention'] = output
 
+        output = output + data  # Residual
+        _layers['output'] = output
+
+    if return_layers:
+        return output, _layers
+    else:
         return output
 
 def non_local_nn(data, hidden_dim, pool=False, name='non_local'):
