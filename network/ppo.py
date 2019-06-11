@@ -40,7 +40,7 @@ class Loss:
     def ppo(policy, log_prob, old_log_prob,
             action, advantage,
             td_target, critic,
-            entropy_beta=0.01, critic_beta=0.5,
+            entropy_beta=0.001, critic_beta=0.5,
             eps=0.2,
             name_scope='loss'):
         with tf.name_scope(name_scope):
