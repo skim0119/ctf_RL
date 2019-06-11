@@ -74,16 +74,16 @@ class A3C_attention(a3c):
             net_static = tf.contrib.layers.separable_conv2d(
                     inputs=net[:,:,:,:3],
                     num_outputs=24,
-                    kernel_size=5,
-                    stride=3,
+                    kernel_size=3,
+                    stride=2,
                     padding='VALID',
                     depth_multiplier=8,
                 )
             net_dynamic = tf.contrib.layers.separable_conv2d(
                     inputs=net[:,:,:,3:],
                     num_outputs=8,
-                    kernel_size=5,
-                    stride=3,
+                    kernel_size=3,
+                    stride=2,
                     padding='VALID',
                     depth_multiplier=1,
                 )
