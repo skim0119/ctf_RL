@@ -1,4 +1,3 @@
-
 #This code is from openai baseline
 #https://github.com/openai/baselines/tree/master/baselines/common/vec_env
 

@@ -45,7 +45,8 @@ class PolicyGen:
 
         self.flag_location = None
         self.enemy_flag_code = 7
-        self.enemy_code = 4 
+        self.enemy_code = 4
+        self.range = 13
 
     def gen_action(self, agent_list, observation, free_map=None):
         """Action generation method.
@@ -93,7 +94,7 @@ class PolicyGen:
         # Expand the observation with wall
         # - in order to avoid dealing with the boundary
         obsx, obsy = obs.shape
-        padding = agent.range
+        padding = self.range
         _obs = np.ones((obsx+2*padding, obsy+2*padding)) * 8
         _obs[padding:obsx+padding, padding:obsy+padding] = obs
         obs = _obs
@@ -113,10 +114,12 @@ class PolicyGen:
         dir_y = [0,-1, 0, 1,  0] # dy for [stay, up, right, down ,left]
         is_possible_to_move = lambda d: obs[x+dir_x[d]][y+dir_y[d]] not in [2,4,8]
         if not is_possible_to_move(action): # Wall or other obstacle
-            action_pool = [0]
-            for movement in range(1,5):
+            action_pool = []
+            for movement in range(5):
                 if is_possible_to_move(movement):
                     action_pool.append(movement)
+            if action_pool == []:
+                action_pool = [0]
             action = np.random.choice(action_pool) # pick from possible movements
 
         # Obtain information based on the vision
@@ -125,7 +128,7 @@ class PolicyGen:
 
         if self.enemy_flag_code in elements: # Flag Found
             # move towards the flag
-            fx, fy = field[self.enemy_flag_code][0] # flag location (coord. of 'view')
+            fx, fy = field.get(self.enemy_flag_code, [0,0])[0] # flag location (coord. of 'view')
             if fy > 2: # move down
                 action = 3
             elif fy < 2: # move up
@@ -134,6 +137,8 @@ class PolicyGen:
                 action = 2
             elif fx < 2: # move right
                 action = 4
+            else:
+                action = 0 # do not move
 
         if np.random.random() <= self.exploration: # Exploration
             action = np.random.randint(1,5)

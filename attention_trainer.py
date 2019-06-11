@@ -19,7 +19,7 @@ import math
 
 # the modules that you can use to generate the policy. 
 import policy.random
-import policy.roomba
+import policy.roombaV2
 import policy.policy_A3C
 import policy.zeros
 
@@ -35,7 +35,7 @@ from network.a3c_attention import A3C_attention as AC
 from network.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='self_att_v1_roomba'
+TRAIN_NAME='v1_roomba_2'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.75 # gpu capacity in percentage
@@ -127,7 +127,7 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.roomba,
+            policy_red=policy.roombaV2,
             config_path='setting1.ini'
         )
         self.name = name

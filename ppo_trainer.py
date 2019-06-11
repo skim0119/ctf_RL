@@ -30,7 +30,7 @@ from utility.buffer import Trajectory
 from utility.gae import gae
 from utility.multiprocessing import SubprocVecEnv
 
-from network.a3c_ppo import PPO as Network
+from network.ppo import PPO as Network
 
 from network.base import initialize_uninitialized_vars as iuv
 
