@@ -54,9 +54,9 @@ class Loss:
             # Actor Loss
             action_size = tf.shape(policy)[1]
             action_OH = tf.one_hot(action, action_size, dtype=tf.float32)
-
             log_prob = tf.reduce_sum(log_prob * action_OH, 1)
-            #old_log_prob = tf.reduce_sum(old_log_prob * action_OH, 1)
+            old_log_prob = tf.reduce_sum(old_log_prob * action_OH, 1)
+
             # Clipped surrogate function
             ratio = log_prob / old_log_prob
             surrogate = ratio * advantage
@@ -97,7 +97,7 @@ class PPO(a3c):
 
             with tf.variable_scope(scope):
                 self._build_placeholder(in_size)
-                self.old_logits_ = tf.placeholder(shape=[None], dtype=tf.float32, name='old_logit_holder')
+                self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_holder')
 
                 # get the parameters of actor and critic networks
                 self.logits, self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
@@ -141,7 +141,6 @@ class PPO(a3c):
         feed_dict = {self.state_input: states}
         a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.logits], feed_dict)
         actions = [np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs]
-        logits = [logit[action] for logit, action in zip(logits, actions)]
         return actions, critics, logits
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
@@ -244,6 +243,7 @@ class PPO(a3c):
                 activation_fn=None)
             actor = tf.nn.softmax(logits)
 
+        # Critic network sharing feature encoder
         with tf.variable_scope('critic'):
             critic = layers.fully_connected(
                 context_net, 1,

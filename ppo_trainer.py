@@ -19,6 +19,7 @@ import math
 # the modules that you can use to generate the policy. 
 import policy.random
 import policy.roomba
+import policy.roombaV2
 import policy.policy_A3C
 import policy.zeros
 
@@ -40,7 +41,6 @@ OVERRIDE = False;
 TRAIN_NAME='v1_ppo'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.5 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -129,7 +129,7 @@ def record( item, writer):
     writer.add_summary(summary,global_episodes)
     writer.flush()
 
-def train(trajs, bootstrap=0.0, epoch=4, batch_size=256, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0.0, epoch=4, batch_size=64, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -248,8 +248,7 @@ while global_episodes < total_episodes:
         if np.all(done):
             break
             
-
-    train(trajs, v1, 4, 256, writer, log_on, global_episodes)
+    train(trajs, v1, 4, 64, writer, log_on, global_episodes)
 
     steps = []
     for env_id in range(nenv):
