@@ -1,7 +1,6 @@
 """
 Attention + sepCNN network for CtF encoder (June 11)
 
-
 Mainly used for:
     A3C
     PPO
@@ -20,25 +19,7 @@ def build_network(input_hold, output_size=128, return_layers=False):
     _layers = {'input': net}
 
     # Block 1 : Separable CNN
-    '''net_static = layers.separable_conv2d(
-            inputs=net[:,:,:,:3],
-            num_outputs=24,
-            kernel_size=3,
-            stride=2,
-            padding='VALID',
-            depth_multiplier=8,
-        )
-    net_dynamic = layers.separable_conv2d(
-            inputs=net[:,:,:,3:],
-            num_outputs=8,
-            kernel_size=3,
-            stride=2,
-            padding='VALID',
-            depth_multiplier=1,
-        )
-    net = tf.concat([net_static, net_dynamic], axis=-1)
-    '''
-    net= layers.separable_conv2d(
+    net = layers.separable_conv2d(
             inputs=net,
             num_outputs=32,
             kernel_size=4,
