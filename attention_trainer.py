@@ -30,12 +30,12 @@ from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 
-from network.a3c_attention import A3C_attention as AC
+from method.attention import A3C_attention as AC
 
-from network.base import initialize_uninitialized_vars as iuv
+from method.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='v1_roomba_2'
+TRAIN_NAME='ctf_model_roombaV2'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.75 # gpu capacity in percentage

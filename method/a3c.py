@@ -16,12 +16,12 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.base import Deep_layer
-from network.pg import Backpropagation, Loss
+from method.base import Deep_layer
+from method.pg import Backpropagation, Loss
 
-from network.base import Tensorboard_utility as TB
+from method.base import Tensorboard_utility as TB
 
-from network.base import put_channels_on_grid
+from method.base import put_channels_on_grid
 from network.attention import non_local_nn_2d
 
 class a3c:

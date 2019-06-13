@@ -31,9 +31,9 @@ from utility.buffer import Trajectory
 from utility.gae import gae
 from utility.multiprocessing import SubprocVecEnv
 
-from network.ppo import PPO as Network
+from method.ppo import PPO as Network
 
-from network.base import initialize_uninitialized_vars as iuv
+from method.base import initialize_uninitialized_vars as iuv
 
 ## Training Setting
 
@@ -77,12 +77,12 @@ entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
 gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd = 0.98
 
-lr_a = 1e-4
+lr_a = 1e-3
 lr_c = 1e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')*4
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 # Env Settings
@@ -90,7 +90,7 @@ vision_range = 19
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
 in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 8
+nenv = 16
 
 global_rewards = MA(moving_average_step)
 global_episode_rewards = MA(moving_average_step)
@@ -130,7 +130,7 @@ def record( item, writer):
     writer.add_summary(summary,global_episodes)
     writer.flush()
 
-def train(trajs, bootstrap=0.0, epoch=4, batch_size=64, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0.0, epoch=2, batch_size=128, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -179,14 +179,6 @@ else:
 
 saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes) # Initial save
 
-
-def encode_state(states, agents):
-    encoded = []
-    agents = np.reshape(agents, [nenv, num_blue])
-    for state, agent in zip(states, agents):
-        encoded.append(one_hot_encoder(state, agent, vision_range))
-    return np.concatenate(encoded, axis=0)
-
 print('Training Initiated:')
 global_episodes = sess.run(global_step) # Reset the counter
 while global_episodes < total_episodes:
@@ -203,11 +195,11 @@ while global_episodes < total_episodes:
     
     # Bootstrap
     s1 = envs.reset()
-    s1 = encode_state(s1, envs.get_team_blue())
     a1, v1, logits1 = network.run_network(s1)
 
 
     # Rollout
+    stime = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a, v0 = a1, v1
@@ -215,7 +207,6 @@ while global_episodes < total_episodes:
         
         a_reshape = np.reshape(a, [nenv, num_blue])
         s1, raw_reward, done, info = envs.step(a_reshape)
-        s1 = encode_state(s1, envs.get_team_blue())
         is_alive = [agent.isAlive for agent in envs.get_team_blue()]
         reward = (raw_reward - prev_rew - 0.1*step)
 
@@ -235,12 +226,7 @@ while global_episodes < total_episodes:
         for idx, agent in enumerate(envs.get_team_blue()):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx],
-                                   a[idx],
-                                   reward[env_idx],
-                                   v0[idx],
-                                   logits[idx]
-                                  ])
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -248,8 +234,13 @@ while global_episodes < total_episodes:
 
         if np.all(done):
             break
+    #print(f'rollout time = {time.time()-stime} sec')
             
-    train(trajs, v1, 4, 64, writer, log_on, global_episodes)
+    stime = time.time()
+    train(trajs, v1, 2, 64, writer, log_on, global_episodes)
+    #print(f'training time = {time.time()-stime} sec')
+    #print('Trajectory: ')
+    #print(f'{len(trajs)} Trajectory, {sum([len(traj) for traj in trajs])} Frames')
 
     steps = []
     for env_id in range(nenv):

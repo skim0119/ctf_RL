@@ -72,31 +72,49 @@ class Backpropagation:
                         lr_actor, lr_critic,
                         tau=None,
                         name_scope='sync',
-                        return_gradient=False):
+                        return_gradient=False,
+                        single_loss=False):
         # Sync with Global Network
         with tf.name_scope(name_scope):
-            critic_optimizer = tf.train.AdamOptimizer(lr_critic)
-            actor_optimizer = tf.train.AdamOptimizer(lr_actor)
+            if single_loss:
+                actor_optimizer = tf.train.AdamOptimizer(lr_actor)
 
-            with tf.name_scope('local_grad'):
-                a_grads = tf.gradients(actor_loss, a_vars)
-                c_grads = tf.gradients(critic_loss, c_vars)
-                if tau is not None:
-                    for val in a_grads + c_grads:
-                        val *= tau
+                with tf.name_scope('local_grad'):
+                    grads = tf.gradients(actor_loss, a_vars)
+                    if tau is not None:
+                        for val in grads:
+                            val *= tau
 
-            with tf.name_scope('pull'):
-                pull_a_vars_op = [var.assign(value) for var, value in zip(a_vars, a_targ_vars)]
-                pull_c_vars_op = [var.assign(value) for var, value in zip(c_vars, c_targ_vars)]
-                pull_op = tf.group(pull_a_vars_op, pull_c_vars_op)
+                with tf.name_scope('pull'):
+                    pull_op = [var.assign(value) for var, value in zip(a_vars, a_targ_vars)]
 
-            with tf.name_scope('push'):
-                update_a_op = actor_optimizer.apply_gradients(zip(a_grads, a_targ_vars))
-                update_c_op = critic_optimizer.apply_gradients(zip(c_grads, c_targ_vars))
-                update_ops = tf.group(update_a_op, update_c_op)
+                with tf.name_scope('push'):
+                    update_ops = actor_optimizer.apply_gradients(zip(grads, a_targ_vars))
+
+            else:
+                critic_optimizer = tf.train.AdamOptimizer(lr_critic)
+                actor_optimizer = tf.train.AdamOptimizer(lr_actor)
+
+                with tf.name_scope('local_grad'):
+                    a_grads = tf.gradients(actor_loss, a_vars)
+                    c_grads = tf.gradients(critic_loss, c_vars)
+                    grads = a_grads + c_grads
+                    if tau is not None:
+                        for val in a_grads + c_grads:
+                            val *= tau
+
+                with tf.name_scope('pull'):
+                    pull_a_vars_op = [var.assign(value) for var, value in zip(a_vars, a_targ_vars)]
+                    pull_c_vars_op = [var.assign(value) for var, value in zip(c_vars, c_targ_vars)]
+                    pull_op = tf.group(pull_a_vars_op, pull_c_vars_op)
+
+                with tf.name_scope('push'):
+                    update_a_op = actor_optimizer.apply_gradients(zip(a_grads, a_targ_vars))
+                    update_c_op = critic_optimizer.apply_gradients(zip(c_grads, c_targ_vars))
+                    update_ops = tf.group(update_a_op, update_c_op)
 
         if return_gradient:
-            return pull_op, update_ops, a_grads+c_grads
+            return pull_op, update_ops, grads
         return pull_op, update_ops
 
     @staticmethod

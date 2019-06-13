@@ -4,6 +4,8 @@
 import numpy as np
 from multiprocessing import Process, Pipe
 
+from utility.dataModule import one_hot_encoder as one_hot_encoder
+
 class CloudpickleWrapper(object):
     """
     Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
@@ -33,9 +35,12 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False):
                     pause = True
                     if continuous:
                         ob = env.reset()
+                        pause = False
+                ob = one_hot_encoder(ob, env.get_team_blue, 19)
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             ob = env.reset()
+            ob = one_hot_encoder(ob, env.get_team_blue, 19)
             pause = False
             remote.send(ob)
         elif cmd == 'get_team_blue':
@@ -84,19 +89,20 @@ class SubprocVecEnv:
         self.observation_space, self.action_space = self.remotes[0].recv()
         self.num_envs = len(env_fns)
 
-    def step(self, actions):
+    def step(self, actions=None):
+        if actions is None: actions = [None]*self.nenvs
         for remote, action in zip(self.remotes, actions):
             remote.send(('step', action))
         self.waiting = True
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
-        return np.stack(obs), np.stack(rews), np.stack(dones), infos
+        return np.concatenate(obs, axis=0), np.stack(rews), np.stack(dones), infos
 
     def reset(self):
         for remote in self.remotes:
             remote.send(('reset', None))
-        return np.stack([remote.recv() for remote in self.remotes])
+        return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
 
     def get_team_blue(self):
         for remote in self.remotes:

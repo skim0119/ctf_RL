@@ -16,11 +16,11 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.base import Deep_layer
-from network.pg import Backpropagation
+from method.base import Deep_layer
+from method.pg import Backpropagation
 
-from network.a3c import a3c
-from network.base import put_channels_on_grid
+from method.a3c import a3c
+from method.base import put_channels_on_grid
 from network.attention import non_local_nn_2d
 
 class Loss:
@@ -221,7 +221,7 @@ class PPO(a3c):
             net = tf.contrib.layers.max_pool2d(net, 2)
 
             # Block 2 : Self Attention (with residual connection)
-            net = non_local_nn_2d(net, 16, pool=False, name='non_local', summary_adder=add_image)
+            net = non_local_nn_2d(net, 16, pool=False, name='non_local')
             add_image(net, 'attention')
 
             # Block 3 : Convolution
