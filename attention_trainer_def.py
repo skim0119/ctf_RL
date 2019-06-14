@@ -35,7 +35,7 @@ from method.attention import A3C_attention as AC
 from method.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME = 'golub_scout_a3c'
+TRAIN_NAME = 'golub_defense_a3c'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.9 # gpu capacity in percentage
@@ -127,7 +127,7 @@ class Worker(object):
         self.env.reset(
             map_size=map_size,
             policy_red=policy.policy_A3C,
-            config_path='config_scout.ini'
+            config_path='config_defense.ini'
         )
         self.name = name
         
@@ -146,8 +146,8 @@ class Worker(object):
         self.sess=sess
 
     def reward_shape(self, done):
-        if self.env.red_flag:
-            return 1
+        if self.env.blue_flag:
+            return -1
         else:
             return 0
 
