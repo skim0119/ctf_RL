@@ -30,6 +30,8 @@ class A3C_attention(a3c):
 
     This module provides simplest template for using a3c module prescribed above.
 
+    Single Optimizer
+
     """
 
     @store_args

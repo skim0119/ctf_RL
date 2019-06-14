@@ -41,7 +41,7 @@ OVERRIDE = False;
 TRAIN_NAME='v1_ppo'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.9
+GPU_CAPACITY=0.75
 
 if OVERRIDE:
     #  Remove and reset log and model directory
