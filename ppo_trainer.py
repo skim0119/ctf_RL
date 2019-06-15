@@ -38,7 +38,7 @@ from method.base import initialize_uninitialized_vars as iuv
 ## Training Setting
 
 OVERRIDE = False;
-TRAIN_NAME='v2_ppo_tmp'
+TRAIN_NAME='v2_ppo_tmp2'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
 GPU_CAPACITY=0.90
@@ -87,7 +87,7 @@ moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 # Env Settings
 vision_range = 19 
-keep_frame = 4
+keep_frame = 2
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6 * keep_frame
 in_size = [None, vision_dx, vision_dy, nchannel]
@@ -218,7 +218,8 @@ while global_episodes < total_episodes:
         episode_rew += reward
 
     
-        a1[is_alive], v1[is_alive], logits1[is_alive] = network.run_network(s1[is_alive])
+        a1, v1, logits1 = network.run_network(s1)
+        #a1[is_alive], v1[is_alive], logits1[is_alive] = network.run_network(s1[is_alive])
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0

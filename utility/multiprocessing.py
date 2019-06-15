@@ -27,7 +27,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
     def append_frame(l:list, obj):
         l.append(obj)
         l.pop(0)
-        assert len(l) == 4
+        assert len(l) == keep_frame
 
     parent_remote.close()
     env = env_fn_wrapper.x()
