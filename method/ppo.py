@@ -143,7 +143,7 @@ class PPO(a3c):
         """
         feed_dict = {self.state_input: states}
         a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.logits], feed_dict)
-        actions = [np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs]
+        actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
         return actions, critics, logits
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):

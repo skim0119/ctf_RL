@@ -38,10 +38,10 @@ from method.base import initialize_uninitialized_vars as iuv
 ## Training Setting
 
 OVERRIDE = False;
-TRAIN_NAME='v1_ppo'
+TRAIN_NAME='v2_ppo_tmp'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.75
+GPU_CAPACITY=0.90
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -82,13 +82,14 @@ lr_c = 1e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')*4
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 # Env Settings
 vision_range = 19 
+keep_frame = 4
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 6
+nchannel = 6 * keep_frame
 in_size = [None, vision_dx, vision_dy, nchannel]
 nenv = 16
 
@@ -101,14 +102,14 @@ global_episodes = 0
 # Environment Setting
 num_blue = 4
 map_size = 20
-policy_red = policy.roomba
+policy_red = policy.roombaV2
 
 def make_env(map_size, policy_red):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy_red,
 	config_path='setting1.ini')
 
 envs = [make_env(map_size, policy_red) for i in range(nenv)]
-envs = SubprocVecEnv(envs)
+envs = SubprocVecEnv(envs, keep_frame)
 action_space = 5
 
 
@@ -130,7 +131,7 @@ def record( item, writer):
     writer.add_summary(summary,global_episodes)
     writer.flush()
 
-def train(trajs, bootstrap=0.0, epoch=2, batch_size=128, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0.0, epoch=3, batch_size=64, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -197,7 +198,6 @@ while global_episodes < total_episodes:
     s1 = envs.reset()
     a1, v1, logits1 = network.run_network(s1)
 
-
     # Rollout
     stime = time.time()
     for step in range(max_ep+1):
@@ -217,7 +217,8 @@ while global_episodes < total_episodes:
         reward /= 100.0
         episode_rew += reward
 
-        a1, v1, logits1 = network.run_network(s1)
+    
+        a1[is_alive], v1[is_alive], logits1[is_alive] = network.run_network(s1[is_alive])
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0

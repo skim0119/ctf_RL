@@ -19,10 +19,19 @@ class CloudpickleWrapper(object):
         import pickle
         self.x = pickle.loads(ob)
 
-def worker(remote, parent_remote, env_fn_wrapper, continuous=False):
+def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1):
     # If continous == True, automatically reset once the game is over.
+    def unstack_frame(frames):
+        s = np.concatenate(frames, axis=3)
+        return s
+    def append_frame(l:list, obj):
+        l.append(obj)
+        l.pop(0)
+        assert len(l) == 4
+
     parent_remote.close()
     env = env_fn_wrapper.x()
+    stacked_frame = []
     pause = False
     while True:
         cmd, data = remote.recv()
@@ -37,11 +46,16 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False):
                         ob = env.reset()
                         pause = False
                 ob = one_hot_encoder(ob, env.get_team_blue, 19)
+                append_frame(stacked_frame, ob)
+                ob = unstack_frame(stacked_frame)
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
-            ob = env.reset()
-            ob = one_hot_encoder(ob, env.get_team_blue, 19)
             pause = False
+            ob = env.reset()
+            static_map = one_hot_encoder(env.get_map, env.get_team_blue, 19)
+            stacked_frame = [np.copy(static_map) for _ in range(keep_frame-1)]
+            stacked_frame.append(one_hot_encoder(ob, env.get_team_blue, 19))
+            ob = unstack_frame(stacked_frame)
             remote.send(ob)
         elif cmd == 'get_team_blue':
             remote.send(env.get_team_blue)
@@ -59,7 +73,7 @@ class SubprocVecEnv:
     """
     Asynchronous Environment Vectorized run
     """
-    def __init__(self, env_fns):
+    def __init__(self, env_fns, keep_frame=1):
         """
         envs: list of gym environments to run in subprocesses
         """
@@ -75,7 +89,7 @@ class SubprocVecEnv:
         self.ps = []
         for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
             self.ps.append(Process(target=worker,
-                args=(work_remote, remote, CloudpickleWrapper(env_fn))) )
+                args=(work_remote, remote, CloudpickleWrapper(env_fn), False, keep_frame) ) )
 
         for p in self.ps:
             p.daemon = True # in case of crasehs, process end
