@@ -18,6 +18,7 @@ Last Modified:
 
 import numpy as np
 import tensorflow as tf
+
 from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import store_args
 
@@ -42,6 +43,8 @@ class PolicyGen:
                  output_name='global/actor/fully_connected_1/Softmax:0',
                  import_scope=None,
                  vision_radius=19,
+                 trainable=False,
+                 name='policy',
                  *args,
                  **kwargs
              ):
@@ -55,12 +58,25 @@ class PolicyGen:
         Initiate session
         """
 
-        # Switches
-        self.full_observation = True
+        # reset_network
+        if not trainable:
+            config = tf.ConfigProto(device_count = {'GPU': 0})  # Only use CPU
 
-        self._reset_done = False
+        ckpt = tf.train.get_checkpoint_state(self.model_dir)
+        if not ckpt or not tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+            raise NameError('Error : Graph is not loaded')
+        # Reset the weight to the newest saved weight.
+        print('Policy using TF pretrained model called:')
+        print('    model path : {}'.format(ckpt.model_checkpoint_path))
+        print('    input_name : {}'.format(input_name))
+        print('    output_name : {}'.format(output_name))
+        self.graph = tf.Graph()
+        self.sess = tf.Session(config=config, graph=self.graph)
+        self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
+        self.state, self.action = self.reset_network_weight()
+        print('    TF policy loaded. {}'.format(name) )
 
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation, free_map=None, centered_obs=False):
         """Action generation method.
 
         This is a required method that generates list of actions corresponding
@@ -78,69 +94,28 @@ class PolicyGen:
             The graph is not updated in this session.
             It only returns action for given input.
         """
-        if not self._reset_done:
-            self.reset_network_weight()
 
-        obs = one_hot_encoder(state=observation,
-                agents=agent_list, vision_radius=self.vision_radius)
-        logit = self.sess.run(self.action, feed_dict={self.state: obs})  # Action Probability
+        if not centered_obs:
+            observation = one_hot_encoder(state=observation,
+                    agents=agent_list, vision_radius=self.vision_radius)
+        logit = self.sess.run(self.action, feed_dict={self.state: observation})  # Action Probability
         action_out = [np.random.choice(5, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
 
         return action_out
 
     def reset_network_weight(self, input_name=None, output_name=None):
-        if not self._reset_done:
-            self.reset_network()
-            self._reset_done = True
-        else:
-            if input_name is None:
-                input_name = self.input_name
-            if output_name is None:
-                output_name = self.output_name
-            ckpt = tf.train.get_checkpoint_state(self.model_dir)
-            with self.sess.graph.as_default():
-                if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-                    saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', import_scope=None, clear_devices=True)
-                    saver.restore(self.sess, ckpt.model_checkpoint_path)
-                else:
-                    raise AssertionError
-
-    def reset_network(self, input_name=None, output_name=None, scope=None):
-        """reset_network
-        Initialize network and TF graph
+        """
+        Reload the weight from the TF meta data
         """
         if input_name is None:
             input_name = self.input_name
-
         if output_name is None:
             output_name = self.output_name
-
-        config = tf.ConfigProto(
-            device_count = {'GPU': 0}
-        )
-
-        # Reset the weight to the newest saved weight.
-        print(f'policy initialization : path {self.model_dir}')
-        ckpt = tf.train.get_checkpoint_state(self.model_dir)
-        print(f'path find: {ckpt.model_checkpoint_path}')
-        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-            print(f'path exist : {ckpt.model_checkpoint_path}')
-            self.graph = tf.Graph()
-            with self.graph.as_default():
-                self.sess = tf.Session(config=config)
-                saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path + '.meta', import_scope=scope, clear_devices=True)
-                saver.restore(self.sess, ckpt.model_checkpoint_path)
-                #print([n.name for n in self.graph.as_graph_def().node])
-
-                self.state = self.graph.get_tensor_by_name(input_name)
-                try:
-                    self.action = self.graph.get_operation_by_name(output_name)
-                except ValueError:
-                    self.action = self.graph.get_tensor_by_name(output_name)
-                    #print([n.name for n in self.graph.as_graph_def().node])
-
-            print('Graph is succesfully loaded.', ckpt.model_checkpoint_path)
-        else:
-            print('Error : Graph is not loaded')
-            raise NameError
-
+        with self.sess.graph.as_default():
+            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+            state = self.graph.get_tensor_by_name(input_name)
+            try:
+                action = self.graph.get_operation_by_name(output_name)
+            except ValueError:
+                action = self.graph.get_tensor_by_name(output_name)
+        return state, action

@@ -240,7 +240,7 @@ class PPO(a3c):
         self.feature_static = _layers['sepCNN1']
         self.feature_dynamic = _layers['attention']
         self.feature_attention = _layers['NLNN']
-        labels = tf.one_hot(self.action_, 5, dtype=tf.float32)
+        labels = tf.one_hot(self.action_, self.action_size, dtype=tf.float32)
         yc = tf.reduce_sum(logits * labels, axis=1)
         self.conv_layer_grad_dynamic = tf.gradients(yc, self.feature_dynamic)[0]
         self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
