@@ -19,6 +19,7 @@ import math
 # the modules that you can use to generate the policy. 
 import policy.policy_A3C
 import policy.policy_scheduler
+import policy.policy_clone
 import policy.roombaV2
 
 # Data Processing Module
@@ -108,7 +109,7 @@ global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, nenv)
 network = Network(in_size=in_size, action_size=action_space, scope='global', sess=sess)
 
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
     
 ckpt = tf.train.get_checkpoint_state(MODEL_PATH)
@@ -202,7 +203,9 @@ def get_action(states):
 
     action = []
     for opt, agent, state in zip(o1, envs.get_team_blue(), states):
-        action = subpol[opt].get_action([agent], state[np.newaxis,:], centered_obs=True)[0]
+        action.append(
+                subpol[opt].gen_action([agent], state[np.newaxis,:], centered_obs=True)[0]
+            )
 
     return o1, v1, logits1, np.array(action)
 

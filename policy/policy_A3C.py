@@ -22,6 +22,8 @@ import tensorflow as tf
 from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import store_args
 
+from method.base import initialize_uninitialized_vars as iuv
+
 
 class PolicyGen:
     """Policy generator class for CtF env.
@@ -72,7 +74,8 @@ class PolicyGen:
         print('    output_name : {}'.format(output_name))
         self.graph = tf.Graph()
         self.sess = tf.Session(config=config, graph=self.graph)
-        self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
+        with self.graph.as_default():
+            self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
@@ -112,6 +115,7 @@ class PolicyGen:
         if output_name is None:
             output_name = self.output_name
         with self.sess.graph.as_default():
+            ckpt = tf.train.get_checkpoint_state(self.model_dir)
             self.saver.restore(self.sess, ckpt.model_checkpoint_path)
             state = self.graph.get_tensor_by_name(input_name)
             try:

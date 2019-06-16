@@ -29,7 +29,6 @@ class Clone:
         load_weight : Load/reload weight to the model.
     """
 
-    @store_args
     def __init__(self, clone=None):
         """Constuctor for policy class.
 

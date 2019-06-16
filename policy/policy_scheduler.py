@@ -24,6 +24,8 @@ import policy.policy_A3C
 from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import store_args
 
+from method.base import initialize_uninitialized_vars as iuv
+
 
 class PolicyGen:
     """Policy generator class for CtF env.
@@ -42,7 +44,7 @@ class PolicyGen:
                  agent_list=None,
                  model_dir='./model/meta/',
                  input_name='global/state:0',
-                 output_name='global/actor/fully_connected_1/Softmax:0',
+                 output_name='global/actor/Softmax:0',
                  import_scope=None,
                  vision_radius=19,
                  trainable=False,
@@ -74,7 +76,8 @@ class PolicyGen:
         print('    output_name : {}'.format(output_name))
         self.graph = tf.Graph()
         self.sess = tf.Session(config=config, graph=self.graph)
-        self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
+        with self.graph.as_default():
+            self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
@@ -121,12 +124,13 @@ class PolicyGen:
         if not centered_obs:
             observation = one_hot_encoder(state=observation,
                     agents=agent_list, vision_radius=self.vision_radius)
-        logit = self.sess.run(self.action, feed_dict={self.state: observation})  # Action Probability
+        with self.graph.as_default():
+            logit = self.sess.run(self.action, feed_dict={self.state: observation})  # Action Probability
         option = [np.random.choice(3, p=logit[x] / sum(logit[x])) for x in range(len(agent_list))]
 
         action = []
         for opt, agent, state in zip(o1, envs.get_team_blue(), states):
-            action = subpol[opt].get_action([agent], state[np.newaxis,:], centered_obs=True)[0]
+            action = subpol[opt].gen_action([agent], state[np.newaxis,:], centered_obs=True)[0]
 
         return np.array(action)
 
@@ -139,6 +143,7 @@ class PolicyGen:
         if output_name is None:
             output_name = self.output_name
         with self.sess.graph.as_default():
+            ckpt = tf.train.get_checkpoint_state(self.model_dir)
             self.saver.restore(self.sess, ckpt.model_checkpoint_path)
             state = self.graph.get_tensor_by_name(input_name)
             try:
