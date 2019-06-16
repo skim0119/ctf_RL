@@ -90,7 +90,7 @@ keep_frame = 1
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6 * keep_frame
 in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 16
+nenv = 2
 
 global_rewards = MA(moving_average_step)
 global_episode_rewards = MA(moving_average_step)
@@ -125,14 +125,16 @@ saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes) # I
 
 ##### Environment Setting
 map_size = 20
-meta_red = policy.policy_scheduler.PolicyGen()
-policy_red = policy.policy_clone.Clone(meta_red.gen_action)
+#meta_red = policy.policy_scheduler.PolicyGen()
+#policy_red = policy.policy_clone.Clone(meta_red.gen_action)
+#meta_red = policy.policy_scheduler
+meta_red = policy.roombaV2
 
 def make_env(map_size, policy_red):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy_red,
 	config_path='setting1.ini')
 
-envs = [make_env(map_size, policy_red) for i in range(nenv)]
+envs = [make_env(map_size, meta_red) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue())//nenv
 
@@ -201,13 +203,12 @@ subpol = [subpol1, subpol2, subpol3]
 def get_action(states):
     o1, v1, logits1 = network.run_network(states)
 
-    action = []
+    actions = []
     for opt, agent, state in zip(o1, envs.get_team_blue(), states):
-        action.append(
-                subpol[opt].gen_action([agent], state[np.newaxis,:], centered_obs=True)[0]
-            )
+        action = subpol[opt].gen_action([agent], state[np.newaxis,:], centered_obs=True)[0]
+        actions.append(action)
 
-    return o1, v1, logits1, np.array(action)
+    return o1, v1, logits1, np.array(actions)
 
 ##### Run
 print('Training Initiated:')
@@ -294,5 +295,5 @@ while global_episodes < total_episodes:
     if save_on:
         saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
 
-    if red_update:
-        meta_red.reset_network_weight()
+    #if red_update:
+        #meta_red.reset_network_weight()

@@ -78,6 +78,7 @@ class PolicyGen:
         self.sess = tf.Session(config=config, graph=self.graph)
         with self.graph.as_default():
             self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
+            iuv(self.sess)
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
