@@ -131,7 +131,7 @@ map_size = 20
 meta_red = policy.roombaV2
 
 def make_env(map_size, policy_red):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy_red,
+    return lambda: gym.make('cap-v0', map_size=map_size,
 	config_path='setting1.ini')
 
 envs = [make_env(map_size, meta_red) for i in range(nenv)]

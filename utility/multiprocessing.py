@@ -35,11 +35,14 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
     pause = False
     while True:
         cmd, data = remote.recv()
-        if cmd == 'step':
+        if cmd == 'step' or cmd == 'step_with_red':
+            if cmd == 'step_with_red':
+                red_action = data[1]
+                data = data[0]
             if pause:
                 remote.send((ob, reward, done, info))
             else:
-                ob, reward, done, info = env.step(data)
+                ob, reward, done, info = env.step(data, override_red_action=red_action)
                 if done:
                     pause = True
                     if continuous:
@@ -59,6 +62,8 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
             remote.send(ob)
         elif cmd == 'get_team_blue':
             remote.send(env.get_team_blue)
+        elif cmd == 'get_team_red':
+            remote.send(env.get_team_red)
         elif cmd == 'blue_win':
             remote.send(env.blue_win)
         elif cmd == 'blue_flag':
@@ -68,6 +73,8 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
             break
         elif cmd == 'get_spaces':
             remote.send((env.observation_space, env.action_space))
+        elif cmd == 'get_full_state':
+            remote.send(env.get_full_state)
         else:
             raise NotImplementedError(f'command {cmd} is not found')
 
@@ -105,10 +112,14 @@ class SubprocVecEnv:
         self.observation_space, self.action_space = self.remotes[0].recv()
         self.num_envs = len(env_fns)
 
-    def step(self, actions=None):
+    def step(self, actions=None, red_actions=None):
         if actions is None: actions = [None]*self.nenvs
-        for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+        if red_actions is None: red_actions = [None]*self.nenvs
+        for remote, action, red_action in zip(self.remotes, actions, red_actions):
+            if red_action is None:
+                remote.send(('step', action))
+            else:
+                remote.send(('step_with_red', (action, red_action)))
         self.waiting = True
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
@@ -119,11 +130,22 @@ class SubprocVecEnv:
         for remote in self.remotes:
             remote.send(('reset', None))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
+    
+    def get_full_state(self):
+        for remote in self.remotes:
+            remote.send(('get_full_state', None))
+        return np.stack([remote.recv() for remote in self.remotes]).tolist()
 
     def get_team_blue(self):
         for remote in self.remotes:
             remote.send(('get_team_blue', None))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=None).tolist()
+
+    def get_team_red(self):
+        for remote in self.remotes:
+            remote.send(('get_team_red', None))
+        return np.concatenate([remote.recv() for remote in self.remotes], axis=None).tolist()
+
 
     def blue_win(self):
         for remote in self.remotes:
