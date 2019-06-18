@@ -1,3 +1,10 @@
+'''
+- Self-play
+- Flat
+- PPO
+- No UAV
+'''
+
 import os
 import shutil
 import configparser
@@ -20,32 +27,30 @@ import math
 import policy.random
 import policy.roomba
 import policy.roombaV2
-import policy.policy_A3C
 import policy.zeros
 
 # Data Processing Module
-from utility.dataModule import one_hot_encoder as one_hot_encoder
+from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage as MA
-from utility.utils import Experience_buffer, discount_rewards
+from utility.utils import discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 from utility.multiprocessing import SubprocVecEnv
+from utility.RL_Wrapper import TrainedNetwork
 
 from method.ppo import PPO as Network
 
 from method.base import initialize_uninitialized_vars as iuv
 
-## Training Setting
-
+## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME='v2_ppo_tmp2'
-LOG_PATH='./logs/'+TRAIN_NAME
-MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.90
+TRAIN_NAME = 'ppo_flat'
+LOG_PATH = './logs/'+TRAIN_NAME
+MODEL_PATH = './model/' + TRAIN_NAME
+GPU_CAPACITY = 0.90
 
 if OVERRIDE:
     #  Remove and reset log and model directory
-    #  !rm -rf logs/A3C_benchmark/ model/A3C_benchmark
     if os.path.exists(LOG_PATH):
         shutil.rmtree(LOG_PATH,ignore_errors=True)
     if os.path.exists(MODEL_PATH):
@@ -63,75 +68,83 @@ if not os.path.exists(LOG_PATH):
     except OSError:
         raise OSError(f'Creation of the directory {LOG_PATH} failed')
 
-## Hyperparameters
-# Importing global configuration
+## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+# Training
+total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
+max_ep = config.getint('TRAINING', 'MAX_STEP')
 
-## Training
-total_episodes = 1e6
-max_ep = config.getint('TRAINING','MAX_STEP')
+gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
+lambd = config.getfloat('TRAINING', 'GAE_LAMBDA')
+ppo_e = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
-gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd = 0.98
 
-lr_a = 1e-3
-lr_c = 1e-4
+lr_a = config.getfloat('TRAINING', 'LR_ACTOR')
+lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
 
-## Save/Summary
-save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')*4
-moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
+# Log Setting
+save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
+save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
-# Env Settings
-vision_range = 19 
-keep_frame = 2
+# Environment/Policy Settings
+action_space = config.getint('DEFAULT', 'ACTION_SPACE')
+vision_range = config.getint('DEFAULT', 'VISION_RANGE')
+keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
+map_size = config.getint('DEFAULT', 'MAP_SIZE')
+nenv = config.getint('DEFAULT', 'NUM_ENV')
+
+## PPO Batch Replay Settings
+minibatch_size = 128
+epoch = 4
+selfplay_reload = 2048
+
+## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6 * keep_frame
-in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 16
+input_size = [None, vision_dx, vision_dy, nchannel]
 
+
+## Logger Initialization 
 global_rewards = MA(moving_average_step)
 global_episode_rewards = MA(moving_average_step)
 global_length = MA(moving_average_step)
 global_succeed = MA(moving_average_step)
 global_episodes = 0
 
-# Environment Setting
-num_blue = 4
-map_size = 20
-policy_red = policy.roombaV2
+## Environment Initialization
+def make_env(map_size):
+    return lambda: gym.make('cap-v0', map_size=map_size,
+	config_path='setting_ppo_flat.ini')
 
-def make_env(map_size, policy_red):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy_red,
-	config_path='setting1.ini')
-
-envs = [make_env(map_size, policy_red) for i in range(nenv)]
+envs = [make_env(map_size) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
-action_space = 5
+num_blue = len(envs.get_team_blue()[0])
+num_red = len(envs.get_team_red()[0])
 
-
-# Launch the session and create Graph
+## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, inter_op_parallelism_threads=nenv)
+config = tf.ConfigProto(gpu_options=gpu_options)
 
 sess = tf.Session(config=config)
 progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, nenv)
-network = Network(in_size=in_size, action_size=action_space, scope='global', sess=sess)
+network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess)
 
-def record( item, writer):
+def record(item, writer, step):
     summary = tf.Summary()
     for key, value in item.items():
         summary.value.add(tag=key, simple_value=value)
-    writer.add_summary(summary,global_episodes)
+    writer.add_summary(summary, step)
     writer.flush()
 
-def train(trajs, bootstrap=0.0, epoch=3, batch_size=64, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -177,26 +190,47 @@ if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
 else:
     sess.run(tf.global_variables_initializer())
     print("Initialized Variables")
+global_episodes = sess.run(global_step) # Reset the counter
 
 saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes) # Initial save
 
+# Red Policy (selfplay)
+red_policy = TrainedNetwork(
+            model_path=MODEL_PATH,
+            input_tensor='main/state:0',
+            output_tensor='main/actor/Softmax:0'
+        )
+
 print('Training Initiated:')
-global_episodes = sess.run(global_step) # Reset the counter
+def get_action(states):
+    states = states.reshape([nenv, num_blue+num_red]+input_size[1:])
+    blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
+    red_s = states[:,-num_red:,:].reshape([nenv*num_red]+input_size[1:])
+    a1, v1, logits1 = network.run_network(blue_s)
+    rprob = red_policy.run_network(red_s)
+    ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
+    actions = np.concatenate([
+            np.reshape(a1, [nenv, num_blue]),
+            np.reshape(ra, [nenv, num_red])], axis=1)  # Concatenate blue and red action
+    return a1, v1, logits1, actions
+
 while global_episodes < total_episodes:
     log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
+    log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
     save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
+    reload_on = global_episodes % selfplay_reload == 0 and global_episodes != 0
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
     prev_rew = np.zeros(nenv)
-    was_alive = [True for agent in envs.get_team_blue()]
+    was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(nenv)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
     s1 = envs.reset()
-    a1, v1, logits1 = network.run_network(s1)
+    a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
     stime = time.time()
@@ -205,9 +239,8 @@ while global_episodes < total_episodes:
         a, v0 = a1, v1
         logits = logits1
         
-        a_reshape = np.reshape(a, [nenv, num_blue])
-        s1, raw_reward, done, info = envs.step(a_reshape)
-        is_alive = [agent.isAlive for agent in envs.get_team_blue()]
+        s1, raw_reward, done, info = envs.step(actions)
+        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         reward = (raw_reward - prev_rew - 0.1*step)
 
         if step == max_ep:
@@ -218,14 +251,13 @@ while global_episodes < total_episodes:
         episode_rew += reward
 
     
-        a1, v1, logits1 = network.run_network(s1)
-        #a1[is_alive], v1[is_alive], logits1[is_alive] = network.run_network(s1[is_alive])
+        a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
         # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue()):
+        for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
                 trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
@@ -236,13 +268,13 @@ while global_episodes < total_episodes:
 
         if np.all(done):
             break
-    #print(f'rollout time = {time.time()-stime} sec')
+    if log_on: print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
-    train(trajs, v1, 2, 64, writer, log_on, global_episodes)
-    #print(f'training time = {time.time()-stime} sec')
-    #print('Trajectory: ')
-    #print(f'{len(trajs)} Trajectory, {sum([len(traj) for traj in trajs])} Frames')
+    train(trajs, v1, 2, 64, writer, log_image_on, global_episodes)
+    if log_on: print(f'training time = {time.time()-stime} sec')
+    if log_on: print('Trajectory: ')
+    if log_on: print(f'{len(trajs)} Trajectory, {sum([len(traj) for traj in trajs])} Frames')
 
     steps = []
     for env_id in range(nenv):
@@ -254,7 +286,7 @@ while global_episodes < total_episodes:
 
     global_episodes += nenv
     sess.run(global_step_next)
-    progbar.update(global_episodes)
+    # progbar.update(global_episodes)
 
     if log_on:
         record({
@@ -262,7 +294,10 @@ while global_episodes < total_episodes:
             'Records/mean_length': global_length(),
             'Records/mean_succeed': global_succeed(),
             'Records/mean_episode_reward': global_episode_rewards(),
-        }, writer)
+        }, writer, global_episodes)
         
     if save_on:
         saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
+
+    if reload_on:
+        red_policy.reset_network_weight()

@@ -31,33 +31,40 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
 
     parent_remote.close()
     env = env_fn_wrapper.x()
+
+    ctrl_red = env.CONTROL_ALL # If CONTROL_ALL, concat red's view
     stacked_frame = []
     pause = False
+
     while True:
         cmd, data = remote.recv()
-        if cmd == 'step' or cmd == 'step_with_red':
-            if cmd == 'step_with_red':
-                red_action = data[1]
-                data = data[0]
+        if cmd == 'step':
             if pause:
                 remote.send((ob, reward, done, info))
             else:
-                ob, reward, done, info = env.step(data, override_red_action=red_action)
+                ob, reward, done, info = env.step(data)
                 if done:
                     pause = True
                     if continuous:
                         ob = env.reset()
                         pause = False
-                ob = one_hot_encoder(ob, env.get_team_blue, 19)
+                ob = one_hot_encoder(ob, env.get_team_blue)
+                if ctrl_red:
+                    rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
+                    ob = np.concatenate([ob, rob], axis=0)
                 append_frame(stacked_frame, ob)
                 ob = unstack_frame(stacked_frame)
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             pause = False
-            ob = env.reset()
-            static_map = one_hot_encoder(env.get_map, env.get_team_blue, 19)
-            stacked_frame = [np.copy(static_map) for _ in range(keep_frame-1)]
-            stacked_frame.append(one_hot_encoder(ob, env.get_team_blue, 19))
+            env.reset()
+            ob = one_hot_encoder(env.get_obs_blue, env.get_team_blue)
+            if ctrl_red:
+                rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
+                initial_map = np.concatenate([ob, rob], axis=0)
+            else:
+                initial_map = ob
+            stacked_frame = [np.copy(initial_map) for _ in range(keep_frame)]
             ob = unstack_frame(stacked_frame)
             remote.send(ob)
         elif cmd == 'get_team_blue':
@@ -112,14 +119,10 @@ class SubprocVecEnv:
         self.observation_space, self.action_space = self.remotes[0].recv()
         self.num_envs = len(env_fns)
 
-    def step(self, actions=None, red_actions=None):
+    def step(self, actions=None):
         if actions is None: actions = [None]*self.nenvs
-        if red_actions is None: red_actions = [None]*self.nenvs
-        for remote, action, red_action in zip(self.remotes, actions, red_actions):
-            if red_action is None:
-                remote.send(('step', action))
-            else:
-                remote.send(('step_with_red', (action, red_action)))
+        for remote, action in zip(self.remotes, actions):
+            remote.send(('step', action))
         self.waiting = True
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
@@ -139,23 +142,23 @@ class SubprocVecEnv:
     def get_team_blue(self):
         for remote in self.remotes:
             remote.send(('get_team_blue', None))
+        return np.stack([remote.recv() for remote in self.remotes])
         return np.concatenate([remote.recv() for remote in self.remotes], axis=None).tolist()
 
     def get_team_red(self):
         for remote in self.remotes:
             remote.send(('get_team_red', None))
-        return np.concatenate([remote.recv() for remote in self.remotes], axis=None).tolist()
-
+        return np.stack([remote.recv() for remote in self.remotes])
 
     def blue_win(self):
         for remote in self.remotes:
             remote.send(('blue_win', None))
-        return np.stack([remote.recv() for remote in self.remotes]).tolist()
+        return np.stack([remote.recv() for remote in self.remotes])
 
     def blue_flag(self):
         for remote in self.remotes:
             remote.send(('blue_flag', None))
-        return np.stack([remote.recv() for remote in self.remotes]).tolist()
+        return np.stack([remote.recv() for remote in self.remotes])
 
     def close(self):
         """

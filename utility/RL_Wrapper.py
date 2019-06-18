@@ -117,7 +117,7 @@ class TrainedNetwork:
         self,
         model_path=None,
         input_tensor='global/state:0',
-        output_tensor='global/actor/fully_connected_1/Softmax:0',
+        output_tensor='global/actor/Softmax:0',
         name=None,
         sess=None,
         *args,
@@ -125,8 +125,8 @@ class TrainedNetwork:
     ):
         # Assertions
         assert model_path is not None, 'model path is not specified'
-        assert sess is not None and name is None, 'If pre-defiend session is used, must provide name of this network'
-        assert name == 'global', 'Model name cannot be global'
+        if sess is not None: assert name is not None, 'If pre-defiend session is used, must provide name of this network'
+        assert name != 'global', 'Model name cannot be global'
        
         # Presets
         if name is not None:
@@ -141,8 +141,8 @@ class TrainedNetwork:
             print('Checkpoint Found.')
             print('Call TF pretrained model:')
             print('    checkpoint_path : {}'.format(ckpt.model_checkpoint_path))
-            print('    input_name : {}'.format(input_name))
-            print('    output_name : {}'.format(output_name))
+            print('    input_name : {}'.format(input_tensor))
+            print('    output_name : {}'.format(output_tensor))
 
         # Set TF graph and session
         if sess is None:
@@ -159,7 +159,6 @@ class TrainedNetwork:
                     clear_devices=True,
                     import_scope=name,
                 )
-            iuv(self.sess)  # Initialize all undefined weights
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
@@ -174,15 +173,13 @@ class TrainedNetwork:
         """
         Reload the weight from the TF meta data
         """
-        input_name = self.input_name
-        output_name = self.output_name
         with self.sess.graph.as_default():
-            ckpt = tf.train.get_checkpoint_state(self.model_dir)
+            ckpt = tf.train.get_checkpoint_state(self.model_path)
             self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-            state = self.graph.get_tensor_by_name(input_name)
+            state = self.graph.get_tensor_by_name(self.input_tensor)
             try:
-                action = self.graph.get_operation_by_name(output_name)
+                action = self.graph.get_operation_by_name(self.output_tensor)
             except ValueError:
-                action = self.graph.get_tensor_by_name(output_name)
+                action = self.graph.get_tensor_by_name(self.output_tensor)
         return state, action
 

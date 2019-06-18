@@ -107,14 +107,12 @@ class PolicyGen:
 
         return action_out
 
-    def reset_network_weight(self, input_name=None, output_name=None):
+    def reset_network_weight(self):
         """
         Reload the weight from the TF meta data
         """
-        if input_name is None:
-            input_name = self.input_name
-        if output_name is None:
-            output_name = self.output_name
+        input_name = self.input_name
+        output_name = self.output_name
         with self.sess.graph.as_default():
             ckpt = tf.train.get_checkpoint_state(self.model_dir)
             self.saver.restore(self.sess, ckpt.model_checkpoint_path)
