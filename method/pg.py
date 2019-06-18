@@ -77,6 +77,7 @@ class Backpropagation:
         # Sync with Global Network
         with tf.name_scope(name_scope):
             if single_loss:
+                # Unly use actor
                 actor_optimizer = tf.train.AdamOptimizer(lr_actor)
 
                 with tf.name_scope('local_grad'):

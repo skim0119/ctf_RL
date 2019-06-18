@@ -9,6 +9,7 @@
 import os
 import shutil
 import configparser
+import sys
 
 import signal
 import threading
@@ -39,9 +40,14 @@ from utility.gae import gae
 from utility.multiprocessing import SubprocVecEnv
 from utility.RL_Wrapper import TrainedNetwork
 
-from method.ppo import PPO_ as Network
+from method.ppo import PPO_multimodes as Network
 
 from method.base import initialize_uninitialized_vars as iuv
+
+MODE = int(sys.argv[-1])
+assert MODE in [1,2,3]
+num_mode = 3
+MODE_NAME = ['attack', 'scout', 'defense'][MODE]
 
 ## Training Directory Reset
 OVERRIDE = False;
@@ -101,8 +107,8 @@ nenv = config.getint('DEFAULT', 'NUM_ENV')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
-epoch = 4
-selfplay_reload = 2048
+epoch = 2
+selfplay_reload = 8192
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -110,16 +116,16 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
-global_rewards = MA(moving_average_step)
 global_episode_rewards = MA(moving_average_step)
 global_length = MA(moving_average_step)
 global_succeed = MA(moving_average_step)
 global_episodes = 0
 
 ## Environment Initialization
+setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path='setting_ppo_flat.ini')
+	config_path=setting_paths[MODE])
 
 envs = [make_env(map_size) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
@@ -135,7 +141,7 @@ progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, nenv)
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess)
+network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode)
 
 def record(item, writer, step):
     summary = tf.Summary()
@@ -176,7 +182,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
                     np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
             network.update_global(
-                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log)
+                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, MODE)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
@@ -206,7 +212,7 @@ def get_action(states):
     states = states.reshape([nenv, num_blue+num_red]+input_size[1:])
     blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
     red_s = states[:,-num_red:,:].reshape([nenv*num_red]+input_size[1:])
-    a1, v1, logits1 = network.run_network(blue_s)
+    a1, v1, logits1 = network.run_network(blue_s, MODE)
     rprob = red_policy.run_network(red_s)
     ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
     actions = np.concatenate([
@@ -281,7 +287,6 @@ while global_episodes < total_episodes:
     for env_id in range(nenv):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards.append(np.mean(episode_rew))
-    global_rewards.append(np.mean(raw_reward))
     global_length.append(np.mean(steps))
     global_succeed.append(np.mean(envs.blue_win()))
 
@@ -291,10 +296,9 @@ while global_episodes < total_episodes:
 
     if log_on:
         record({
-            'Records/mean_reward': global_rewards(),
-            'Records/mean_length': global_length(),
-            'Records/mean_succeed': global_succeed(),
-            'Records/mean_episode_reward': global_episode_rewards(),
+            'Records/mean_length_'+MODE_NAME: global_length(),
+            'Records/mean_succeed_'+MODE_NAME: global_succeed(),
+            'Records/mean_episode_reward_'+MODE_NAME: global_episode_rewards(),
         }, writer, global_episodes)
         
     if save_on:
