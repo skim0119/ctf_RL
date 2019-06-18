@@ -253,7 +253,6 @@ class PPO_multimodes(a3c):
 
         with self.sess.as_default(), self.sess.graph.as_default():
             #loss = kwargs.get('loss', Loss.softmax_cross_entropy_selection)
-            loss = Loss.ppo
             backprop = Backpropagation.selfupdate
 
             with tf.variable_scope(scope):
@@ -269,8 +268,15 @@ class PPO_multimodes(a3c):
                 self.update_ops = []
                 self.gradients = []
                 for option in range(num_mode):
-                    loss = loss(self.actor[option], self.logits[option], self.old_logits_,
-                            *train_args, self.critic[option], entropy_beta=entropy_beta)
+                    loss = Loss.ppo(
+                            self.actor[option],
+                            self.logits[option],
+                            self.old_logits_,
+                            *train_args,
+                            self.critic[option],
+                            entropy_beta=entropy_beta,
+                            name_scope='loss{}'.format(option)
+                        )
                     actor_loss, critic_loss, entropy = loss
 
                     update_ops, gradients = backprop(

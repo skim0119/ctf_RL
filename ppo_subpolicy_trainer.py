@@ -45,7 +45,7 @@ from method.ppo import PPO_multimodes as Network
 from method.base import initialize_uninitialized_vars as iuv
 
 MODE = int(sys.argv[-1])
-assert MODE in [1,2,3]
+assert MODE in [0,1,2]
 num_mode = 3
 MODE_NAME = ['attack', 'scout', 'defense'][MODE]
 
@@ -141,6 +141,8 @@ progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, nenv)
+subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
+subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode)
 
 def record(item, writer, step):
@@ -213,7 +215,7 @@ def get_action(states):
     blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
     red_s = states[:,-num_red:,:].reshape([nenv*num_red]+input_size[1:])
     a1, v1, logits1 = network.run_network(blue_s, MODE)
-    rprob = red_policy.run_network(red_s)
+    rprob = red_policy.run_network(red_s[:,:,:,keep_frame-1::keep_frame])
     ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
     actions = np.concatenate([
             np.reshape(a1, [nenv, num_blue]),
@@ -221,6 +223,7 @@ def get_action(states):
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
+    verbose_on = global_episodes % nenv * 10 == 0 and global_episodes != 0
     log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
     log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
     save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
@@ -274,11 +277,12 @@ while global_episodes < total_episodes:
 
         if np.all(done):
             break
-    if log_on: print(f'rollout time = {time.time()-stime} sec')
+    if verbose_on: 
+        print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
     train(trajs, v1, 2, 64, writer, log_image_on, global_episodes)
-    if log_on:
+    if verbose_on:
         print(f'training time = {time.time()-stime} sec')
         print('Trajectory: ')
         print(f'{len(trajs)} Trajectory, {sum([len(traj) for traj in trajs])} Frames')
@@ -292,6 +296,7 @@ while global_episodes < total_episodes:
 
     global_episodes += nenv
     sess.run(global_step_next)
+    sess.run(subtrain_step_next[MODE])
     # progbar.update(global_episodes)
 
     if log_on:
@@ -299,7 +304,7 @@ while global_episodes < total_episodes:
             'Records/mean_length_'+MODE_NAME: global_length(),
             'Records/mean_succeed_'+MODE_NAME: global_succeed(),
             'Records/mean_episode_reward_'+MODE_NAME: global_episode_rewards(),
-        }, writer, global_episodes)
+        }, writer, subtrain_step[MODE])
         
     if save_on:
         saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
