@@ -75,6 +75,8 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
             remote.send(env.blue_win)
         elif cmd == 'blue_flag':
             remote.send(env.blue_flag)
+        elif cmd == 'red_flag':
+            remote.send(env.red_flag)
         elif cmd == 'close':
             remote.close()
             break
@@ -158,6 +160,11 @@ class SubprocVecEnv:
     def blue_flag(self):
         for remote in self.remotes:
             remote.send(('blue_flag', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
+    def red_flag(self):
+        for remote in self.remotes:
+            remote.send(('red_flag', None))
         return np.stack([remote.recv() for remote in self.remotes])
 
     def close(self):

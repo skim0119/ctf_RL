@@ -10,8 +10,10 @@ DOs/Denis Osipychev
 
 import numpy as np
 
+from policy.policy import Policy
 
-class PolicyGen:
+
+class Random(Policy):
     """Policy generator class for CtF env.
     
     This class can be used as a template for policy generator.
@@ -21,14 +23,11 @@ class PolicyGen:
         gen_action: Required method to generate a list of actions.
     """
     
-    def __init__(self, free_map, agent_list):
+    def __init__(self):
         """Constuctor for policy class.
         
         This class can be used as a template for policy generator.
-        
-        Args:
-            free_map (np.array): 2d map of static environment.
-            agent_list (list): list of all friendly units.
+
         """
         self.random = np.random
         
@@ -47,7 +46,7 @@ class PolicyGen:
             action_out (list): list of integers as actions selected for team.
         """
         action_out = []
-
+        
         for i in agent_list:
             action_out.append(self.random.randint(0, 5)) # choose random action
         

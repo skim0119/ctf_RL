@@ -94,7 +94,7 @@ lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
 moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
@@ -123,8 +123,9 @@ global_episodes = 0
 
 ## Environment Initialization
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
+red_policy = policy.roombaV2.RoombaV2
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size,
+    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
 
 envs = [make_env(map_size) for i in range(nenv)]
@@ -203,23 +204,43 @@ global_episodes = sess.run(global_step) # Reset the counter
 saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes) # Initial save
 
 # Red Policy (selfplay)
+'''
 red_policy = TrainedNetwork(
             model_path='model/a3c_pretrained',
             input_tensor='global/state:0',
             output_tensor='global/actor/Softmax:0'
         )
+'''
+
+
+def reward_shape(prev_red_alive, red_alive, done, idx=None):
+    prev_red_alive = np.reshape(prev_red_alive, [nenv, num_red])
+    red_alive = np.reshape(red_alive, [nenv, num_red])
+    reward = []
+    red_flags = envs.red_flag()
+    blue_flags = envs.blue_flag()
+    for i in range(nenv):
+        if idx == 0:
+            # Attack (C/max enemy)
+            num_prev_enemy = sum(prev_red_alive[i])
+            num_enemy = sum(red_alive[i])
+            reward.append((num_prev_enemy - num_enemy)*0.25)
+        if idx == 1:
+            if red_flags[i]:
+                reward.append(1)
+            else:
+                reward.append(0)
+        if idx == 2:
+            if blue_flags[i]:
+                reward.append(-1)
+            else:
+                reward.append(0)
+    return np.array(reward)
 
 print('Training Initiated:')
 def get_action(states):
-    states = states.reshape([nenv, num_blue+num_red]+input_size[1:])
-    blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
-    red_s = states[:,-num_red:,:].reshape([nenv*num_red]+input_size[1:])
-    a1, v1, logits1 = network.run_network(blue_s, MODE)
-    rprob = red_policy.run_network(red_s[:,:,:,keep_frame-1::keep_frame])
-    ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
-    actions = np.concatenate([
-            np.reshape(a1, [nenv, num_blue]),
-            np.reshape(ra, [nenv, num_red])], axis=1)  # Concatenate blue and red action
+    a1, v1, logits1 = network.run_network(states, MODE)
+    actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
@@ -233,6 +254,7 @@ while global_episodes < total_episodes:
     episode_rew = np.zeros(nenv)
     prev_rew = np.zeros(nenv)
     was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(nenv)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
@@ -247,18 +269,15 @@ while global_episodes < total_episodes:
         s0 = s1
         a, v0 = a1, v1
         logits = logits1
-        
+
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.1*step)
-
-        if step == max_ep:
-            reward[:] = -100
-            done[:] = True
-
-        reward /= 100.0
+        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
         episode_rew += reward
 
+        if step == max_ep:
+            done[:] = True
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -273,6 +292,7 @@ while global_episodes < total_episodes:
 
         prev_rew = raw_reward
         was_alive = is_alive
+        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
@@ -281,7 +301,7 @@ while global_episodes < total_episodes:
         print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
-    train(trajs, v1, 2, 64, writer, log_image_on, global_episodes)
+    train(trajs, v1, epoch, minibatch_size, writer, log_image_on, global_episodes)
     if verbose_on:
         print(f'training time = {time.time()-stime} sec')
         print('Trajectory: ')
@@ -300,11 +320,12 @@ while global_episodes < total_episodes:
     # progbar.update(global_episodes)
 
     if log_on:
+        step = sess.run(subtrain_step[MODE])
         record({
             'Records/mean_length_'+MODE_NAME: global_length(),
             'Records/mean_succeed_'+MODE_NAME: global_succeed(),
             'Records/mean_episode_reward_'+MODE_NAME: global_episode_rewards(),
-        }, writer, subtrain_step[MODE])
+        }, writer, step)
         
     if save_on:
         saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)

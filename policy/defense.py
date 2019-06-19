@@ -9,9 +9,11 @@ DOs/Denis Osipychev
 """
 
 import numpy as np
+import gym_cap.envs.const as const
 
+from policy.policy import Policy
 
-class PolicyGen:
+class Defense(Policy):
     """Policy generator class for CtF env.
 
     This class can be used as a template for policy generator.
@@ -22,17 +24,7 @@ class PolicyGen:
         patrol: Private method to control a single unit.
     """
 
-    def __init__(self, free_map, agent_list):
-        """Constuctor for policy class.
-
-        Patrolling policy provides the actions for the team of units that
-        command units to approach the boarder between friendly and enemy
-        zones and patrol along it.
-
-        Args:
-            free_map (np.array): 2d map of static environment.
-            agent_list (list): list of all friendly units.
-        """
+    def initiate(self, free_map, agent_list):
         self.free_map = free_map
         self.free_map_old = free_map
         self.team = agent_list[0].team
@@ -41,7 +33,7 @@ class PolicyGen:
         self.random = np.random
         self.exploration = 0.5
 
-        self.flag_code = 6 if self.team == 0 else 7
+        self.flag_code = const.TEAM1_FLAG
 
     def gen_action(self, agent_list, observation, free_map=None):
         """Action generation method.
@@ -68,7 +60,7 @@ class PolicyGen:
         # search for a flag until finds it
         if self.flag_location == None:
 
-            loc = self.scan_obs(observation,self.flag_code)
+            loc = self.scan_obs(observation, self.flag_code)
             if len(loc) is not 0:
                 self.flag_location = loc[0]
 
@@ -87,7 +79,6 @@ class PolicyGen:
 
     def random_search(self, agent, index, obs):
         """Generate 1 action for given agent object."""
-        x,y = agent.get_loc()
         action = self.random.randint(0, 5)
 
         return action
@@ -116,7 +107,7 @@ class PolicyGen:
 
         for y in range(len(obs)):
             for x in range(len(obs[0])):
-                if obs[x][y] == value:
+                if obs[x][y] == const.TEAM1_FLAG:
                     location.append([x,y])
 
         return location

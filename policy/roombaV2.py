@@ -11,8 +11,9 @@ DOs/Denis Osipychev
 import numpy as np
 from collections import defaultdict
 
+from policy.policy import Policy
 
-class PolicyGen:
+class RoombaV2(Policy):
     """Policy generator class for CtF env.
 
     This class can be used as a template for policy generator.
@@ -28,7 +29,7 @@ class PolicyGen:
         previous_move : variable to save previous action
     """
 
-    def __init__(self, free_map, agent_list):
+    def initiate(self, free_map, agent_list):
         """Constuctor for policy class.
 
         This class can be used as a template for policy generator.
