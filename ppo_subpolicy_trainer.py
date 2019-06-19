@@ -244,7 +244,7 @@ def get_action(states):
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
-    verbose_on = global_episodes % nenv * 10 == 0 and global_episodes != 0
+    verbose_on = global_episodes % nenv * 100 == 0 and global_episodes != 0
     log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
     log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
     save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
@@ -268,7 +268,7 @@ while global_episodes < total_episodes:
     batch_size = 0
     min_batch_size = 4000
     batch = []
-    while batch_size < min_batch_size>
+    while batch_size < min_batch_size:
         for step in range(max_ep+1):
             s0 = s1
             a, v0 = a1, v1
