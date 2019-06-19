@@ -123,7 +123,7 @@ global_episodes = 0
 
 ## Environment Initialization
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
-red_policy = policy.roombaV2.RoombaV2
+red_policy = policy.roombaV2.RoombaV2()
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
@@ -265,47 +265,56 @@ while global_episodes < total_episodes:
 
     # Rollout
     stime = time.time()
-    for step in range(max_ep+1):
-        s0 = s1
-        a, v0 = a1, v1
-        logits = logits1
+    batch_size = 0
+    min_batch_size = 4000
+    batch = []
+    while batch_size < min_batch_size>
+        for step in range(max_ep+1):
+            s0 = s1
+            a, v0 = a1, v1
+            logits = logits1
 
-        s1, raw_reward, done, info = envs.step(actions)
-        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
-        episode_rew += reward
+            s1, raw_reward, done, info = envs.step(actions)
+            is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+            is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
+            reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+            episode_rew += reward
 
-        if step == max_ep:
-            done[:] = True
-    
-        a1, v1, logits1, actions = get_action(s1)
-        for idx, d in enumerate(done):
-            if d:
-                v1[idx*num_blue: (idx+1)*num_blue] = 0.0
+            if step == max_ep:
+                done[:] = True
+        
+            a1, v1, logits1, actions = get_action(s1)
+            for idx, d in enumerate(done):
+                if d:
+                    v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
-        # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // num_blue
-            if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+            # push to buffer
+            for idx, agent in enumerate(envs.get_team_blue().flat):
+                env_idx = idx // num_blue
+                if was_alive[idx] and not was_done[env_idx]:
+                    trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
-        prev_rew = raw_reward
-        was_alive = is_alive
-        was_alive_red = is_alive_red
-        was_done = done
+            prev_rew = raw_reward
+            was_alive = is_alive
+            was_alive_red = is_alive_red
+            was_done = done
 
-        if np.all(done):
-            break
+            if np.all(done):
+                break
+
+        for traj in trajs:
+            batch.append(traj)
+            batch_size += len(traj)
+
     if verbose_on: 
         print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
-    train(trajs, v1, epoch, minibatch_size, writer, log_image_on, global_episodes)
+    train(batch, v1, epoch, minibatch_size, writer, log_image_on, global_episodes)
     if verbose_on:
         print(f'training time = {time.time()-stime} sec')
         print('Trajectory: ')
-        print(f'{len(trajs)} Trajectory, {sum([len(traj) for traj in trajs])} Frames')
+        print(f'{len(batch)} Trajectory, {batch_size} Frames')
 
     steps = []
     for env_id in range(nenv):
