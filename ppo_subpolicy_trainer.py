@@ -144,7 +144,7 @@ global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, nenv)
 subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
 subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode)
+network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def record(item, writer, step):
     summary = tf.Summary()
@@ -153,7 +153,7 @@ def record(item, writer, step):
     writer.add_summary(summary, step)
     writer.flush()
 
-def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -167,7 +167,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         observations = traj[0]
         actions = traj[1]
 
-        td_target, advantages = gae(traj[2], traj[3], bootstrap[idx],
+        td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
         
         buffer_s.extend(observations)
@@ -305,12 +305,17 @@ while global_episodes < total_episodes:
         for traj in trajs:
             batch.append(traj)
             batch_size += len(traj)
+            
+        global_episodes += nenv
+        sess.run(global_step_next)
+        sess.run(subtrain_step_next[MODE])
+        # progbar.update(global_episodes)
 
     if verbose_on: 
         print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
-    train(batch, v1, epoch, minibatch_size, writer, log_image_on, global_episodes)
+    train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
     if verbose_on:
         print(f'training time = {time.time()-stime} sec')
         print('Trajectory: ')
@@ -323,10 +328,6 @@ while global_episodes < total_episodes:
     global_length.append(np.mean(steps))
     global_succeed.append(np.mean(envs.blue_win()))
 
-    global_episodes += nenv
-    sess.run(global_step_next)
-    sess.run(subtrain_step_next[MODE])
-    # progbar.update(global_episodes)
 
     if log_on:
         step = sess.run(subtrain_step[MODE])
