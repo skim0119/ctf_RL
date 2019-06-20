@@ -41,6 +41,9 @@ LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
 
+BOARD_PATH = 'fair_map'
+board_list = [BOARD_PATH+'/board{}.txt'.format(idx) for idx in range(1,4)]
+
 if OVERRIDE:
     #  Remove and reset log and model directory
     if os.path.exists(LOG_PATH):
@@ -93,7 +96,7 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 minibatch_size = 128
 epoch = 4
 minimum_replay_size = 4000
-selfplay_reload = 2048*8
+selfplay_reload = 2048*4
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -118,7 +121,7 @@ config = tf.ConfigProto(gpu_options=gpu_options)
 sess = tf.Session(config=config)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
-dummy_ = tf.placeholder(tf.float32)
+dummy_ = tf.placeholder(tf.int32)
 global_step_next = tf.assign_add(global_step, dummy_)
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess)
 # Resotre / Initialize
@@ -174,22 +177,16 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
 print('Training Initiated:')
 blue_stack = []
 red_stack = []
-def get_action(states):
-    blue_s = one_hot_encoder(states, env.get_team_blue, vision_range)
-    red_s = one_hot_encoder(env.get_obs_red, env.get_team_red, vision_range)
+def process_state(states, stack, agent):
+    oh = one_hot_encoder(states, agent, vision_range)
+    stack.append(oh)
+    stack.pop(0)
+    assert len(stack) == keep_frame
+    return np.concatenate(stack, axis=3)
 
-    blue_stack.append(blue_s)
-    blue_stack.pop(0)
-    assert len(blue_stack) == keep_frame
-    blue_s = np.concatenate(blue_stack, axis=3)
-
-    red_stack.append(red_s)
-    red_stack.pop(0)
-    assert len(red_stack) == keep_frame
-    red_s = np.concatenate(red_stack, axis=3)
-
-    a1, v1, logits1 = network.run_network(blue_s)
-    rprob = red_policy.run_network(red_s)
+def get_action(blue_state_input, red_state_input):
+    a1, v1, logits1 = network.run_network(blue_state_input)
+    rprob = red_policy.run_network(red_state_input)
     ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
     actions = np.concatenate([a1, ra])
     return a1, v1, logits1, actions
@@ -201,17 +198,21 @@ while global_episodes < total_episodes:
     reload_on = global_episodes % selfplay_reload == 0 and global_episodes != 0
     
     # initialize parameters 
+
+    s1 = env.reset(custom_board=random.choice(board_list))
     episode_rew = 0
     prev_rew = 0
     was_alive = [True] * num_blue
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue)]
-    
-    # Bootstrap
-    s1 = env.reset()
+
     blue_stack = [one_hot_encoder(s1, env.get_team_blue, vision_range) for _ in range(keep_frame)]
     red_stack = [one_hot_encoder(env.get_obs_red, env.get_team_red, vision_range) for _ in range(keep_frame)]
-    a1, v1, logits1, actions = get_action(s1)
+    
+    # Bootstrap
+    s1 = process_state(s1, blue_stack, env.get_team_blue)
+    red_state = process_state(env.get_obs_red, red_stack, env.get_team_red)
+    a1, v1, logits1, actions = get_action(s1, red_state)
 
     # Rollout
     replay_size = 0
@@ -222,8 +223,6 @@ while global_episodes < total_episodes:
             a, v0 = a1, v1
             logits = logits1
 
-            print(actions)
-            
             s1, raw_reward, done, info = env.step(actions)
             is_alive = [agent.isAlive for agent in env.get_team_blue]
             reward = (raw_reward - prev_rew - 0.1*step)
@@ -235,7 +234,9 @@ while global_episodes < total_episodes:
             reward /= 100.0
             episode_rew += reward
         
-            a1, v1, logits1, actions = get_action(s1)
+            s1 = process_state(s1, blue_stack, env.get_team_blue)
+            red_state = process_state(env.get_obs_red, red_stack, env.get_team_red)
+            a1, v1, logits1, actions = get_action(s1, red_state)
 
             # push to buffer
             for idx, agent in enumerate(env.get_team_blue):
@@ -252,9 +253,9 @@ while global_episodes < total_episodes:
             replay_size += len(traj)
 
         rollout_size += 1
-        global_episode_rewards.append(np.mean(episode_rew))
-        global_length.append(np.mean(steps))
-        global_succeed.append(np.mean(env.blue_win()))
+        global_episode_rewards.append(episode_rew)
+        global_length.append(step)
+        global_succeed.append(env.blue_win)
 
     train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
     global_episodes += rollout_size
@@ -266,9 +267,12 @@ while global_episodes < total_episodes:
             'Records/mean_succeed': global_succeed(),
             'Records/mean_episode_reward': global_episode_rewards(),
         }, writer, global_episodes)
+        print('logged')
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+        print('saved')
 
     if reload_on:
         red_policy.reset_network_weight()
+        print('reloaded')
