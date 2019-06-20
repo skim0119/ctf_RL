@@ -38,7 +38,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
     pause = False
 
     map_dir = 'fair_map/'
-    map_list = [map_dir+'board{}.txt'.i for i in range(1,4)]
+    map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,4)]
 
     while True:
         cmd, data = remote.recv()
@@ -61,7 +61,8 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             pause = False
-            env.reset(custom_board=random.choice(map_list))
+            #env.reset(custom_board=random.choice(map_list))
+            env.reset()
             ob = one_hot_encoder(env.get_obs_blue, env.get_team_blue)
             if ctrl_red:
                 rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
