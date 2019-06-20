@@ -84,7 +84,7 @@ def discount_rewards(rewards, gamma, normalized=False, mask_array=None):
     """
 
     if mask_array is None:
-        return scipy.signal.lfilter([1], [1, -gamma], rewards[::-1], axis=0)[::-1]
+        return scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1], axis=0)[::-1]
     else:
         y, adv = 0.0, []
         mask_reverse = mask_array[::-1]
@@ -225,57 +225,3 @@ class MovingAverage:
         """
         self.average = 0.0
         self.queue.clear()
-
-
-class Experience_buffer:
-    """Experience_buffer
-    Experience buffer use for storing tuples for MDP.
-    Support returning and shuffling features
-
-    Method:
-        __init__ (int, int)
-        __len__
-        add (list)
-        add_element (object)
-        flush
-        empty
-        sample (int, bool)
-        pop (int, bool)
-    """
-
-    def __init__(self, experience_shape=4, buffer_size=50000):
-        self.buffer = []
-        self.buffer_size = buffer_size
-        self.experience_shape = experience_shape
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def add(self, experience):
-        if len(self.buffer) + len(experience) >= self.buffer_size:
-            self.buffer[0:(len(experience) + len(self.buffer)) - self.buffer_size] = []
-        self.buffer.extend(experience)
-
-    def add_element(self, sample):
-        self.buffer.append(sample)
-
-    def flush(self):
-        # Return the remaining buffer and reset.
-        batch = np.reshape(np.array(self.buffer), [len(self.buffer), self.experience_shape])
-        self.buffer = []
-        return batch
-
-    def empty(self):
-        return len(self.buffer) == 0
-
-    def pop(self, size, shuffle=False):
-        # Pop the first `size` items in order (queue).
-        if shuffle:
-            random.shuffle(self.buffer)
-        batch = self.buffer[:size]
-        self.buffer = self.buffer[size:]
-        return batch
-
-
-if __name__ == '__main__':
-    pass
