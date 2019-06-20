@@ -2,6 +2,7 @@
 #https://github.com/openai/baselines/tree/master/baselines/common/vec_env
 
 import numpy as np
+import random
 from multiprocessing import Process, Pipe
 
 from utility.dataModule import one_hot_encoder as one_hot_encoder
@@ -36,6 +37,9 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
     stacked_frame = []
     pause = False
 
+    map_dir = 'fair_map/'
+    map_list = [map_dir+'board{}.txt'.i for i in range(1,4)]
+
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
@@ -57,7 +61,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             pause = False
-            env.reset()
+            env.reset(custom_board=random.choice(map_list))
             ob = one_hot_encoder(env.get_obs_blue, env.get_team_blue)
             if ctrl_red:
                 rob = one_hot_encoder(env.get_obs_red, env.get_team_red)

@@ -233,6 +233,7 @@ def interv_cntr(step, freq, name):
 
 def get_action(states):
     a1, v1, logits1 = network.run_network(states, MODE)
+    print(a1)
     actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
