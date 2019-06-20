@@ -274,9 +274,12 @@ while global_episodes < total_episodes:
             'Records/mean_succeed': global_succeed(),
             'Records/mean_episode_reward': global_episode_rewards(),
         }, writer, global_episodes)
+        print('log', global_episodes)
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+        print('save', global_episodes)
 
     if reload_on:
         red_policy.reset_network_weight()
+        print('reload', global_episodes)
