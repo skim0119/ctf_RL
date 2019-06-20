@@ -38,7 +38,7 @@ from method.ppo import PPO as Network
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_flat'
+TRAIN_NAME = 'ppo_flat_selfplay'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
@@ -81,7 +81,7 @@ lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
 moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
@@ -94,8 +94,8 @@ nenv = config.getint('DEFAULT', 'NUM_ENV')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
-epoch = 4
-selfplay_reload = 2048
+epoch = 2
+selfplay_reload = 2048*4
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -144,7 +144,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         observations = traj[0]
         actions = traj[1]
 
-        td_target, advantages = gae(traj[2], traj[3], bootstrap[idx],
+        td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
         
         buffer_s.extend(observations)
@@ -180,6 +180,16 @@ red_policy = TrainedNetwork(
         )
 
 print('Training Initiated:')
+def interv_cntr(step, freq):
+    count = step // freq
+    if not hasattr(interv_cntr, "counter"):
+        interv_cntr.counter = count
+    if interv_cntr.counter < count:
+        interv_cntr.counter = count
+        return True
+    else:
+        return False
+
 def get_action(states):
     states = states.reshape([nenv, num_blue+num_red]+input_size[1:])
     blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
@@ -193,10 +203,10 @@ def get_action(states):
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
-    log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
-    log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
-    save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
-    reload_on = global_episodes % selfplay_reload == 0 and global_episodes != 0
+    log_on = interv_cntr(global_episodes, save_stat_frequency)
+    log_image_on = interv_cntr(global_episodes, save_image_frequency)
+    save_on = interv_cntr(global_episodes, save_network_frequency)
+    reload_on = interv_cntr(global_episodes,selfplay_reload)
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -228,11 +238,7 @@ while global_episodes < total_episodes:
         reward /= 100.0
         episode_rew += reward
 
-    
         a1, v1, logits1, actions = get_action(s1)
-        for idx, d in enumerate(done):
-            if d:
-                v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
@@ -248,7 +254,8 @@ while global_episodes < total_episodes:
             break
             
     stime = time.time()
-    train(trajs, v1, epoch, minibatch_size, writer, log_image_on, global_episodes)
+    total_frame = sum([len(traj) for traj in trajs])
+    train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
 
     steps = []
     for env_id in range(nenv):

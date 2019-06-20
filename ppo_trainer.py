@@ -3,6 +3,7 @@
 - Flat
 - PPO
 - No UAV
+- Single Process environment
 '''
 
 import os
@@ -191,11 +192,24 @@ def get_action(blue_state_input, red_state_input):
     actions = np.concatenate([a1, ra])
     return a1, v1, logits1, actions
 
+def interv_cntr(step, freq):
+    count = step // freq
+    if not hasattr(interv_cntr, "counter"):
+        interv_cntr.counter = count
+    if interv_cntr.counter < count:
+        interv_cntr.counter = count
+        return True
+    else:
+        return False
+
+replay_size = 0
+batch = []
 while global_episodes < total_episodes:
-    log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
-    log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
-    save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
-    reload_on = global_episodes % selfplay_reload == 0 and global_episodes != 0
+    print(global_episodes, replay_size)
+    log_on = interv_cntr(global_episodes, save_stat_frequency)
+    log_image_on = interv_cntr(global_episodes, save_image_frequency)
+    save_on = interv_cntr(global_episodes, save_network_frequency)
+    reload_on = interv_cntr(global_episodes,selfplay_reload)
     
     # initialize parameters 
 
@@ -215,51 +229,51 @@ while global_episodes < total_episodes:
     a1, v1, logits1, actions = get_action(s1, red_state)
 
     # Rollout
-    replay_size = 0
-    rollout_size = 0
-    while replay_size < minimum_replay_size:
-        for step in range(max_ep+1):
-            s0 = s1
-            a, v0 = a1, v1
-            logits = logits1
+    for step in range(max_ep+1):
+        s0 = s1
+        a, v0 = a1, v1
+        logits = logits1
 
-            s1, raw_reward, done, info = env.step(actions)
-            is_alive = [agent.isAlive for agent in env.get_team_blue]
-            reward = (raw_reward - prev_rew - 0.1*step)
+        s1, raw_reward, done, info = env.step(actions)
+        is_alive = [agent.isAlive for agent in env.get_team_blue]
+        reward = (raw_reward - prev_rew - 0.1*step)
 
-            if step == max_ep:
-                reward = -100
-                done = True
+        if step == max_ep:
+            reward = -100
+            done = True
 
-            reward /= 100.0
-            episode_rew += reward
-        
-            s1 = process_state(s1, blue_stack, env.get_team_blue)
-            red_state = process_state(env.get_obs_red, red_stack, env.get_team_red)
-            a1, v1, logits1, actions = get_action(s1, red_state)
+        reward /= 100.0
+        episode_rew += reward
+    
+        s1 = process_state(s1, blue_stack, env.get_team_blue)
+        red_state = process_state(env.get_obs_red, red_stack, env.get_team_red)
+        a1, v1, logits1, actions = get_action(s1, red_state)
 
-            # push to buffer
-            for idx, agent in enumerate(env.get_team_blue):
-                if was_alive[idx]:
-                    trajs[idx].append([s0[idx], a[idx], reward, v0[idx], logits[idx]])
+        # push to buffer
+        for idx, agent in enumerate(env.get_team_blue):
+            if was_alive[idx]:
+                trajs[idx].append([s0[idx], a[idx], reward, v0[idx], logits[idx]])
 
-            prev_rew = raw_reward
-            was_alive = is_alive
+        prev_rew = raw_reward
+        was_alive = is_alive
 
-            if done:
-                break
+        if done:
+            break
 
-        for traj in trajs:
-            replay_size += len(traj)
+    for traj in trajs:
+        replay_size += len(traj)
+    batch.extend(trajs)
 
-        rollout_size += 1
-        global_episode_rewards.append(episode_rew)
-        global_length.append(step)
-        global_succeed.append(env.blue_win)
+    global_episode_rewards.append(episode_rew)
+    global_length.append(step)
+    global_succeed.append(env.blue_win)
+    global_episodes += 1
+    sess.run(global_step_next, feed_dict={dummy_:1})
 
-    train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-    global_episodes += rollout_size
-    sess.run(global_step_next, feed_dict={dummy_:rollout_size})
+    if replay_size > minimum_replay_size:
+        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        replay_size = 0
+        batch = []
 
     if log_on:
         record({
