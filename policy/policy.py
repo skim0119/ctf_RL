@@ -24,9 +24,14 @@ class Policy:
         """Constuctor for policy class.
         
         This class can be used as a template for policy generator.
+
+        Define:
+            agent_list (list): list of all friendly units.
+            free_map (np.array): 2d map of static environment (optional).
         
         """
-        pass
+        self.free_map = None
+        self.agent_list = None
         
     def gen_action(self, agent_list, observation, free_map=None):
         """Action generation method.

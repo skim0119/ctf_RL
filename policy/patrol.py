@@ -24,6 +24,9 @@ class Patrol(Policy):
         gen_action: Required method to generate a list of actions.
         patrol: Private method to control a single unit.
     """
+
+    def __init__(self):
+        super().__init__()
     
     def initiate(self, free_map, agent_list):
         self.team = agent_list[0].team

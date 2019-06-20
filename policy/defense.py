@@ -24,6 +24,9 @@ class Defense(Policy):
         patrol: Private method to control a single unit.
     """
 
+    def __init__(self):
+        super().__init__()
+
     def initiate(self, free_map, agent_list):
         self.free_map = free_map
         self.free_map_old = free_map

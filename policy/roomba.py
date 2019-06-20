@@ -38,6 +38,8 @@ class Roomba(Policy):
             free_map (np.array): 2d map of static environment.
             agent_list (list): list of all friendly units.
         """
+        self.free_map = free_map
+
         self.random = np.random
         self.exploration = 0.1
         self.previous_move = self.random.randint(0, 5, len(agent_list)).tolist()
@@ -46,8 +48,12 @@ class Roomba(Policy):
 
         self.flag_location = None
         self.enemy_flag_code = 7
-        self.enemy_code = 4
-        self.range = 5
+        self.enemy_code = 1
+        self.enemy_agent_code = 4
+        self.team_code = 0
+
+        self.enemy_range = 5 # Range to see around and avoid enemy
+        self.flag_range = 5  # Range to see the flag
 
     def gen_action(self, agent_list, observation, free_map=None):
         """Action generation method.
@@ -66,8 +72,18 @@ class Roomba(Policy):
         """
         action_out = []
 
+        # Expand the observation with wall
+        padding = max(self.enemy_range, self.flag_range)
+        obs = self.center_padding(observation, padding)
+
         for idx, agent in enumerate(agent_list):
-            action = self.policy(agent,observation, idx)
+            # Initialize Variables
+            x, y = agent.get_loc()
+            x += padding
+            y += padding
+            self_centered = obs[x+1-padding:x+padding,
+                                y+1-padding:y+padding] # limited view for the agent
+            action = self.policy(agent, self_centered, idx)
             action_out.append(action)
 
         return action_out
@@ -80,79 +96,85 @@ class Roomba(Policy):
         This method provides simple protocol of movement based on the agent's location and it's vision.
 
         Protocol :
-            1. Deterministic situation (in order of priority) :
-                - Encountered Enemy :
-                    - Run Away
-                - Flag Found :
-                    - Run towards the flag
-                - Wall :
-                    - Change the direction
-            2. Non-deterministic situation :
-                - Move in the previous direction (straight forward). (85%)
-                - Move in the random direction (15% exploration rate)
+            1. Scan the area with flag_range:
+                - Flag within radius : Set the movement towards flag
+                - No Flag : random movement
+            2. Scan the area with enemy_range:
+                - Enemy in the direction of movement
+                    - If I'm in enemy's territory: reverse direction
+                    - Continue
+                - Else: contonue moving in the direction
+            3. Random exploration
+                - 0.1 chance switching direction of movement
+                - Follow same direction
+                - Change direction if it heats the wall
         """
-
-        # Expand the observation with wall
-        # - in order to avoid dealing with the boundary
-        obsx, obsy = obs.shape
-        padding = self.range
-        _obs = np.ones((obsx+2*padding, obsy+2*padding)) * 8
-        _obs[padding:obsx+padding, padding:obsy+padding] = obs
-        obs = _obs
-
-        # Initialize Variables
-        x, y = agent.get_loc()
-        x += padding
-        y += padding
-        view = obs[x+1-padding:x+padding,
-                    y+1-padding:y+padding] # limited view for the agent
 
         # Continue the previous action
         action = self.previous_move[agent_id]
+        x, y = obs.shape
+        x //= 2; y //= 2
 
-        # Checking obstacle
         dir_x = [0, 0, 1, 0, -1] # dx for [stay, up, right, down, left]
         dir_y = [0,-1, 0, 1,  0] # dy for [stay, up, right, down ,left]
-        is_possible_to_move = lambda d: obs[x+dir_x[d]][y+dir_y[d]] not in [2,4,8]
-        if not is_possible_to_move(action): # Wall or other obstacle
-            action_pool = []
-            for movement in range(5):
-                if is_possible_to_move(movement):
-                    action_pool.append(movement)
-            if action_pool == []:
-                action_pool = [0]
-            action = np.random.choice(action_pool) # pick from possible movements
+        blocking = lambda d: obs[x+dir_x[d]][y+dir_y[d]] in [8, 2]  
 
-        # Obtain information based on the vision
-        field = self.scan(view)
+        field = self.scan(obs)
         elements = field.keys()
-
+        # 1. Set direction to flag
         if self.enemy_flag_code in elements: # Flag Found
             # move towards the flag
-            fx, fy = field.get(self.enemy_flag_code, [0,0])[0] # flag location (coord. of 'view')
-            if fy > 2: # move down
-                action = 3
-            elif fy < 2: # move up
-                action = 1
-            elif fx > 2: # move left
-                action = 2
-            elif fx < 2: # move right
-                action = 4
+            fx, fy = field[self.enemy_flag_code][0]
+            fx -= x; fy -= y
+            action_pool = []
+            if fy > 0: # move down
+                action_pool.append(3)
+            if fy < 0: # move up
+                action_pool.append(1)
+            if fx > 0: # move left
+                action_pool.append(2)
+            if fx < 0: # move right
+                action_pool.append(4)
+            if action_pool == []:
+                action_pool = [0]
+            action = np.random.choice(action_pool)
+        
+        # 2. Scan with enemy range
+        opposite_move = [0, 3, 4, 1, 2]
+        for ex, ey in field.get(self.enemy_agent_code, []):
+            if self.free_map[agent.get_loc()] != agent.team:
+                ex -= x; ey -= y
+                if (ey > 0 and abs(ex) < 2 and action == 3) or \
+                   (ey < 0 and abs(ex) < 2 and action == 1) or \
+                   (ex > 0 and abs(ey) < 2 and action == 2) or \
+                   (ex < 0 and abs(ey) < 2 and action == 4):
+                    action = opposite_move[action]
             else:
-                action = 0 # do not move
+                if ey > 0 and ex == 0: # move down
+                    action = 3
+                elif ey < 0 and ex == 0: # move up
+                    action = 1
+                elif ex > 0 and ey == 0: # move left
+                    action = 2
+                elif ex < 0 and ey == 0: # move right
+                    aciton = 4
 
-        if np.random.random() <= self.exploration: # Exploration
+
+        # 3. Exploration
+        if action == 0 or np.random.random() <= self.exploration: # Exploration
             action = np.random.randint(1,5)
+        # Checking obstacle
+        if blocking(action): # Wall or other obstacle
+            action_pool = [move for move in range(1,5) if not blocking(move)]
+            if action_pool == []:
+                action_pool = [0]
+            action = np.random.choice(action_pool)
 
-        if self.enemy_code in elements: # Enemy in the vision
-            opposite_move = [0, 3, 4, 1, 2]
-            action = opposite_move[self.previous_move[agent_id]]
-        else:
-            self.previous_move[agent_id] = action
+        self.previous_move[agent_id] = action
 
         return action
 
-    def scan(self, view):
+    def scan(self, view, exclude=[-1, 8]):
         """
         This function returns the dictionary of locations for each element by its type.
             key : field element (int)
@@ -160,9 +182,19 @@ class Roomba(Policy):
         """
 
         objects = defaultdict(list)
-        dx, dy = len(view), len(view[0])
+        dx, dy = view.shape
         for i in range(dx):
             for j in range(dy):
+                if view[i][j] in exclude: 
+                    continue
                 objects[view[i][j]].append((i,j))
 
         return objects
+
+    def center_padding(self, m, width, padder=8):
+        lx, ly = m.shape
+        pm = np.empty((lx+(2*width),ly+(2*width)), dtype=np.int)
+        pm[:] = padder
+        pm[width:lx+width, width:ly+width] = m
+        return pm
+

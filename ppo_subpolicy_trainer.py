@@ -26,10 +26,7 @@ import random
 import math
 
 # the modules that you can use to generate the policy. 
-import policy.random
-import policy.roomba
-import policy.roombaV2
-import policy.zeros
+import policy
 
 # Data Processing Module
 from utility.dataModule import one_hot_encoder
@@ -38,6 +35,7 @@ from utility.utils import discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 from utility.multiprocessing import SubprocVecEnv
+from utility.logger import record
 from utility.RL_Wrapper import TrainedNetwork
 
 from method.ppo import PPO_multimodes as Network
@@ -123,7 +121,7 @@ global_episodes = 0
 
 ## Environment Initialization
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
-red_policy = policy.roombaV2.RoombaV2()
+red_policy = policy.roomba.Roomba()
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
@@ -145,13 +143,6 @@ global_step_next = tf.assign_add(global_step, nenv)
 subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
 subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
-
-def record(item, writer, step):
-    summary = tf.Summary()
-    for key, value in item.items():
-        summary.value.add(tag=key, simple_value=value)
-    writer.add_summary(summary, step)
-    writer.flush()
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
@@ -189,19 +180,11 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
-writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-    
-ckpt = tf.train.get_checkpoint_state(MODEL_PATH)
-if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-    saver.restore(sess, ckpt.model_checkpoint_path)
-    print("Load Model : ", ckpt.model_checkpoint_path)
-    iuv(sess)
-else:
-    sess.run(tf.global_variables_initializer())
-    print("Initialized Variables")
-global_episodes = sess.run(global_step) # Reset the counter
+network.initiate(saver, MODEL_PATH)
 
-saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes) # Initial save
+writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+global_episodes = sess.run(global_step) # Reset the counter
+network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 # Red Policy (selfplay)
 '''
@@ -238,17 +221,27 @@ def reward_shape(prev_red_alive, red_alive, done, idx=None):
     return np.array(reward)
 
 print('Training Initiated:')
+def interv_cntr(step, freq, name):
+    count = step // freq
+    if not hasattr(interv_cntr, name):
+        setattr(interv_cntr, name, count)
+    if getattr(interv_cntr, name) < count:
+        setattr(interv_cntr, name, count)
+        return True
+    else:
+        return False
+
 def get_action(states):
     a1, v1, logits1 = network.run_network(states, MODE)
     actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
-    verbose_on = global_episodes % nenv * 100 == 0 and global_episodes != 0
-    log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
-    log_image_on = global_episodes % save_image_frequency == 0 and global_episodes != 0
-    save_on = global_episodes % save_network_frequency == 0 and global_episodes != 0
-    reload_on = False #global_episodes % selfplay_reload == 0 and global_episodes != 0
+    log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
+    log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
+    save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
+    reload_on = False #interv_cntr(global_episodes,selfplay_reload, 'reload')
+    verbose_on = interv_cntr(global_episodes, 100*nenv, 'verb')
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -265,61 +258,53 @@ while global_episodes < total_episodes:
 
     # Rollout
     stime = time.time()
-    batch_size = 0
-    min_batch_size = 4000
-    batch = []
-    while batch_size < min_batch_size:
-        for step in range(max_ep+1):
-            s0 = s1
-            a, v0 = a1, v1
-            logits = logits1
+    for step in range(max_ep+1):
+        s0 = s1
+        a, v0 = a1, v1
+        logits = logits1
 
-            s1, raw_reward, done, info = envs.step(actions)
-            is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-            is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-            reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
-            episode_rew += reward
+        s1, raw_reward, done, info = envs.step(actions)
+        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        episode_rew += reward
 
-            if step == max_ep:
-                done[:] = True
-        
-            a1, v1, logits1, actions = get_action(s1)
-            for idx, d in enumerate(done):
-                if d:
-                    v1[idx*num_blue: (idx+1)*num_blue] = 0.0
+        if step == max_ep:
+            done[:] = True
+    
+        a1, v1, logits1, actions = get_action(s1)
+        for idx, d in enumerate(done):
+            if d:
+                v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
-            # push to buffer
-            for idx, agent in enumerate(envs.get_team_blue().flat):
-                env_idx = idx // num_blue
-                if was_alive[idx] and not was_done[env_idx]:
-                    trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+        # push to buffer
+        for idx, agent in enumerate(envs.get_team_blue().flat):
+            env_idx = idx // num_blue
+            if was_alive[idx] and not was_done[env_idx]:
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
-            prev_rew = raw_reward
-            was_alive = is_alive
-            was_alive_red = is_alive_red
-            was_done = done
+        prev_rew = raw_reward
+        was_alive = is_alive
+        was_alive_red = is_alive_red
+        was_done = done
 
-            if np.all(done):
-                break
+        if np.all(done):
+            break
 
-        for traj in trajs:
-            batch.append(traj)
-            batch_size += len(traj)
-            
-        global_episodes += nenv
-        sess.run(global_step_next)
-        sess.run(subtrain_step_next[MODE])
-        # progbar.update(global_episodes)
+    global_episodes += nenv
+    sess.run(global_step_next)
+    sess.run(subtrain_step_next[MODE])
+    # progbar.update(global_episodes)
 
     if verbose_on: 
         print(f'rollout time = {time.time()-stime} sec')
             
     stime = time.time()
-    train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+    train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
     if verbose_on:
         print(f'training time = {time.time()-stime} sec')
         print('Trajectory: ')
-        print(f'{len(batch)} Trajectory, {batch_size} Frames')
+        print(f'{sum([len(traj) for traj in trajs])} Frames')
 
     steps = []
     for env_id in range(nenv):
@@ -338,7 +323,7 @@ while global_episodes < total_episodes:
         }, writer, step)
         
     if save_on:
-        saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
+        network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
     if reload_on:
         red_policy.reset_network_weight()

@@ -24,11 +24,7 @@ class Random(Policy):
     """
     
     def __init__(self):
-        """Constuctor for policy class.
-        
-        This class can be used as a template for policy generator.
-
-        """
+        super().__init__()
         self.random = np.random
         
     def gen_action(self, agent_list, observation, free_map=None):
