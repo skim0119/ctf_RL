@@ -37,9 +37,6 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
     stacked_frame = []
     pause = False
 
-    map_dir = 'fair_map/'
-    map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,4)]
-
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
@@ -61,8 +58,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             pause = False
-            #env.reset(custom_board=random.choice(map_list))
-            env.reset()
+            env.reset(**data)
             ob = one_hot_encoder(env.get_obs_blue, env.get_team_blue)
             if ctrl_red:
                 rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
@@ -136,9 +132,9 @@ class SubprocVecEnv:
         obs, rews, dones, infos = zip(*results)
         return np.concatenate(obs, axis=0), np.stack(rews), np.stack(dones), infos
 
-    def reset(self):
+    def reset(self, **kwargs):
         for remote in self.remotes:
-            remote.send(('reset', None))
+            remote.send(('reset', kwargs))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
     
     def get_full_state(self):

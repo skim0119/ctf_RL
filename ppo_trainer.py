@@ -110,6 +110,8 @@ global_succeed = MovingAverage(moving_average_step)
 global_episodes = 0
 
 ## Environment Initialization
+map_dir = 'fair_map/'
+map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,4)]
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
 	config_path='setting_ppo_flat.ini')
@@ -217,7 +219,7 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    s1 = envs.reset()
+    s1 = envs.reset(custom_board=random.choice(map_list))
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
