@@ -146,9 +146,8 @@ class TrainedNetwork:
 
         # Set TF graph and session
         if sess is None:
-            config = tf.ConfigProto(device_count = {'GPU': 0})  # Only use CPU
             self.graph = tf.Graph()
-            self.sess = tf.Session(config=config, graph=self.graph)
+            self.sess = tf.Session(graph=self.graph)
         else:  # Use given graph
             self.graph = sess.graph
 
