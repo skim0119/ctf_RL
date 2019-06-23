@@ -223,14 +223,15 @@ class a3c:
 
     def initiate(self, saver, model_path):
         # Restore if savepoint exist. Initialize everything else
-        ckpt = tf.train.get_checkpoint_state(model_path)
-        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-            saver.restore(self.sess, ckpt.model_checkpoint_path)
-            print("Load Model : ", ckpt.model_checkpoint_path)
-            iuv(self.sess)
-        else:
-            self.sess.run(tf.global_variables_initializer())
-            print("Initialized Variables")
+        with self.sess.graph.as_default():
+            ckpt = tf.train.get_checkpoint_state(model_path)
+            if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+                saver.restore(self.sess, ckpt.model_checkpoint_path)
+                print("Load Model : ", ckpt.model_checkpoint_path)
+                iuv(self.sess)
+            else:
+                self.sess.run(tf.global_variables_initializer())
+                print("Initialized Variables")
 
     def save(self, saver, model_path, global_step):
         saver.save(self.sess, model_path, global_step=global_step)
