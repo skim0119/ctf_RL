@@ -208,12 +208,13 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
         if len(traj) == 0:
             continue
         observations = traj[0]
+        actions = traj[1]
         
         for mode in range(num_mode):
-            actions = [t[1][mode] for t in traj[1]]
-            rewards = [t[2][mode] for t in traj[2]]
-            critics = [t[3][mode] for t in traj[3]]
-            logits = [t[4][mode] for t in traj[4]]
+            actions = [t[mode] for t in traj[1]]
+            rewards = [t[mode] for t in traj[2]]
+            critics = [t[mode] for t in traj[3]]
+            logits = [t[mode] for t in traj[4]]
             mask = [t == mode for t in traj[5]]
             td_target, advantages = gae(rewards, critics, 0,
                     gamma, lambd, normalize=False)
