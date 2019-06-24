@@ -33,7 +33,7 @@ class Policy:
         self.free_map = None
         self.agent_list = None
         
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation):
         """Action generation method.
         
         This is a required method that generates list of actions corresponding 

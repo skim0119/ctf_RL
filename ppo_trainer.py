@@ -38,10 +38,12 @@ from method.ppo import PPO as Network
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_flat_selfplay'
+TRAIN_NAME = 'ppo_flat_roomba'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
+
+env_setting_path = 'setting_ppo_flat_roomba.ini'
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -113,8 +115,8 @@ global_episodes = 0
 map_dir = 'fair_map/'
 map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,4)]
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path='setting_ppo_flat.ini')
+    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy.roomba.Roomba(),
+	config_path=env_setting_path)
 
 envs = [make_env(map_size) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
@@ -175,11 +177,12 @@ global_episodes = sess.run(global_step) # Reset the counter
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 # Red Policy (selfplay)
-red_policy = TrainedNetwork(
+'''red_policy = TrainedNetwork(
             model_path=MODEL_PATH,
             input_tensor='main/state:0',
             output_tensor='main/actor/Softmax:0'
         )
+'''
 
 print('Training Initiated:')
 def interv_cntr(step, freq, name):
@@ -193,22 +196,15 @@ def interv_cntr(step, freq, name):
         return False
 
 def get_action(states):
-    states = states.reshape([nenv, num_blue+num_red]+input_size[1:])
-    blue_s = states[:,:num_blue,:].reshape([nenv*num_blue]+input_size[1:])
-    red_s = states[:,-num_red:,:].reshape([nenv*num_red]+input_size[1:])
-    a1, v1, logits1 = network.run_network(blue_s)
-    rprob = red_policy.run_network(red_s)
-    ra = [np.random.choice(action_space, p=p/sum(p)) for p in rprob]
-    actions = np.concatenate([
-            np.reshape(a1, [nenv, num_blue]),
-            np.reshape(ra, [nenv, num_red])], axis=1)  # Concatenate blue and red action
+    a1, v1, logits1 = network.run_network(states)
+    actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
 while global_episodes < total_episodes:
     log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
-    reload_on = interv_cntr(global_episodes,selfplay_reload, 'reload')
+    reload_on = False # interv_cntr(global_episodes,selfplay_reload, 'reload')
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -219,7 +215,7 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    s1 = envs.reset(custom_board=random.choice(map_list))
+    s1 = envs.reset() #custom_board=random.choice(map_list))
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -231,7 +227,7 @@ while global_episodes < total_episodes:
         
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.1*step)
+        reward = (raw_reward - prev_rew - 0.1)
 
         if step == max_ep:
             reward[:] = -100
@@ -268,7 +264,7 @@ while global_episodes < total_episodes:
 
     global_episodes += nenv
     sess.run(global_step_next)
-    # progbar.update(global_episodes)
+    progbar.update(global_episodes)
 
     if log_on:
         record({
@@ -276,12 +272,7 @@ while global_episodes < total_episodes:
             'Records/mean_succeed': global_succeed(),
             'Records/mean_episode_reward': global_episode_rewards(),
         }, writer, global_episodes)
-        print('log', global_episodes)
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
-        print('save', global_episodes)
 
-    if reload_on:
-        red_policy.reset_network_weight()
-        print('reload', global_episodes)

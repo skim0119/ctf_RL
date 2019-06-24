@@ -169,6 +169,19 @@ def one_hot_encoder(state, agents=None, vision_radius=19,
     else:
         return oh_state
 
+def centering(obs, agents, vision_range, padder=[1,0,0,1,0,0]):
+    assert obs.shape[-1] == len(padder)
+
+    length = vision_range*2+1
+    states = np.zeros([len(agents), length, length, len(padder)])
+    for ch, pad in enumerate(padder):
+        states[:,:,:,ch] = pad
+    for idx, agent in enumerate(agents):
+        x, y = agent.get_loc()
+        states[idx, vision_range-x:length-x, vision_range-y:length-y, :] = obs
+
+    return states
+
 def _find_coord(grid, element_id, single_value=False):
     """_find_coord
 

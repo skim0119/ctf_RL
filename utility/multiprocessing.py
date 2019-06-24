@@ -5,7 +5,7 @@ import numpy as np
 import random
 from multiprocessing import Process, Pipe
 
-from utility.dataModule import one_hot_encoder as one_hot_encoder
+from utility.dataModule import centering
 
 class CloudpickleWrapper(object):
     """
@@ -49,19 +49,19 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                     if continuous:
                         ob = env.reset()
                         pause = False
-                ob = one_hot_encoder(ob, env.get_team_blue)
+                ob = centering(ob, env.get_team_blue, 19)
                 if ctrl_red:
-                    rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
+                    rob = centering(env.get_obs_red, env.get_team_red, 19)
                     ob = np.concatenate([ob, rob], axis=0)
                 append_frame(stacked_frame, ob)
                 ob = unstack_frame(stacked_frame)
                 remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             pause = False
-            env.reset(**data)
-            ob = one_hot_encoder(env.get_obs_blue, env.get_team_blue)
+            ob = env.reset(**data)
+            ob = centering(ob, env.get_team_blue, 19)
             if ctrl_red:
-                rob = one_hot_encoder(env.get_obs_red, env.get_team_red)
+                rob = centering(env.get_obs_red, env.get_team_red, 19)
                 initial_map = np.concatenate([ob, rob], axis=0)
             else:
                 initial_map = ob

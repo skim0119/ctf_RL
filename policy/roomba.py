@@ -39,23 +39,16 @@ class Roomba(Policy):
             agent_list (list): list of all friendly units.
         """
         self.free_map = free_map
+        self.agent_list = agent_list
 
         self.random = np.random
-        self.exploration = 0.1
+        self.exploration = 0.05
         self.previous_move = self.random.randint(0, 5, len(agent_list)).tolist()
 
-        self.team = agent_list[0].team
-
-        self.flag_location = None
-        self.enemy_flag_code = 7
-        self.enemy_code = 1
-        self.enemy_agent_code = 4
-        self.team_code = 0
-
-        self.enemy_range = 5 # Range to see around and avoid enemy
+        self.enemy_range = 4 # Range to see around and avoid enemy
         self.flag_range = 5  # Range to see the flag
 
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation):
         """Action generation method.
 
         This is a required method that generates list of actions corresponding
@@ -72,18 +65,9 @@ class Roomba(Policy):
         """
         action_out = []
 
-        # Expand the observation with wall
-        padding = max(self.enemy_range, self.flag_range)
-        obs = self.center_padding(observation, padding)
-
         for idx, agent in enumerate(agent_list):
             # Initialize Variables
-            x, y = agent.get_loc()
-            x += padding
-            y += padding
-            self_centered = obs[x+1-padding:x+padding,
-                                y+1-padding:y+padding] # limited view for the agent
-            action = self.policy(agent, self_centered, idx)
+            action = self.policy(agent, observation, idx)
             action_out.append(action)
 
         return action_out
@@ -109,23 +93,26 @@ class Roomba(Policy):
                 - Follow same direction
                 - Change direction if it heats the wall
         """
+        dir_x = [0, 0, 1, 0, -1] # dx for [stay, down, right, up, left]
+        dir_y = [0,-1, 0, 1,  0] # dy for [stay, down, right, up,left]
+        def blocking(x,y,d):
+            nx = x + dir_x[d]
+            ny = y + dir_y[d]
+            if nx < 0 or nx >= mapx: return True
+            elif ny < 0 or ny >= mapy: return True
+
+            return self.free_map[nx][ny]==8 or obs[nx,ny,4] != 0
+
+        lx, ly = agent.get_loc()
+        mapx, mapy = self.free_map.shape
 
         # Continue the previous action
         action = self.previous_move[agent_id]
-        x, y = obs.shape
-        x //= 2; y //= 2
 
-        dir_x = [0, 0, 1, 0, -1] # dx for [stay, up, right, down, left]
-        dir_y = [0,-1, 0, 1,  0] # dy for [stay, up, right, down ,left]
-        blocking = lambda d: obs[x+dir_x[d]][y+dir_y[d]] in [8, 2]  
-
-        field = self.scan(obs)
-        elements = field.keys()
         # 1. Set direction to flag
-        if self.enemy_flag_code in elements: # Flag Found
-            # move towards the flag
-            fx, fy = field[self.enemy_flag_code][0]
-            fx -= x; fy -= y
+        is_flag, coord = self.obj_in_range(lx, ly, self.flag_range, obs, 2)
+        if is_flag:
+            fx, fy = coord[0]
             action_pool = []
             if fy > 0: # move down
                 action_pool.append(3)
@@ -140,10 +127,11 @@ class Roomba(Policy):
             action = np.random.choice(action_pool)
         
         # 2. Scan with enemy range
+        in_home = self.free_map[agent.get_loc()] == agent.team
+        is_enemy, enemy_locs = self.obj_in_range(lx, ly, self.enemy_range, obs, 4)
         opposite_move = [0, 3, 4, 1, 2]
-        for ex, ey in field.get(self.enemy_agent_code, []):
-            if self.free_map[agent.get_loc()] != agent.team:
-                ex -= x; ey -= y
+        for ex, ey in enemy_locs:
+            if not in_home:
                 if (ey > 0 and abs(ex) < 2 and action == 3) or \
                    (ey < 0 and abs(ex) < 2 and action == 1) or \
                    (ex > 0 and abs(ey) < 2 and action == 2) or \
@@ -159,39 +147,34 @@ class Roomba(Policy):
                 elif ex < 0 and ey == 0: # move right
                     aciton = 4
 
-
-        # 3. Exploration
         if action == 0 or np.random.random() <= self.exploration: # Exploration
             action = np.random.randint(1,5)
+
         # Checking obstacle
-        if blocking(action): # Wall or other obstacle
-            action_pool = [move for move in range(1,5) if not blocking(move)]
+        if blocking(lx, ly, action): # Wall or other obstacle
+            action_pool = [move for move in range(1,5) if not blocking(lx, ly, move)]
             if action_pool == []:
                 action_pool = [0]
             action = np.random.choice(action_pool)
 
+        # Save move
         self.previous_move[agent_id] = action
 
         return action
 
-    def scan(self, view, exclude=[-1, 8]):
-        """
-        This function returns the dictionary of locations for each element by its type.
-            key : field element (int)
-            value : list of element's coordinate ( (x,y) tuple )
-        """
+    def obj_in_range(self, x, y, r, obs, chn, elem=-1):
+        loc_list = np.where(obs[:,:,chn]==elem)
+        #rel_coord = np.column_stack(loc_list) - (x,y)
+        dif_coord = []
+        rsqr = r*r
+        for dx, dy in zip(*loc_list):
+            dx -= x
+            dy -= y
+            if dx*dx+dy*dy <= rsqr:
+                dif_coord.append((dx,dy))
+        return len(dif_coord)>0, dif_coord
 
-        objects = defaultdict(list)
-        dx, dy = view.shape
-        for i in range(dx):
-            for j in range(dy):
-                if view[i][j] in exclude: 
-                    continue
-                objects[view[i][j]].append((i,j))
-
-        return objects
-
-    def center_padding(self, m, width, padder=8):
+    def center_pad(self, m, width, padder=8):
         lx, ly = m.shape
         pm = np.empty((lx+(2*width),ly+(2*width)), dtype=np.int)
         pm[:] = padder
