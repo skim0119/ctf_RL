@@ -106,7 +106,7 @@ nenv = config.getint('DEFAULT', 'NUM_ENV')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-selfplay_reload = 8192
+batch_size = 8000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -121,7 +121,7 @@ global_episodes = 0
 
 ## Environment Initialization
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
-red_policy = policy.roomba.Roomba()
+red_policy = policy.Roomba()
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
@@ -236,12 +236,12 @@ def get_action(states):
     actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
-while global_episodes < total_episodes:
+batch = []
+num_batch = 0
+while True:
     log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
-    reload_on = False #interv_cntr(global_episodes,selfplay_reload, 'reload')
-    verbose_on = interv_cntr(global_episodes, 100*nenv, 'verb')
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -296,15 +296,15 @@ while global_episodes < total_episodes:
     sess.run(subtrain_step_next[MODE])
     # progbar.update(global_episodes)
 
-    if verbose_on: 
-        print(f'rollout time = {time.time()-stime} sec')
-            
-    stime = time.time()
-    train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-    if verbose_on:
-        print(f'training time = {time.time()-stime} sec')
-        print('Trajectory: ')
-        print(f'{sum([len(traj) for traj in trajs])} Frames')
+    batch.extend(trajs)
+    num_batch += sum([len(traj) for traj in trajs])
+
+    if num_batch >= batch_size:
+        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        print(f'collected {num_batch} steps, trained {len(batch)} trajectories')
+        batch = []
+        num_batch = 0
+        log_on = True
 
     steps = []
     for env_id in range(nenv):
@@ -312,7 +312,6 @@ while global_episodes < total_episodes:
     global_episode_rewards.append(np.mean(episode_rew))
     global_length.append(np.mean(steps))
     global_succeed.append(np.mean(envs.blue_win()))
-
 
     if log_on:
         step = sess.run(subtrain_step[MODE])
@@ -325,5 +324,3 @@ while global_episodes < total_episodes:
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
-    if reload_on:
-        red_policy.reset_network_weight()
