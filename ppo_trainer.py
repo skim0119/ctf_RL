@@ -5,6 +5,7 @@
 - No UAV
 '''
 
+import pickle
 import os
 import shutil
 import configparser
@@ -41,6 +42,7 @@ OVERRIDE = False;
 TRAIN_NAME = 'ppo_flat_roomba'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
 
 env_setting_path = 'setting_ppo_flat_roomba.ini'
@@ -51,6 +53,8 @@ if OVERRIDE:
         shutil.rmtree(LOG_PATH,ignore_errors=True)
     if os.path.exists(MODEL_PATH):
         shutil.rmtree(MODEL_PATH,ignore_errors=True)
+    if os.path.exists(SAVE_PATH):
+        shutil.rmtree(SAVE_PATH,ignore_errors=True)
 
 # Create model and log directory
 if not os.path.exists(MODEL_PATH):
@@ -63,6 +67,11 @@ if not os.path.exists(LOG_PATH):
         os.makedirs(LOG_PATH)
     except OSError:
         raise OSError(f'Creation of the directory {LOG_PATH} failed')
+if not os.path.exists(SAVE_PATH):
+    try:
+        os.makedirs(SAVE_PATH)
+    except OSError:
+        raise OSError(f'Creation of the directory {SAVE_PATH} failed')
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -205,6 +214,7 @@ while global_episodes < total_episodes:
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
     reload_on = False # interv_cntr(global_episodes,selfplay_reload, 'reload')
+    play_save_on = interv_cntr(global_episodes, 50000, 'replay_save')
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -275,4 +285,9 @@ while global_episodes < total_episodes:
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+
+    if play_save_on:
+        for i in range(nenv):
+            with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
+                pickle.dump(info[i], handle)
 
