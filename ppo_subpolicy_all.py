@@ -224,8 +224,7 @@ def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
             r.append(-1)
         else:
             r.append(0)
-        rewards.append(r)
-    return np.array(reward)
+    return np.array(r)
 
 print('Training Initiated:')
 def interv_cntr(step, freq, name):
@@ -294,7 +293,7 @@ while True:
             done[:] = True
 
         reward = reward_shape(was_alive_red, is_alive_red, done, env_reward)
-        episode_rew += reward
+        episode_rew += env_reward
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -319,15 +318,16 @@ while True:
     sess.run(global_step_next)
     for i in range(num_mode):
         sess.run(subtrain_step_next[i])
-    # progbar.update(global_episodes)
-
-    batch_att.append(trajs[0])
-    batch_att.append(trajs[1])
-    batch_sct.append(trajs[2])
-    batch_def.append(trajs[3])
-    num_batch_att += len(trajs[0]) + len(trajs[1])
-    num_batch_sct += len(trajs[2])
-    num_batch_def += len(trajs[3])
+    progbar.update(global_episodes)
+    
+    for i in range(nenv):
+        batch_att.append(trajs[4*i+0])
+        batch_att.append(trajs[4*i+1])
+        batch_sct.append(trajs[4*i+2])
+        batch_def.append(trajs[4*i+3])
+        num_batch_att += len(trajs[4*i+0]) + len(trajs[4*i+1])
+        num_batch_sct += len(trajs[4*i+2])
+        num_batch_def += len(trajs[4*i+3])
 
     if num_batch_att >= minbatch_size:
         train(batch_att, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=0)
