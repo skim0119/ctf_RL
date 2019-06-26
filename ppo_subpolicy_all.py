@@ -1,11 +1,11 @@
 '''
-- Self-play
 - Subpolicy
+- 2 att, 1 nav, 1 def
 - Shared CNN
 - PPO
 - No UAV
 '''
-
+import pickle
 import os
 import shutil
 import configparser
@@ -42,17 +42,16 @@ from method.ppo import PPO_multimodes as Network
 
 from method.base import initialize_uninitialized_vars as iuv
 
-MODE = int(sys.argv[-1])
-assert MODE in [0,1,2,3]
 num_mode = 3
-MODE_NAME = ['_attack', '_scout', '_defense', ''][MODE]
+fair_map_path = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
 
 ## Training Directory Reset
 OVERRIDE = False;
 TRAIN_NAME = 'ppo_subpolicies'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
-GPU_CAPACITY = 0.90
+REPLAY_PATH = './save/' + TRAIN_NAME
+GPU_CAPACITY = 0.95
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -60,6 +59,8 @@ if OVERRIDE:
         shutil.rmtree(LOG_PATH,ignore_errors=True)
     if os.path.exists(MODEL_PATH):
         shutil.rmtree(MODEL_PATH,ignore_errors=True)
+    if os.path.exists(REPLAY_PATH):
+        shutil.rmtree(REPLAY_PATH,ignore_errors=True)
 
 # Create model and log directory
 if not os.path.exists(MODEL_PATH):
@@ -67,6 +68,11 @@ if not os.path.exists(MODEL_PATH):
         os.makedirs(MODEL_PATH)
     except OSError:
         raise OSError(f'Creation of the directory {MODEL_PATH} failed')
+if not os.path.exists(REPLAY_PATH):
+    try:
+        os.makedirs(REPLAY_PATH)
+    except OSError:
+        raise OSError(f'Creation of the directory {REPLAY_PATH} failed')
 if not os.path.exists(LOG_PATH):
     try:
         os.makedirs(LOG_PATH)
@@ -101,7 +107,8 @@ action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
-nenv = config.getint('DEFAULT', 'NUM_ENV')
+nenv = multiprocessing.cpu_count()  # config.getint('DEFAULT', 'NUM_ENV')
+print('cpu count: {}'.format(nenv))
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
@@ -120,11 +127,10 @@ global_succeed = MA(moving_average_step)
 global_episodes = 0
 
 ## Environment Initialization
-setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
 red_policy = policy.Roomba()
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
-	config_path=setting_paths[MODE])
+	config_path='setting_subpolicy_all.ini')
 
 envs = [make_env(map_size) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
@@ -144,7 +150,7 @@ subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
 subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
-def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
+def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
         for _ in range(size // batch_size):
@@ -176,7 +182,7 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
             batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
                     np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
             network.update_global(
-                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, MODE)
+                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, mode)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
@@ -196,28 +202,29 @@ red_policy = TrainedNetwork(
 '''
 
 
-def reward_shape(prev_red_alive, red_alive, done, idx=None):
+def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
     prev_red_alive = np.reshape(prev_red_alive, [nenv, num_red])
     red_alive = np.reshape(red_alive, [nenv, num_red])
-    reward = []
+    r = []
     red_flags = envs.red_flag()
     blue_flags = envs.blue_flag()
     for i in range(nenv):
-        if idx == 0:
-            # Attack (C/max enemy)
-            num_prev_enemy = sum(prev_red_alive[i])
-            num_enemy = sum(red_alive[i])
-            reward.append((num_prev_enemy - num_enemy)*0.25)
-        if idx == 1:
-            if red_flags[i]:
-                reward.append(1)
-            else:
-                reward.append(0)
-        if idx == 2:
-            if blue_flags[i]:
-                reward.append(-1)
-            else:
-                reward.append(0)
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        r.append((num_prev_enemy - num_enemy)*0.25)
+        r.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            r.append(1)
+        else:
+            r.append(0)
+        # Defense
+        if blue_flags[i]:
+            r.append(-1)
+        else:
+            r.append(0)
+        rewards.append(r)
     return np.array(reward)
 
 print('Training Initiated:')
@@ -232,16 +239,27 @@ def interv_cntr(step, freq, name):
         return False
 
 def get_action(states):
-    a1, v1, logits1 = network.run_network(states, MODE)
+    a1, v1, logits1 = [], [], []
+    a, v, logits = network.run_network(states, 0)
+    a1.extend(a[:2]); v1.extend(v[:2]); logits1.extend(logits[:2])
+    a, v, logits = network.run_network(states, 1)
+    a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
+    a, v, logits = network.run_network(states, 2)
+    a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
     actions = np.reshape(a1, [nenv, num_blue])
-    return a1, v1, logits1, actions
+    return np.array(a1), np.array(v1), np.array(logits1), actions
 
-batch = []
-num_batch = 0
+batch_att = []
+batch_sct = []
+batch_def = []
+num_batch_att = 0
+num_batch_sct = 0
+num_batch_def = 0
 while True:
     log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
+    play_save_on = interv_cntr(global_episodes, 5000, 'replay_save')
     
     # initialize parameters 
     episode_rew = np.zeros(nenv)
@@ -253,7 +271,10 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    s1 = envs.reset()
+    if np.random.random() < 0.05:
+        s1 = envs.reset(custom_board=random.choice(fair_map_path))
+    else:
+        s1 = envs.reset()
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -266,11 +287,14 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
-        episode_rew += reward
+        env_reward = (raw_reward-prev_rew-0.01)/100.0
 
         if step == max_ep:
+            env_reward[:] = -1
             done[:] = True
+
+        reward = reward_shape(was_alive_red, is_alive_red, done, env_reward)
+        episode_rew += reward
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -281,7 +305,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward[idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -293,17 +317,30 @@ while True:
 
     global_episodes += nenv
     sess.run(global_step_next)
-    sess.run(subtrain_step_next[MODE])
+    for i in range(num_mode):
+        sess.run(subtrain_step_next[i])
     # progbar.update(global_episodes)
 
-    batch.extend(trajs)
-    num_batch += sum([len(traj) for traj in trajs])
+    batch_att.append(trajs[0])
+    batch_att.append(trajs[1])
+    batch_sct.append(trajs[2])
+    batch_def.append(trajs[3])
+    num_batch_att += len(trajs[0]) + len(trajs[1])
+    num_batch_sct += len(trajs[2])
+    num_batch_def += len(trajs[3])
 
-    if num_batch >= minbatch_size:
-        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        batch = []
-        num_batch = 0
-        log_on = True
+    if num_batch_att >= minbatch_size:
+        train(batch_att, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=0)
+        batch_att = []
+        num_batch_att = 0
+    if num_batch_sct >= minbatch_size:
+        train(batch_sct, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=1)
+        batch_sct = []
+        num_batch_sct = 0
+    if num_batch_def >= minbatch_size:
+        train(batch_def, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=2)
+        batch_def = []
+        num_batch_def = 0
 
     steps = []
     for env_id in range(nenv):
@@ -313,13 +350,17 @@ while True:
     global_succeed.append(np.mean(envs.blue_win()))
 
     if log_on:
-        step = sess.run(subtrain_step[MODE])
+        step = sess.run(global_step)
         record({
-            'Records/mean_length'+MODE_NAME: global_length(),
-            'Records/mean_succeed'+MODE_NAME: global_succeed(),
-            'Records/mean_episode_reward'+MODE_NAME: global_episode_rewards(),
+            'Records/mean_length': global_length(),
+            'Records/mean_succeed': global_succeed(),
+            'Records/mean_episode_reward': global_episode_rewards(),
         }, writer, step)
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
+    if play_save_on:
+        for i in range(nenv):
+            with open(REPLAY_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
+                pickle.dump(info[i], handle)
