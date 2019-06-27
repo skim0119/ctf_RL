@@ -44,7 +44,7 @@ def build_network(input_hold, output_size=128, return_layers=False):
     _layers['NLNN'] = net
 
     # Block 4 : Feature Vector
-    net = tf.reduce_max(net, axis=-2)
+    net = tf.reduce_max(net, axis=-2) # Feature-wise max pool
     net = layers.flatten(net)
     _layers['flat'] = net
     net = layers.fully_connected(
