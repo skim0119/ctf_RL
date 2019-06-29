@@ -138,13 +138,13 @@ class Roomba(Policy):
                    (ex < 0 and abs(ey) < 2 and action == 4):
                     action = opposite_move[action]
             else:
-                if ey > 0 and ex == 0: # move down
+                if ey > 0: # move down
                     action = 3
-                elif ey < 0 and ex == 0: # move up
+                elif ey < 0: # move up
                     action = 1
-                elif ex > 0 and ey == 0: # move left
+                elif ex > 0: # move left
                     action = 2
-                elif ex < 0 and ey == 0: # move right
+                elif ex < 0: # move right
                     aciton = 4
 
         if action == 0 or np.random.random() <= self.exploration: # Exploration

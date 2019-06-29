@@ -2,6 +2,8 @@ import tensorflow as tf
 
 import numpy as np
 
+from network.core import layer_normalization
+
 def soft_attention(h_prev, a, num_input, hidden_size):
     def weight_variable(name, shape):
         return tf.get_variable(name,shape=shape, initializer=tf.contrib.layers.xavier_initializer())
@@ -52,7 +54,7 @@ def self_attention(data, hidden_dim, output_dim, residual=True):
 
     return output
 
-def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', return_layers=False):
+def non_local_nn_2d(data, hidden_dim=None, pool=False, use_dense=False, normalize=False, name='non_local', return_layers=False):
     # data shape : [Batch, H, W, Channel]
     # output dim : [Batch, H, W, Channel]
     _layers = {'input': data} # monitoring layer (input, attention, output)
@@ -72,28 +74,40 @@ def non_local_nn_2d(data, hidden_dim, pool=False, name='non_local', return_layer
             return attention
 
         nbatch, h, w, output_dim = data.get_shape().as_list()
-        Q = tf.contrib.layers.convolution(data, hidden_dim, 1)
-        Q = tf.reshape(Q, [-1, h*w, hidden_dim])
+        if hidden_dim is None: hidden_dim = output_dim
 
-        if pool:
-            K = tf.contrib.layers.convolution(data, hidden_dim, 1)
-            K = tf.contrib.layers.max_pool2d(K, 2)
-            K = tf.reshape(K, [-1, (h//2)*(w//2), hidden_dim])
-
-            V = tf.contrib.layers.convolution(data, hidden_dim, 1)
-            V = tf.contrib.layers.max_pool2d(V, 2)
-            V = tf.reshape(V, [-1, (h//2)*(w//2), hidden_dim])
+        if use_dense:
+            flattened = tf.reshape(data, [-1, h*w, output_dim])
+            Q = tf.contrib.layers.fully_connected(data, hidden_dim)
+            K = tf.contrib.layers.fully_connected(data, hidden_dim)
+            V = tf.contrib.layers.fully_connected(data, hidden_dim)
         else:
-            K = tf.contrib.layers.convolution(data, hidden_dim, 1)
-            K = tf.reshape(K, [-1, h*w, hidden_dim])
+            Q = tf.contrib.layers.convolution(data, hidden_dim, 1)
+            Q = tf.reshape(Q, [-1, h*w, hidden_dim])
+            if pool:
+                K = tf.contrib.layers.convolution(data, hidden_dim, 1)
+                K = tf.contrib.layers.max_pool2d(K, 2)
+                K = tf.reshape(K, [-1, (h//2)*(w//2), hidden_dim])
+                V = tf.contrib.layers.convolution(data, hidden_dim, 1)
+                V = tf.contrib.layers.max_pool2d(V, 2)
+                V = tf.reshape(V, [-1, (h//2)*(w//2), hidden_dim])
+            else:
+                K = tf.contrib.layers.convolution(data, hidden_dim, 1)
+                K = tf.reshape(K, [-1, h*w, hidden_dim])
 
-            V = tf.contrib.layers.convolution(data, hidden_dim, 1)
-            V = tf.reshape(V, [-1, h*w, hidden_dim])
+                V = tf.contrib.layers.convolution(data, hidden_dim, 1)
+                V = tf.reshape(V, [-1, h*w, hidden_dim])
+
+        if normalize:
+            Q = layer_normalization(Q)
+            K = layer_normalization(K)
+            V = layer_normalization(V)
 
         dot = scaled_dot_product(Q, K)
         output = tf.matmul(dot, V)  # [batch_size, sequence_length, output_dim]
         output = tf.reshape(output, [-1,h,w,hidden_dim])
-        output = tf.contrib.layers.convolution(output, output_dim, 1)
+        if hidden_dim != output_dim:
+            output = tf.contrib.layers.convolution(output, output_dim, 1)
         _layers['attention'] = output
 
         output = output + data  # Residual
