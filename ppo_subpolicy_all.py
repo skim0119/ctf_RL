@@ -47,7 +47,7 @@ fair_map_path = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_subpolicies'
+TRAIN_NAME = 'golub_ppo_subpolicies'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 REPLAY_PATH = './save/' + TRAIN_NAME
@@ -270,7 +270,7 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    if np.random.random() < 0.05:
+    if np.random.random() < 0.00:
         s1 = envs.reset(custom_board=random.choice(fair_map_path))
     else:
         s1 = envs.reset()
@@ -318,7 +318,6 @@ while True:
     sess.run(global_step_next)
     for i in range(num_mode):
         sess.run(subtrain_step_next[i])
-    progbar.update(global_episodes)
     
     for i in range(nenv):
         batch_att.append(trajs[4*i+0])

@@ -109,7 +109,7 @@ nenv = config.getint('DEFAULT', 'NUM_ENV')
 minibatch_size = 128
 epoch = 2
 meta_delay = 10
-batch_memory_size = 8000
+batch_memory_size = 4000
 batch_meta_memory_size = 4000
 
 ## Setup
@@ -214,8 +214,6 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
         actions = traj[1]
         bootstrap = traj[6][-1]
         mode = traj[5][0]
-        print(traj[5])
-        input('')
         
         td_target, advantages = gae(traj[2], traj[3], bootstrap,
                 gamma, lambd, normalize=False)
@@ -296,10 +294,9 @@ def get_action(states, meta):
         a_list.append(a1)
         v_list.append(v1)
         logits_list.append(logits1)
-    action = np.array(a_list)[meta]
-    crtiic = np.array(v_list)[meta]
-    logits = np.array(logits_list)[meta]
-
+    action = np.array([a_list[mode][idx] for idx, mode in enumerate(meta)])
+    critic = np.array([v_list[mode][idx] for idx, mode in enumerate(meta)])
+    logits = np.array([logits_list[mode][idx] for idx, mode in enumerate(meta)])
     actions = np.reshape(action, [nenv, num_blue])
     return action, critic, logits, actions
 
@@ -307,7 +304,7 @@ meta_batch = []
 num_meta_batch = 0
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
+while True:
     log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
@@ -348,8 +345,7 @@ while global_episodes < total_episodes:
         reward = reward_shape(was_alive_red, is_alive_red, done, env_reward) - 0.01
         cumul_reward += env_reward
     
-        meta_a1, meta_v1, meta_logits1 = get_meta_action(s1)
-        a1, v1, logits1, actions = get_action(s1, meta_a1)
+        a1, v1, logits1, actions = get_action(s1, meta_a)
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
@@ -366,18 +362,15 @@ while global_episodes < total_episodes:
                     logits[idx],
                     meta_a[idx],
                     v1[idx]])
-
-        # Reselect meta
-        if step % meta_delay == 1:
-            for idx, agent in enumerate(envs.get_team_blue().flat):
-                env_idx = idx // num_blue
-                if was_alive[idx] and not was_done[env_idx]:
+                # Reselect meta
+                if (step+1) % meta_delay == 0:
                     meta_trajs[idx].append([s0[idx], meta_a[idx], cumul_reward[env_idx], meta_v0[idx], meta_logits[idx]])
-            cumul_reward[:] = 0
+                    cumul_reward[:] = 0
+                    meta_a1, meta_v1, meta_logits1 = get_meta_action(s1)
 
-            batch.extend(trajs)
-            num_batch += sum([len(traj) for traj in trajs])
-            trajs = [Trajectory(depth=7) for _ in range(num_blue*nenv)]
+                    batch.extend(trajs)
+                    num_batch += sum([len(traj) for traj in trajs])
+                    trajs = [Trajectory(depth=7) for _ in range(num_blue*nenv)]
 
         prev_rew = raw_reward
         was_alive = is_alive
