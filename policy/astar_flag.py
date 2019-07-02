@@ -33,7 +33,6 @@ class AStar(Policy):
 
     def initiate(self, free_map, agent_list):
         super().initiate(free_map, agent_list)
-        self.l, self.b = free_map.shape
         self.found_route = []
         self.agent_route = []
         flag_id = const.TEAM2_FLAG if agent_list[0].team==const.TEAM1_BACKGROUND else const.TEAM1_FLAG
@@ -152,7 +151,7 @@ class AStar(Policy):
                 x2, y2 = current
                 x = x2 + dx
                 y = y2 + dy
-                if (x >= 0 and x < self.l) and (y >= 0 and y < self.b) and board[x,y] != 8:
+                if (x >= 0 and x < board.shape[0]) and (y >= 0 and y < board.shape[1]) and board[x,y] != 8:
                     neighbours.append((x, y))
 
             for neighbour in neighbours:
