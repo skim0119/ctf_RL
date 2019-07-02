@@ -23,6 +23,7 @@ from method.a3c import a3c
 from method.base import put_channels_on_grid
 
 from network.attention_ctf import build_network
+#from network.model_V3 import build_network
 
 class Loss:
     """Loss

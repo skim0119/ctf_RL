@@ -45,11 +45,17 @@ from method.base import initialize_uninitialized_vars as iuv
 MODE = int(sys.argv[-1])
 assert MODE in [0,1,2,3]
 num_mode = 3
-MODE_NAME = ['_attack', '_scout', '_defense', ''][MODE]
+if MODE == 3:
+    ALTERMODE = True
+    MODE = 0
+MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
+
+map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
+call_map = lambda: random.choice(map_list)
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_subpolicies'
+TRAIN_NAME = 'golub_ppo_subpolicies2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
@@ -243,6 +249,15 @@ while True:
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
     save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
     
+    # Bootstrap
+    if ALTERMODE:
+        MODE = np.random.randint(3)
+        s1 = envs.reset(config_path=setting_paths[MODE])
+    if np.random.random() < 0.5:
+        s1 = envs.reset(custom_board=call_map())
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
+    
     # initialize parameters 
     episode_rew = np.zeros(nenv)
     prev_rew = np.zeros(nenv)
@@ -252,8 +267,6 @@ while True:
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
-    # Bootstrap
-    s1 = envs.reset()
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -267,9 +280,11 @@ while True:
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        env_reward = (raw_reward - prev_rew)/100
         episode_rew += reward
 
         if step == max_ep:
+            env_reward[:] = -1
             done[:] = True
     
         a1, v1, logits1, actions = get_action(s1)
@@ -281,7 +296,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx]-env_reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -315,9 +330,9 @@ while True:
     if log_on:
         step = sess.run(subtrain_step[MODE])
         record({
-            'Records/mean_length'+MODE_NAME: global_length(),
-            'Records/mean_succeed'+MODE_NAME: global_succeed(),
-            'Records/mean_episode_reward'+MODE_NAME: global_episode_rewards(),
+            'Records/mean_length'+MODE_NAME(MODE): global_length(),
+            'Records/mean_succeed'+MODE_NAME(MODE): global_succeed(),
+            'Records/mean_episode_reward'+MODE_NAME(MODE): global_episode_rewards(),
         }, writer, step)
         
     if save_on:
