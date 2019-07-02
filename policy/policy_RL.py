@@ -1,155 +1,109 @@
-""" Reinforce Learning Policy Generator
+"""Simple agents policy generator.
 
-This module calls any pre-trained tensorflow model and generates the policy.
-It includes method to switch between the network and weights. 
-
-For use: generate policy to simulate along with CTF environment.
-
+This module demonstrates an example of a simple heuristic policy generator
 for Capture the Flag environment.
-    http://github.com/osipychev/missionplanner/
+    http://github.com/osipychev/ctf_public/
 
 DOs/Denis Osipychev
     http://www.denisos.com
-
-Last Modified:
-    Seung Hyun Kim
-    created :Wed Oct 24 12:21:34 CDT 2018
 """
 
 import numpy as np
-import tensorflow as tf
-from tensorflow.python.tools import inspect_checkpoint as chkp
-from utility.dataModule import one_hot_encoder_v2 as one_hot_encoder
+from collections import defaultdict
+from utility.RL_Wrapper import TrainedNetwork
 
-class PolicyGen:
-    import tensorflow as tf
+from policy.policy import Policy
+
+class PPO(Policy):
     """Policy generator class for CtF env.
-    
+
+    This class can be used as a template for policy generator.
     Designed to summon an AI logic for the team of units.
-    
+
     Methods:
-        gen_action  : Required method to generate a list of actions.
-        load_model  : Load pre-defined model (*.meta file). Only TensorFlow model supported
-        load_weight : Load/reload weight to the model. 
+        gen_action: Required method to generate a list of actions.
+        policy: Method to determine the action based on observation for a single unit
+        scan : Method that returns the dictionary of object around the agent
+
+    Variables:
+        exploration : exploration rate
+        previous_move : variable to save previous action
     """
-    
-    def __init__(self,
-                 free_map,
-                 agent_list,
-                 model_dir,
-                 input_name,
-                 output_name,
-                 color='blue',
-                 import_scope=None
-                 ):
+
+    def unstack_frame(frames):
+        s = np.concatenate(frames, axis=3)
+        return s
+
+    def append_frame(l:list, obj):
+        l.append(obj)
+        l.pop(0)
+        assert len(l) == keep_frame
+
+    def __init__(self):
+        self.keep_frame = 4
+        self.vision_range = 19
+        self.network = TrainedNetwork(
+                model_name='ppo_flat_roomba',
+                input_tensor='main/state:0',
+                output_tensor='main/actor/Softmax:0'
+            )
+
+    def initiate(self, free_map, agent_list):
         """Constuctor for policy class.
-        
+
+        This class can be used as a template for policy generator.
+
         Args:
             free_map (np.array): 2d map of static environment.
             agent_list (list): list of all friendly units.
-
-        Initialize TensorFlow Graph
-        Initiate session
         """
+        self.free_map = free_map
+        self.agent_list = agent_list
 
-        # Switches 
-        self.deterministic = False
-        self.full_observation = True
-        self.is_blue = color == 'blue'
-        
-        
-        self.model_dir = model_dir # Default
-        self.input_name = input_name
-        self.output_name = output_name
-        self.reset_network(self.input_name, self.output_name, import_scope)
+        self.initial_move = True
+        self.stacked_frame = None
 
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation):
         """Action generation method.
-        
-        This is a required method that generates list of actions corresponding 
-        to the list of units. 
-        
+
+        This is a required method that generates list of actions corresponding
+        to the list of units.
+
         Args:
             agent_list (list): list of all friendly units.
             observation (np.array): 2d map of partially observable map.
             free_map (np.array): 2d map of static environment (optional).
-            
+
         Returns:
             action_out (list): list of integers as actions selected for team.
 
-        Note:
-            The graph is not updated in this session.
-            It only returns action for given input.
         """
 
-        obs = one_hot_encoder(observation, agent_list, self.input_shape, reverse=not self.is_blue)
-        action_prob = self.sess.run(self.action, feed_dict={self.state:obs}) # Action Probability
+        inputx, inputy = 39, 39
+        obs = self.center_pad(observation, width=self.vision_range)
 
-        # If the policy is deterministic policy, return the argmax
-        # The parameter can be changed with set_deterministic(bool)
-        if self.deterministic:
-            action_out = np.argmax(action_prob, axis=1).tolist()
-        else: 
-            action_out = [np.random.choice(5, p=action_prob[x]/sum(action_prob[x])) for x in range(len(agent_list))]
+        if self.initial_move:
+            self.stacked_frame = [obs for _ in range(self.keep_frame)]
+            self.initial_move = False
+        else:
+            self.stacked_frame.pop(0)
+            self.stacked_frame.append(obs)
+        obs = np.concatenate(self.stacked_frame, axis=2)
+
+        agent_state = []
+        for idx, agent in enumerate(agent_list):
+            x, y = agent.get_loc()
+            agent_state.append(obs[x:x+inputx, y:y+inputy, :])
+        state = np.stack(agent_state)
+        action_out = self.network.get_action(state)
 
         return action_out
-    
-    def reset_network_weight(self, input_name='state:0', output_name='action:0'):
-        """reset_network_weight
 
-        :param input_name:
-        :param output_name:
-        """
-        ckpt = tf.train.get_checkpoint_state(self.model_dir)
-        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-            print('Weight is succesfully loaded.', ckpt.model_checkpoint_path)
-        else:
-            print('Error : Graph is not loaded')
-    
-    def reset_network(self, input_name = 'state:0', output_name = 'action:0', im_scope=None):
-        """reset_network
+    def center_pad(self, m, width, padder=[1,0,0,1,0,0]):
+        lx, ly, nch = m.shape
+        pm = np.zeros((lx+(2*width),ly+(2*width), nch), dtype=np.int)
+        for ch, pad in enumerate(padder):
+            pm[:,:,ch] = pad
+        pm[width:lx+width, width:ly+width] = m
+        return pm
 
-        :param input_name:
-        :param output_name:
-        :param im_scope:
-        """
-        # Reset the weight to the newest saved weight.
-        ckpt = tf.train.get_checkpoint_state(self.model_dir)
-        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-            print(f'path exist : {ckpt.model_checkpoint_path}')
-            self.graph = tf.Graph()
-            self.sess = tf.Session(graph=self.graph)
-            with self.graph.as_default():
-                self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', import_scope=im_scope, clear_devices=True);
-                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-                #print([n.name for n in self.graph.as_graph_def().node])
-            
-                self.state = self.graph.get_tensor_by_name(input_name)
-                try:
-                    self.action = self.graph.get_operation_by_name(output_name)
-                except ValueError:
-                    self.action = self.graph.get_tensor_by_name(output_name)
-                    #print([n.name for n in self.graph.as_graph_def().node])
-            
-            self.input_shape = 9
-            print('Graph is succesfully loaded.', ckpt.model_checkpoint_path)
-        else:
-            print('Error : Graph is not loaded')
-            raise NameError
-
-    def set_directory(self, model_dir):
-        """set_directory
-
-        :param model_dir:
-        """
-        self.model_dir = model_dir
-
-    def set_deterministic(self, b):
-        """set_deterministic
-
-        Change deterministic/stochastic algorithm
-
-        :param b:
-        """
-        self.deterministic = b

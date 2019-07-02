@@ -33,7 +33,7 @@ class Patrol(Policy):
         self.free_map = free_map 
         self.heading_right = [True] * len(agent_list) #: Attr to track directions.
         
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation):
         """Action generation method.
         
         This is a required method that generates list of actions corresponding 
@@ -49,29 +49,43 @@ class Patrol(Policy):
         """
         action_out = []
         
-        if free_map is not None: self.free_map = free_map
-        
-        for idx,agent in enumerate(agent_list):
-            a = self.patrol(agent, idx, observation)
+        for agent in agent_list:
+            a = self.patrol(agent, self.free_map)
             action_out.append(a)
         
         return action_out
 
-    def patrol(self, agent, index, obs):
+    def patrol(self, agent, obs):
         """Generate 1 action for given agent object."""
         x,y = agent.get_loc()
-        action = 0
 
         #approach the boarder.
-        if (y > len(self.free_map[0])/2 and 
+        '''if (y > len(self.free_map[0])/2 and 
             self.free_map[x][y-1] == self.free_map[x][y]):
             action = 1
         elif (y < len(self.free_map[0])/2 - 1 and
             self.free_map[x][y+1] == self.free_map[x][y]):
             action = 3
+        '''
         
         #patrol along the boarder.
-        else:
+        dir_x = [0, 0, 1, 0, -1] # dx for [stay, down, right, up, left]
+        dir_y = [0,-1, 0, 1,  0] # dy for [stay, down, right, up,left]
+        enemy = 0 if agent.team else 1
+        def cannot_move(x,y,d):
+            nx = x + dir_x[d]
+            ny = y + dir_y[d]
+            if nx < 0 or nx >= 20: return True
+            elif ny < 0 or ny >= 20: return True
+
+            return obs[nx][ny]==enemy or obs[nx][ny]==8
+        action = [0]
+        for a in range(1,5):
+            if cannot_move(x,y,a): continue
+            action.append(a)
+        return np.random.choice(action)
+
+        '''else:
             if (x <= 0 or x >= len(self.free_map)-1):
                 self.heading_right[index] = not self.heading_right[index]
                 
@@ -90,3 +104,4 @@ class Patrol(Policy):
                 self.heading_right[index] = not self.heading_right[index]
                 
         return action
+        '''

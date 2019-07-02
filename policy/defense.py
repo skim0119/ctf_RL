@@ -38,7 +38,7 @@ class Defense(Policy):
 
         self.flag_code = const.TEAM1_FLAG
 
-    def gen_action(self, agent_list, observation, free_map=None):
+    def gen_action(self, agent_list, observation):
         """Action generation method.
 
         This is a required method that generates list of actions corresponding
@@ -55,27 +55,22 @@ class Defense(Policy):
         action_out = []
 
         # if map changes then reset the flag location
-        if free_map is not None and self.free_map is not free_map:
-            self.flag_location = None
-            self.free_map_old = self.free_map
-            self.free_map = free_map
-
         # search for a flag until finds it
         if self.flag_location == None:
 
-            loc = self.scan_obs(observation, self.flag_code)
+            loc = self.scan_obs(self.free_map, self.flag_code)
             if len(loc) is not 0:
                 self.flag_location = loc[0]
 
             for idx,agent in enumerate(agent_list):
-                a = self.random_search(agent, idx, observation)
+                a = self.random_search(agent, idx, self.free_map)
                 action_out.append(a)
 
             return action_out
 
         # go to the flag to defend it
         for idx,agent in enumerate(agent_list):
-            a = self.flag_approach(agent, idx, observation)
+            a = self.flag_approach(agent, idx, self.free_map)
             action_out.append(a)
 
         return action_out

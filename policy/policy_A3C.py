@@ -22,7 +22,6 @@ import tensorflow as tf
 from utility.dataModule import one_hot_encoder as one_hot_encoder
 from utility.utils import store_args
 
-from method.base import initialize_uninitialized_vars as iuv
 
 
 class PolicyGen:
@@ -40,9 +39,9 @@ class PolicyGen:
     def __init__(self,
                  free_map=None,
                  agent_list=None,
-                 model_dir='./policy/A3C_model/',
+                 model_dir='./model/A3C_pretrained/',
                  input_name='global/state:0',
-                 output_name='global/actor/fully_connected_1/Softmax:0',
+                 output_name='global/actor/Softmax:0',
                  import_scope=None,
                  vision_radius=19,
                  trainable=False,
@@ -76,7 +75,6 @@ class PolicyGen:
         self.sess = tf.Session(config=config, graph=self.graph)
         with self.graph.as_default():
             self.saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta', clear_devices=True)
-            iuv(self.sess)
         self.state, self.action = self.reset_network_weight()
         print('    TF policy loaded. {}'.format(name) )
 
