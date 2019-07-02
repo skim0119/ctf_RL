@@ -16,14 +16,13 @@ import numpy as np
 
 from utility.utils import store_args
 
-from method.base import Deep_layer
 from method.pg import Backpropagation
 
 from method.a3c import a3c
 from method.base import put_channels_on_grid
 
-from network.attention_ctf import build_network
-#from network.model_V3 import build_network
+#from network.attention_ctf import build_network
+from network.model_V2 import build_network
 
 class Loss:
     """Loss

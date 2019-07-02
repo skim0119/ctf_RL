@@ -39,13 +39,13 @@ from method.ppo import PPO as Network
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_flat_roomba'
+TRAIN_NAME = 'ppo_flat_robust'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
 
-env_setting_path = 'setting_ppo_flat_roomba.ini'
+env_setting_path = 'setting_ppo_flat.ini'
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -106,7 +106,7 @@ nenv = config.getint('DEFAULT', 'NUM_ENV')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-selfplay_reload = 2048*4
+minimum_batch_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -120,9 +120,37 @@ global_length = MovingAverage(moving_average_step)
 global_succeed = MovingAverage(moving_average_step)
 global_episodes = 0
 
-## Environment Initialization
+## Map Setting
 map_dir = 'fair_map/'
-map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,4)]
+map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
+max_epsilon = 0.75; max_at = 150000
+def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
+    x = (x-lowx) / (highx-lowx)
+    if x < 0:
+        val = 0
+    elif x > 1:
+        val = 1
+    else:
+        val = x * x * (3 - 2 * x)
+    return val*(highy-lowy)+lowy
+def use_this_map(x, max_episode, max_prob):
+    prob = smoothstep(x, highx=max_x, highy=max_y)    
+    if np.random.random < prob:
+        return random.choice(map_list)
+    else:
+        return None
+
+## Policy Setting
+heur_policy_list = [
+map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
+def use_this_policy():
+    if np.random.random < prob:
+        return random.choice(map_list)
+    else:
+        return None
+
+
+## Environment Initialization
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy.roomba.Roomba(),
 	config_path=env_setting_path)
@@ -209,6 +237,8 @@ def get_action(states):
     actions = np.reshape(a1, [nenv, num_blue])
     return a1, v1, logits1, actions
 
+batch = []
+num_batch = 0
 while global_episodes < total_episodes:
     log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
     log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
@@ -225,11 +255,10 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    s1 = envs.reset() #custom_board=random.choice(map_list))
+    s1 = envs.reset(custom_board=use_this_map(global_episodes, max_at, max_epsilon))
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
-    stime = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a, v0 = a1, v1
@@ -261,9 +290,12 @@ while global_episodes < total_episodes:
         if np.all(done):
             break
             
-    stime = time.time()
-    total_frame = sum([len(traj) for traj in trajs])
-    train(trajs, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+    batch.extend(trajs)
+    num_batch += sum([len(traj) for traj in trajs])
+    if num_batch >= minimum_batch_size:
+        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        batch = []
+        num_batch = 0
 
     steps = []
     for env_id in range(nenv):
@@ -274,7 +306,7 @@ while global_episodes < total_episodes:
 
     global_episodes += nenv
     sess.run(global_step_next)
-    progbar.update(global_episodes)
+    #progbar.update(global_episodes)
 
     if log_on:
         record({
