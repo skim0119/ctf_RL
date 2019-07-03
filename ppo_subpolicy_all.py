@@ -113,7 +113,7 @@ print('cpu count: {}'.format(nenv))
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 8000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
