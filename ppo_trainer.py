@@ -134,25 +134,22 @@ def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
         val = x * x * (3 - 2 * x)
     return val*(highy-lowy)+lowy
 def use_this_map(x, max_episode, max_prob):
-    prob = smoothstep(x, highx=max_x, highy=max_y)    
-    if np.random.random < prob:
+    prob = smoothstep(x, highx=max_episode, highy=max_prob)
+    if np.random.random() < prob:
         return random.choice(map_list)
     else:
         return None
 
 ## Policy Setting
-heur_policy_list = [
-map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
+heur_policy_list = [policy.Patrol(), policy.Roomba(), policy.Defense(), policy.AStar()]
+heur_weight = [1,3,1,1]
+heur_weight = np.array(heur_weight) / sum(heur_weight)
 def use_this_policy():
-    if np.random.random < prob:
-        return random.choice(map_list)
-    else:
-        return None
-
+    return np.random.choice(heur_policy_list, p=heur_weight)
 
 ## Environment Initialization
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=policy.roomba.Roomba(),
+    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=use_this_policy(),
 	config_path=env_setting_path)
 
 envs = [make_env(map_size) for i in range(nenv)]
@@ -255,7 +252,10 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    s1 = envs.reset(custom_board=use_this_map(global_episodes, max_at, max_epsilon))
+    s1 = envs.reset(
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=use_this_policy()
+        )
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
