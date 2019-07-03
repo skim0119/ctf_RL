@@ -101,7 +101,7 @@ action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
-nenv = config.getint('DEFAULT', 'NUM_ENV')
+nenv = multiprocessing.cpu_count()  # config.getint('DEFAULT', 'NUM_ENV')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128

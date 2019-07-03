@@ -43,11 +43,11 @@ from method.ppo import PPO_multimodes as Network
 from method.base import initialize_uninitialized_vars as iuv
 
 num_mode = 3
-fair_map_path = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
+env_setting_path = 'setting_subpolicy_all.ini'
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'golub_ppo_subpolicies2'
+TRAIN_NAME = 'ppo_subp_robust'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 REPLAY_PATH = './save/' + TRAIN_NAME
@@ -126,11 +126,38 @@ global_length = MA(moving_average_step)
 global_succeed = MA(moving_average_step)
 global_episodes = 0
 
+## Map Setting
+map_dir = 'fair_map/'
+map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
+max_epsilon = 0.75; max_at = 150000
+def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
+    x = (x-lowx) / (highx-lowx)
+    if x < 0:
+        val = 0
+    elif x > 1:
+        val = 1
+    else:
+        val = x * x * (3 - 2 * x)
+    return val*(highy-lowy)+lowy
+def use_this_map(x, max_episode, max_prob):
+    prob = smoothstep(x, highx=max_episode, highy=max_prob)
+    if np.random.random() < prob:
+        return random.choice(map_list)
+    else:
+        return None
+
+## Policy Setting
+heur_policy_list = [policy.Patrol(), policy.Roomba(), policy.Defense(), policy.AStar()]
+heur_weight = [1,3,1,1]
+heur_weight = np.array(heur_weight) / sum(heur_weight)
+def use_this_policy():
+    return np.random.choice(heur_policy_list, p=heur_weight)
+
 ## Environment Initialization
 red_policy = policy.Roomba()
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
-	config_path='setting_subpolicy_all.ini')
+    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=use_this_policy(),
+	config_path=env_setting_path)
 
 envs = [make_env(map_size) for i in range(nenv)]
 envs = SubprocVecEnv(envs, keep_frame)
@@ -270,10 +297,10 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
     
     # Bootstrap
-    if np.random.random() < 0.50:
-        s1 = envs.reset(custom_board=random.choice(fair_map_path))
-    else:
-        s1 = envs.reset()
+    s1 = envs.reset(
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=use_this_policy()
+        )
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
