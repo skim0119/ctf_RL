@@ -1,5 +1,6 @@
 import os
 import shutil
+import stat
 import configparser
 
 import signal
@@ -18,7 +19,7 @@ import math
 
 # the modules that you can use to generate the policy. 
 import policy.random
-import policy.roomba
+import policy.roombaV2
 import policy.policy_A3C
 import policy.zeros
 
@@ -29,23 +30,28 @@ from utility.utils import Experience_buffer, discount_rewards
 from utility.buffer import Trajectory
 from utility.gae import gae
 
-from network.a3c import V1 as AC
+from method.attention import A3C_attention as AC
 
-from network.base import initialize_uninitialized_vars as iuv
+from method.base import initialize_uninitialized_vars as iuv
 
 OVERRIDE = False;
-TRAIN_NAME='v1_fullSep'
+TRAIN_NAME='ctf_model_roombaV2'
 LOG_PATH='./logs/'+TRAIN_NAME
 MODEL_PATH='./model/' + TRAIN_NAME
-GPU_CAPACITY=0.5 # gpu capacity in percentage
+GPU_CAPACITY=0.75 # gpu capacity in percentage
 
 if OVERRIDE:
     #  Remove and reset log and model directory
     #  !rm -rf logs/A3C_benchmark/ model/A3C_benchmark
     if os.path.exists(LOG_PATH):
         shutil.rmtree(LOG_PATH,ignore_errors=True)
+        if os.path.exists(LOG_PATH):
+            print('not deleted')
+
     if os.path.exists(MODEL_PATH):
         shutil.rmtree(MODEL_PATH,ignore_errors=True)
+        if os.path.exists(MODEL_PATH):
+            print('not deleted')
 
 # Create model and log directory
 if not os.path.exists(MODEL_PATH):
@@ -76,25 +82,25 @@ max_ep = config.getint('TRAINING','MAX_STEP')
 critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
 gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd = 0.98
+lambd = 0.98 # GAE constant
 
 lr_a = 5e-5
 lr_c = 2e-4
 
 ## Save/Summary
 save_network_frequency = config.getint('TRAINING','SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ')*4
+save_stat_frequency = config.getint('TRAINING','SAVE_STATISTICS_FREQ') * 4
 moving_average_step = config.getint('TRAINING','MOVING_AVERAGE_SIZE')
 
 
 # Local configuration parameters
-update_frequency = 16
+update_frequency = 32
 
 # Env Settings
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
 in_size = [None, vision_dx, vision_dy, nchannel]
-nenv = 8
+nenv = 16
 
 # Asynch Settings
 global_scope = 'global'
@@ -112,7 +118,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options, inter_op_parallelism_threads=nenv)
 
 sess = tf.Session(config=config)
-progbar = tf.keras.utils.Progbar(total_episodes,interval=1)
+progbar = tf.keras.utils.Progbar(total_episodes,interval=5)
 
 # ## Worker
 class Worker(object):
@@ -121,10 +127,9 @@ class Worker(object):
         self.env = gym.make("cap-v0").unwrapped
         self.env.reset(
             map_size=map_size,
-            policy_red=policy.zeros,
+            policy_red=policy.roombaV2,
             config_path='setting1.ini'
         )
-        # self.env()
         self.name = name
         
         # Create AC Network for Worker
@@ -148,14 +153,18 @@ class Worker(object):
     def work(self, saver, writer, coord):
         global global_rewards, global_ep_rewards, global_episodes, global_length, global_succeed
         total_step = 1
+
+        channel_roll = np.array([0,1,5,2,3,4])
                 
         # loop
         print(f'{self.name} work initiated')
         with self.sess.as_default(), self.sess.graph.as_default(), coord.stop_on_exception():
             while not coord.should_stop() and global_episodes < total_episodes:
-                log_on = global_episodes % save_stat_frequency == 0 and global_episodes != 0
+                log_on = global_episodes % save_stat_frequency == 0 and global_episodes > 0
+
                 s0 = self.env.reset()
-                s0 = one_hot_encoder(self.env.get_obs_blue, self.env.get_team_blue, vision_range)
+                s0 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
+                s0 = s0[:,:,:,channel_roll]
                 
                 # parameters 
                 ep_r = 0 # Episodic Reward
@@ -163,6 +172,8 @@ class Worker(object):
                 was_alive = [ag.isAlive for ag in self.env.get_team_blue]
 
                 trajs = [Trajectory(depth=4) for _ in range(num_blue)]
+
+                #self.AC.reset_rnn(num_memory=num_blue)
                 
                 # Bootstrap
                 a1, v1 = self.get_action(s0)
@@ -171,6 +182,7 @@ class Worker(object):
                     
                     s1, rc, d, info = self.env.step(a)
                     s1 = one_hot_encoder(self.env._env, self.env.get_team_blue, vision_range)
+                    s1 = s1[:,:,:,channel_roll]
                     is_alive = [ag.isAlive for ag in self.env.get_team_blue]
                     r = (rc - prev_r - 0.5)
 
@@ -223,53 +235,47 @@ class Worker(object):
                         'Records/mean_length': global_length(),
                         'Records/mean_succeed': global_succeed(),
                         'Records/mean_episode_reward': global_ep_rewards(),
-                    }, writer)
-                    
+                    }, writer, ignore_nan=True)
+
                 if global_episodes % save_network_frequency == 0 and global_episodes != 0:
                     saver.save(self.sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episodes)
 
-    def record(self, item, writer):
+    def record(self, item, writer, ignore_nan=False):
         summary = tf.Summary()
         for key, value in item.items():
+            if ignore_nan and math.isnan(value):
+                continue
             summary.value.add(tag=key, simple_value=value)
         writer.add_summary(summary,global_episodes)
         writer.flush()
 
     def train(self, trajs, bootstrap=0.0, writer=None, log=False):
         global global_episodes
-        buffer_s, buffer_a, buffer_tdtarget, buffer_adv = [], [], [], []
+        train_counter = 0
         for idx, traj in enumerate(trajs):
-            if len(traj) == 0:
+            if len(traj) <= 1:
                 continue
-            observations = traj[0]
-            actions = traj[1]
+            train_counter += 1
 
-            td_target, advantages = gae(traj[2], traj[3], bootstrap[idx],
-                    gamma, lambd, normalize=False)
+            observations = np.stack(traj[0])
+            actions = np.array(traj[1])
             
-            buffer_s.extend(observations)
-            buffer_a.extend(actions)
-            buffer_tdtarget.extend(td_target)
-            buffer_adv.extend(advantages)
-
-        if len(buffer_s) == 0:
-            return
-
-        # Update Buffer
-        self.AC.update_global(
-            buffer_s,
-            buffer_a,
-            buffer_tdtarget,
-            buffer_adv,
-            global_episodes,
-            writer,
-            log
-        )
+            # GAE
+            td_target, advantages = gae(traj[2], traj[3], bootstrap[idx], gamma, lambd, False)
+            
+            # Update Buffer
+            self.AC.update_global(
+                    observations,
+                    actions,
+                    td_target,
+                    advantages,
+                    global_episodes,
+                    writer,
+                    log=log
+                )
 
         # get global parameters to local ActorCritic 
         self.AC.pull_global()
-
-        return
 
 # ## Run
 # Global Network
