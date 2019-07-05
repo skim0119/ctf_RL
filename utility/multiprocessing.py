@@ -5,7 +5,7 @@ import numpy as np
 import random
 from multiprocessing import Process, Pipe
 
-from utility.dataModule import centering
+from utility.dataModule import centering, Stacked_state
 
 class CloudpickleWrapper(object):
     """
@@ -22,19 +22,11 @@ class CloudpickleWrapper(object):
 
 def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1):
     # If continous == True, automatically reset once the game is over.
-    def unstack_frame(frames):
-        s = np.concatenate(frames, axis=3)
-        return s
-    def append_frame(l:list, obj):
-        l.append(obj)
-        l.pop(0)
-        assert len(l) == keep_frame
-
     parent_remote.close()
     env = env_fn_wrapper.x()
 
     ctrl_red = env.CONTROL_ALL # If CONTROL_ALL, concat red's view
-    stacked_frame = []
+    stacked_state = Stacked_state(keep_frame, 3)
     pause = False
 
     while True:
@@ -53,9 +45,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 if ctrl_red:
                     rob = centering(env.get_obs_red, env.get_team_red, 19)
                     ob = np.concatenate([ob, rob], axis=0)
-                append_frame(stacked_frame, ob)
-                ob = unstack_frame(stacked_frame)
-                remote.send((ob, reward, done, info))
+                remote.send((stacked_state(ob), reward, done, info))
         elif cmd == 'reset':
             pause = False
             ob = env.reset(**data)
@@ -65,26 +55,15 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 initial_map = np.concatenate([ob, rob], axis=0)
             else:
                 initial_map = ob
-            stacked_frame = [np.copy(initial_map) for _ in range(keep_frame)]
-            ob = unstack_frame(stacked_frame)
-            remote.send(ob)
-        elif cmd == 'get_team_blue':
-            remote.send(env.get_team_blue)
-        elif cmd == 'get_team_red':
-            remote.send(env.get_team_red)
-        elif cmd == 'blue_win':
-            remote.send(env.blue_win)
-        elif cmd == 'blue_flag':
-            remote.send(env.blue_flag)
-        elif cmd == 'red_flag':
-            remote.send(env.red_flag)
+            stacked_state.initiate(initial_map)
+            remote.send(stacked_state())
         elif cmd == 'close':
             remote.close()
             break
         elif cmd == 'get_spaces':
             remote.send((env.observation_space, env.action_space))
-        elif cmd == 'get_full_state':
-            remote.send(env.get_full_state)
+        else hasattr(env, cmd):
+            remote.send(getattr(env, cmd))
         else:
             raise NotImplementedError(f'command {cmd} is not found')
 

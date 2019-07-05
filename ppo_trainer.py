@@ -31,7 +31,7 @@ from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage
 from utility.utils import discount_rewards, interval_flag, path_create
 from utility.buffer import Trajectory
-from utility.buffer import random_batch_sampling as batch_sampler
+from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
 from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record

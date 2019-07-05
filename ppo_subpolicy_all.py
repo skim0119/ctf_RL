@@ -24,6 +24,7 @@ import gym_cap.envs.const as CONST
 import numpy as np
 import random
 import math
+from collections import defaultdict
 
 # the modules that you can use to generate the policy. 
 import policy
@@ -33,7 +34,7 @@ from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import discount_rewards, interval_flag, path_create
 from utility.buffer import Trajectory
-from utility.buffer import random_batch_sampling as batch_sampler
+from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
 from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record
@@ -153,38 +154,36 @@ subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
-    def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
-        size = len(states)
-        for _ in range(epoch * size // batch_size):
-            rand_ids = np.random.randint(0, size, batch_size)
-            yield states[rand_ids, :], actions[rand_ids], logits[rand_ids], tdtargets[rand_ids], advantages[rand_ids]
-
-    buffer_s, buffer_a, buffer_tdtarget, buffer_adv, buffer_logit = [], [], [], [], []
+    traj_buffer = defaultdict(list)
+    buffer_size = 0
     for idx, traj in enumerate(trajs):
         if len(traj) == 0:
             continue
-        observations = traj[0]
-        actions = traj[1]
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
         
-        buffer_s.extend(observations)
-        buffer_a.extend(actions)
-        buffer_tdtarget.extend(td_target)
-        buffer_adv.extend(advantages)
-        buffer_logit.extend(traj[4])
+        traj_buffer['state'].extend(traj[0])
+        traj_buffer['action'].extend(traj[1])
+        traj_buffer['td_target'].extend(td_target)
+        traj_buffer['advantage'].extend(advantages)
+        traj_buffer['logit'].extend(traj[4])
 
     buffer_size = len(buffer_s)
     if buffer_size < 10:
         return
 
-    for state, action, old_logit, tdtarget, advantage in  \
-        batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
-                np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
-        network.update_global(
-            state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, mode)
-    buffer_s, buffer_a, buffer_tdtarget, buffer_adv, buffer_logit = [], [], [], [], []
+    it = batch_sampler(
+            batch_size,
+            epoch,
+            np.stack(traj_buffer['state']),
+            np.stack(traj_buffer['action']),
+            np.stack(traj_buffer['td_target']),
+            np.stack(traj_buffer['advantage']),
+            np.stack(traj_buffer['logit'])
+        )
+    for mdp_tuple in it:
+        network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
