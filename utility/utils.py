@@ -4,33 +4,15 @@ This module contains extra features and functions frequently used in Ctf Project
 Please include the docstrings for any method or class to easily reference from Jupyter
 Any pipeline or data manipulation is excluded: they are included in dataModule.py file.
 
-Methods:
-    discount_rewards(numpy.list, float, bool):
-        Perform discounting reward to the list by the ratio 'gamma'
-        Include normalization of the list at the end.
-
-    normalize(numpy.list):
-        Only perform the normalization of the list.
-        * Centralize by subtracting the average, zoom by dividing the variance.
-
-Classes:
-    MovingAverage:
-        The container in format of queue.
-        Only store upto fixed amount of data, and return the average.
-        Any abundant records will be removed, and the average will be kept
-
-    Experience_bufffer:
-        The container in format of list.
-        Provides method of sampling and shuffling.
-
-Note:
-    Use 'from utils import <def_name>' to use specific method/class
-
 Todo:
     * Finish documenting the module
     * If necessary, include __main__ in module for debuging and quick operation checking
 
 """
+import os
+import shutil
+import sys
+
 import random
 
 import inspect
@@ -69,6 +51,48 @@ def store_args(method):
 
     return wrapper
 
+def interval_flag(step, freq, name):
+    """
+    Returns true at the beginning of the interval.
+    It is used in case where step is not incrementing uniformly.
+    The method defines internal attribute based on name for instant counter.
+
+    Parameters
+    ----------------
+    step : [int] 
+        The current step number
+    freq : [int] 
+        The interval size
+    name : [str] 
+        Arbitrary string for counter
+
+    Returns
+    ----------------
+    flag: [bool]
+
+    """
+
+    count = step // freq
+    if not hasattr(interval_flag, name):
+        setattr(interval_flag, name, count)
+    if getattr(interval_flag, name) < count:
+        setattr(interval_flag, name, count)
+        return True
+    else:
+        return False
+
+def path_create(path, override=False):
+    if override:
+        if os.path.exists(path):
+            shutil.rmtree(path,ignore_errors=True)
+            if os.path.exists(path):
+                raise OSError("Failed to remove path {}.".format(path))
+
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError:
+            raise OSError("Creation of the directory {} failed".format(path))
 
 def discount_rewards(rewards, gamma, normalized=False, mask_array=None):
     """ take 1D float numpy array of rewards and compute discounted reward

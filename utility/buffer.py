@@ -29,6 +29,24 @@ Todo:
 
 """
 
+def random_batch_sampling(batch_size, epoch, *argv):
+    """
+    The number of batch is defined by the size // batch_size.
+    Number of batch is multiplied by epoch.
+    Each sampling is done randomly with replacement.
+
+    It does not use shuffle or removal, which makes it faster to operate with large dataset
+
+    argv contains numpy ndarray of dataset. All array should be equal length.
+    """
+    lengths = [len(arg) for arg in argv]
+    assert len(set(lengths))<=1
+    size = len(lengths[0])
+    num_batch - epoch * (size // batch_size)
+    for _ in range(num_batch):
+        rand_ids = np.random.randint(0, size, batch_size)
+        yield tuple(arg[rand_idx] for arg in argv)
+
 
 class Trajectory:
     """ Trajectory
@@ -55,16 +73,15 @@ class Trajectory:
 
     """
 
-    def __init__(self, depth=4, length_max=150):
+    def __init__(self, depth=4):
         # Configuration
         self.depth = depth
-        self.length_max = length_max
 
         # Initialize Components
         self.buffer = [[] for _ in range(depth)]
 
     def __repr__(self):
-        return f'Trajectory (depth={self.depth},length={self.length_max})'
+        return f'Trajectory (depth={self.depth}'
 
     def __len__(self):
         return len(self.buffer[0])
@@ -75,56 +92,21 @@ class Trajectory:
     def __setitem__(self, key, item):
         self.buffer[key] = item
 
-    def is_full(self):
-        return len(self.buffer[0]) == self.length_max
-
     def append(self, mdp_tup):
         for buf, element in zip(self.buffer, mdp_tup):
             buf.append(element)
-            if len(self.buffer[0]) == self.length_max:
-                buf = buf[1:]
-        # for i, element in enumerate(mdp_tup):
-        #    self.buffer[i].append(element)
-        #    if len(self.buffer[0]) == self.length_max:
-        #        self.buffer[i] = self.buffer[i][1:]
 
-    def trim(self, serial_length):
+    def trim(self, trim_length):
         traj_list = []
-        s_, e_ = len(self.buffer[0]) - serial_length, len(self.buffer[0])
+        s_, e_ = len(self.buffer[0]) - trim_length, len(self.buffer[0])
         while e_ > 0:
-            new_traj = Trajectory(depth=self.depth, length_max=self.length_max)
+            new_traj = Trajectory(depth=self.depth)
             new_buffer = [buf[max(s_, 0):e_] for buf in self.buffer]
             new_traj.buffer = new_buffer
             traj_list.append(new_traj)
-            s_ -= serial_length
-            e_ -= serial_length
+            s_ -= trim_length
+            e_ -= trim_length
         return traj_list
-
-    def sample(self):
-        # Find longest length sequence
-        ret = tuple(np.array(b) for b in self.buffer)
-        return ret
-
-    def section(self, length):
-        self.buffer = [b[-length:] for b in self.buffer]
-
-    def draw_trace(self, seq_len=8):
-        buf_len = len(self.buffer[0])
-        if seq_len > buf_len:  # return with concat zeros
-            ret = []
-            exceed_len = seq_len - buf_len
-            for buf in self.buffer:
-                buf = np.array(buf)
-                shape = [exceed_len] + list(buf.shape[1:])
-                buf = np.append(buf, np.zeros(shape), axis=0)
-                ret.append(buf)
-            return tuple(ret)
-        else:
-            start = random.sample(range(len(self.buffer[0]) - seq_len + 1), k=1)[0]
-            end = start + seq_len
-            ret = tuple(np.array(b[start:end]) for b in self.buffer)
-            return ret
-
 
 class Trajectory_buffer:
     """Trajectory_buffer

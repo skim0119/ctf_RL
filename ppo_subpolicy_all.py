@@ -113,7 +113,7 @@ print('cpu count: {}'.format(nenv))
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 2000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -140,7 +140,7 @@ def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
         val = x * x * (3 - 2 * x)
     return val*(highy-lowy)+lowy
 def use_this_map(x, max_episode, max_prob):
-    prob = smoothstep(x, lowx=initial_episode_num, highx=initial_episode_num+max_episode, highy=max_prob)
+    prob = smoothstep(x, highx=max_episode, highy=max_prob)
     if np.random.random() < prob:
         return random.choice(map_list)
     else:
@@ -217,7 +217,6 @@ network.initiate(saver, MODEL_PATH)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 global_episodes = sess.run(global_step) # Reset the counter
-initial_episode_num = global_episodes
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 # Red Policy (selfplay)
