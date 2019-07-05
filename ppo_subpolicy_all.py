@@ -111,9 +111,9 @@ nenv = multiprocessing.cpu_count()  # config.getint('DEFAULT', 'NUM_ENV')
 print('cpu count: {}'.format(nenv))
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 64
 epoch = 2
-minbatch_size = 2000
+minbatch_size = 2500
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -180,7 +180,7 @@ network = Network(in_size=input_size, action_size=action_space, scope='main', se
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
         size = len(states)
-        for _ in range(size // batch_size):
+        for _ in range(epoch * size // batch_size):
             rand_ids = np.random.randint(0, size, batch_size)
             yield states[rand_ids, :], actions[rand_ids], logits[rand_ids], tdtargets[rand_ids], advantages[rand_ids]
 
@@ -204,12 +204,12 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
     if buffer_size < 10:
         return
 
-    for _ in range(epoch):
-        for state, action, old_logit, tdtarget, advantage in  \
-            batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
-                    np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
-            network.update_global(
-                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, mode)
+    for state, action, old_logit, tdtarget, advantage in  \
+        batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
+                np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
+        network.update_global(
+            state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, mode)
+    buffer_s, buffer_a, buffer_tdtarget, buffer_adv, buffer_logit = [], [], [], [], []
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
@@ -357,14 +357,17 @@ while True:
         num_batch_def += len(trajs[4*i+3])
 
     if num_batch_att >= minbatch_size:
+        stime = time.time()
         train(batch_att, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=0)
         batch_att = []
         num_batch_att = 0
     if num_batch_sct >= minbatch_size:
+        stime = time.time()
         train(batch_sct, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=1)
         batch_sct = []
         num_batch_sct = 0
     if num_batch_def >= minbatch_size:
+        stime = time.time()
         train(batch_def, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=2)
         batch_def = []
         num_batch_def = 0
