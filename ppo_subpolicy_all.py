@@ -30,7 +30,6 @@ from collections import defaultdict
 import policy
 
 # Data Processing Module
-from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import discount_rewards, interval_flag, path_create
 from utility.buffer import Trajectory
@@ -50,7 +49,7 @@ OVERRIDE = False;
 TRAIN_NAME = 'ppo_subp_robust'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
-REPLAY_PATH = './save/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count()  
 
@@ -135,7 +134,7 @@ def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=use_this_policy(),
 	config_path=env_setting_path)
 
-envs = [make_env(map_size) for i in range(nenv)]
+envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
@@ -148,9 +147,9 @@ sess = tf.Session(config=config)
 progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, nenv)
+global_step_next = tf.assign_add(global_step, NENV)
 subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
-subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
+subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
@@ -159,6 +158,7 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
     for idx, traj in enumerate(trajs):
         if len(traj) == 0:
             continue
+        buffer_size += len(traj)
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
@@ -169,7 +169,6 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['logit'].extend(traj[4])
 
-    buffer_size = len(buffer_s)
     if buffer_size < 10:
         return
 
@@ -204,12 +203,12 @@ red_policy = TrainedNetwork(
 
 
 def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
-    prev_red_alive = np.reshape(prev_red_alive, [nenv, num_red])
-    red_alive = np.reshape(red_alive, [nenv, num_red])
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
     r = []
     red_flags = envs.red_flag()
     blue_flags = envs.blue_flag()
-    for i in range(nenv):
+    for i in range(NENV):
         # Attack (C/max enemy)
         num_prev_enemy = sum(prev_red_alive[i])
         num_enemy = sum(red_alive[i])
@@ -246,7 +245,7 @@ def get_action(states):
     a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
     a, v, logits = network.run_network(states, 2)
     a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
-    actions = np.reshape(a1, [nenv, num_blue])
+    actions = np.reshape(a1, [NENV, num_blue])
     return np.array(a1), np.array(v1), np.array(logits1), actions
 
 batch_att = []
@@ -262,13 +261,13 @@ while True:
     play_save_on = interv_cntr(global_episodes, 5000, 'replay_save')
     
     # initialize parameters 
-    episode_rew = np.zeros(nenv)
-    prev_rew = np.zeros(nenv)
+    episode_rew = np.zeros(NENV)
+    prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
-    was_done = [False for env in range(nenv)]
+    was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
     s1 = envs.reset(
@@ -315,12 +314,12 @@ while True:
         if np.all(done):
             break
 
-    global_episodes += nenv
+    global_episodes += NENV
     sess.run(global_step_next)
     for i in range(num_mode):
         sess.run(subtrain_step_next[i])
     
-    for i in range(nenv):
+    for i in range(NENV):
         batch_att.append(trajs[4*i+0])
         batch_att.append(trajs[4*i+1])
         batch_sct.append(trajs[4*i+2])
@@ -346,7 +345,7 @@ while True:
         num_batch_def = 0
 
     steps = []
-    for env_id in range(nenv):
+    for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards.append(np.mean(episode_rew))
     global_length.append(np.mean(steps))
@@ -364,6 +363,6 @@ while True:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
     if play_save_on:
-        for i in range(nenv):
-            with open(REPLAY_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
+        for i in range(NENV):
+            with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
                 pickle.dump(info[i], handle)

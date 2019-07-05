@@ -31,7 +31,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
 
     while True:
         cmd, data = remote.recv()
-        if cmd == 'step':
+        if cmd == '_step':
             if pause:
                 remote.send((ob, reward, done, info))
             else:
@@ -45,8 +45,9 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 if ctrl_red:
                     rob = centering(env.get_obs_red, env.get_team_red, 19)
                     ob = np.concatenate([ob, rob], axis=0)
-                remote.send((stacked_state(ob), reward, done, info))
-        elif cmd == 'reset':
+                ob = stacked_state(ob)
+                remote.send((ob, reward, done, info))
+        elif cmd == '_reset':
             pause = False
             ob = env.reset(**data)
             ob = centering(ob, env.get_team_blue, 19)
@@ -57,12 +58,12 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 initial_map = ob
             stacked_state.initiate(initial_map)
             remote.send(stacked_state())
-        elif cmd == 'close':
+        elif cmd == '_close':
             remote.close()
             break
-        elif cmd == 'get_spaces':
+        elif cmd == '_get_spaces':
             remote.send((env.observation_space, env.action_space))
-        else hasattr(env, cmd):
+        elif hasattr(env, cmd):
             remote.send(getattr(env, cmd))
         else:
             raise NotImplementedError(f'command {cmd} is not found')
@@ -97,14 +98,14 @@ class SubprocVecEnv:
         for remote in self.work_remotes:
             remote.close()
 
-        self.remotes[0].send(('get_spaces', None))
+        self.remotes[0].send(('_get_spaces', None))
         self.observation_space, self.action_space = self.remotes[0].recv()
         self.num_envs = len(env_fns)
 
     def step(self, actions=None):
         if actions is None: actions = [None]*self.nenvs
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(('_step', action))
         self.waiting = True
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
@@ -113,7 +114,7 @@ class SubprocVecEnv:
 
     def reset(self, **kwargs):
         for remote in self.remotes:
-            remote.send(('reset', kwargs))
+            remote.send(('_reset', kwargs))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
     
     def get_full_state(self):
@@ -157,7 +158,7 @@ class SubprocVecEnv:
             for remote in self.remotes:            
                 remote.recv()
         for remote in self.remotes:
-            remote.send(('close', None))
+            remote.send(('_close', None))
         for p in self.ps:
             p.join()
             self.closed = True

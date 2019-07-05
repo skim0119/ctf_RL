@@ -48,6 +48,8 @@ num_mode = 3
 if MODE == 3:
     ALTERMODE = True
     MODE = 0
+else:
+    ALTERMODE = False
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
 map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
