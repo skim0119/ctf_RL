@@ -31,16 +31,15 @@ import policy
 # Data Processing Module
 from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage as MA
-from utility.utils import discount_rewards
+from utility.utils import discount_rewards, interval_flag, path_create
 from utility.buffer import Trajectory
-from utility.gae import gae
+from utility.buffer import random_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
-from utility.logger import record
 from utility.RL_Wrapper import TrainedNetwork
+from utility.logger import record
+from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
-
-from method.base import initialize_uninitialized_vars as iuv
 
 num_mode = 3
 env_setting_path = 'setting_subpolicy_all.ini'
@@ -52,32 +51,12 @@ LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 REPLAY_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
+NENV = multiprocessing.cpu_count()  
 
-if OVERRIDE:
-    #  Remove and reset log and model directory
-    if os.path.exists(LOG_PATH):
-        shutil.rmtree(LOG_PATH,ignore_errors=True)
-    if os.path.exists(MODEL_PATH):
-        shutil.rmtree(MODEL_PATH,ignore_errors=True)
-    if os.path.exists(REPLAY_PATH):
-        shutil.rmtree(REPLAY_PATH,ignore_errors=True)
-
-# Create model and log directory
-if not os.path.exists(MODEL_PATH):
-    try:
-        os.makedirs(MODEL_PATH)
-    except OSError:
-        raise OSError(f'Creation of the directory {MODEL_PATH} failed')
-if not os.path.exists(REPLAY_PATH):
-    try:
-        os.makedirs(REPLAY_PATH)
-    except OSError:
-        raise OSError(f'Creation of the directory {REPLAY_PATH} failed')
-if not os.path.exists(LOG_PATH):
-    try:
-        os.makedirs(LOG_PATH)
-    except OSError:
-        raise OSError(f'Creation of the directory {LOG_PATH} failed')
+## Data Path
+path_create(LOG_PATH, override=OVERRIDE)
+path_create(MODEL_PATH, override=OVERRIDE)
+path_create(SAVE_PATH, override=OVERRIDE)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -85,33 +64,29 @@ config.read('config.ini')
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
-max_ep = config.getint('TRAINING', 'MAX_STEP')
-
-gamma = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd = config.getfloat('TRAINING', 'GAE_LAMBDA')
-ppo_e = config.getfloat('TRAINING', 'PPO_EPSILON')
-critic_beta = config.getfloat('TRAINING', 'CRITIC_BETA')
-entropy_beta = config.getfloat('TRAINING', 'ENTROPY_BETA')
-
-lr_a = config.getfloat('TRAINING', 'LR_ACTOR')
-lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
+max_ep         = config.getint('TRAINING', 'MAX_STEP')
+gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
+lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
+ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
+critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
+entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
+lr_a           = config.getfloat('TRAINING', 'LR_ACTOR')
+lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
-moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
+save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
-map_size = config.getint('DEFAULT', 'MAP_SIZE')
-nenv = multiprocessing.cpu_count()  # config.getint('DEFAULT', 'NUM_ENV')
-print('cpu count: {}'.format(nenv))
+keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
+map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 64
+minibatch_size = 128
 epoch = 2
 minbatch_size = 2500
 

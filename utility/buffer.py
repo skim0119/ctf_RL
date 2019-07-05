@@ -33,7 +33,7 @@ def random_batch_sampling(batch_size, epoch, *argv):
     """
     The number of batch is defined by the size // batch_size.
     Number of batch is multiplied by epoch.
-    Each sampling is done randomly with replacement.
+    Each sampling is done randomly without replacement.
 
     It does not use shuffle or removal, which makes it faster to operate with large dataset
 
@@ -41,11 +41,32 @@ def random_batch_sampling(batch_size, epoch, *argv):
     """
     lengths = [len(arg) for arg in argv]
     assert len(set(lengths))<=1
-    size = len(lengths[0])
-    num_batch - epoch * (size // batch_size)
+    size = lengths[0]
+    num_batch = epoch * (size // batch_size)
     for _ in range(num_batch):
         rand_ids = np.random.randint(0, size, batch_size)
-        yield tuple(arg[rand_idx] for arg in argv)
+        yield tuple(arg[rand_ids] for arg in argv)
+
+def expense_batch_sampling(batch_size, epoch, *argv):
+    """
+    The number of batch is defined by the size // batch_size.
+    Number of batch is multiplied by epoch.
+    Each sampling is done without replacement
+
+    It does not use shuffle or removal, which makes it faster to operate with large dataset
+
+    argv contains numpy ndarray of dataset. All array should be equal length.
+    """
+    lengths = [len(arg) for arg in argv]
+    assert len(set(lengths))<=1
+    size = lengths[0]
+    indices = np.arange(size); random.shuffle(indices)
+    start_indices = np.arange(0, size, batch_size)
+    for _ in range(epoch):
+        for start_index in start_indices:
+            end_index = min(start_index+batch_size, size)
+            ids = indices[start_index:end_index]
+            yield tuple(arg[ids] for arg in argv)
 
 
 class Trajectory:

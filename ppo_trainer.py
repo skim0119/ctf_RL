@@ -201,7 +201,7 @@ def get_action(states):
 
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
+while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -231,13 +231,12 @@ while global_episodes < total_episodes:
         
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.1)
+        reward = (raw_reward - prev_rew - 0.1)/100.0
 
         if step == max_ep:
-            reward[:] = -100
+            reward[:] = -1
             done[:] = True
 
-        reward /= 100.0
         episode_rew += reward
 
         a1, v1, logits1, actions = get_action(s1)
