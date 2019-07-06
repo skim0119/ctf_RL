@@ -19,7 +19,6 @@ import tensorflow as tf
 import time
 import gym
 import gym_cap
-import gym_cap.envs.const as CONST
 import numpy as np
 import random
 import math
@@ -27,9 +26,8 @@ from collections import defaultdict
 
 import policy
 
-from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage
-from utility.utils import discount_rewards, interval_flag, path_create
+from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv

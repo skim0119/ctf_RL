@@ -20,25 +20,23 @@ import tensorflow as tf
 import time
 import gym
 import gym_cap
-import gym_cap.envs.const as CONST
 import numpy as np
 import random
 import math
+from collections import defaultdict
 
-# the modules that you can use to generate the policy. 
 import policy
 
-# Data Processing Module
 from utility.utils import MovingAverage as MA
-from utility.utils import discount_rewards
+from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
-from utility.gae import gae
+from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
-from utility.logger import record
 from utility.RL_Wrapper import TrainedNetwork
+from utility.logger import record
+from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
-
 
 MODE = int(sys.argv[-1])
 assert MODE in [0,1,2,3]
@@ -58,27 +56,14 @@ OVERRIDE = False;
 TRAIN_NAME = 'golub_ppo_subpolicies_backup'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()
 
-if OVERRIDE:
-    #  Remove and reset log and model directory
-    if os.path.exists(LOG_PATH):
-        shutil.rmtree(LOG_PATH,ignore_errors=True)
-    if os.path.exists(MODEL_PATH):
-        shutil.rmtree(MODEL_PATH,ignore_errors=True)
-
-# Create model and log directory
-if not os.path.exists(MODEL_PATH):
-    try:
-        os.makedirs(MODEL_PATH)
-    except OSError:
-        raise OSError(f'Creation of the directory {MODEL_PATH} failed')
-if not os.path.exists(LOG_PATH):
-    try:
-        os.makedirs(LOG_PATH)
-    except OSError:
-        raise OSError(f'Creation of the directory {LOG_PATH} failed')
+## Data Path
+path_create(LOG_PATH, override=OVERRIDE)
+path_create(MODEL_PATH, override=OVERRIDE)
+path_create(SAVE_PATH, override=OVERRIDE)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -144,7 +129,6 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options)
 
 sess = tf.Session(config=config)
-progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
@@ -153,38 +137,36 @@ subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
-    def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
-        size = len(states)
-        for _ in range(size // batch_size):
-            rand_ids = np.random.randint(0, size, batch_size)
-            yield states[rand_ids, :], actions[rand_ids], logits[rand_ids], tdtargets[rand_ids], advantages[rand_ids]
-
-    buffer_s, buffer_a, buffer_tdtarget, buffer_adv, buffer_logit = [], [], [], [], []
+    traj_buffer = defaultdict(list)
+    buffer_size = 0
     for idx, traj in enumerate(trajs):
         if len(traj) == 0:
             continue
-        observations = traj[0]
-        actions = traj[1]
+        buffer_size += len(traj)
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
         
-        buffer_s.extend(observations)
-        buffer_a.extend(actions)
-        buffer_tdtarget.extend(td_target)
-        buffer_adv.extend(advantages)
-        buffer_logit.extend(traj[4])
+        traj_buffer['state'].extend(traj[0])
+        traj_buffer['action'].extend(traj[1])
+        traj_buffer['td_target'].extend(td_target)
+        traj_buffer['advantage'].extend(advantages)
+        traj_buffer['logit'].extend(traj[4])
 
-    buffer_size = len(buffer_s)
     if buffer_size < 10:
         return
 
-    for _ in range(epoch):
-        for state, action, old_logit, tdtarget, advantage in  \
-            batch_iter(batch_size, np.stack(buffer_s), np.stack(buffer_a),
-                    np.stack(buffer_logit), np.stack(buffer_tdtarget), np.stack(buffer_adv)):
-            network.update_global(
-                state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, MODE)
+    it = batch_sampler(
+            batch_size,
+            epoch,
+            np.stack(traj_buffer['state']),
+            np.stack(traj_buffer['action']),
+            np.stack(traj_buffer['td_target']),
+            np.stack(traj_buffer['advantage']),
+            np.stack(traj_buffer['logit'])
+        )
+    for mdp_tuple in it:
+        network.update_global(*mdp_tuple, global_episodes, writer, log, MODE)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
@@ -229,16 +211,6 @@ def reward_shape(prev_red_alive, red_alive, done, idx=None):
     return np.array(reward)
 
 print('Training Initiated:')
-def interv_cntr(step, freq, name):
-    count = step // freq
-    if not hasattr(interv_cntr, name):
-        setattr(interv_cntr, name, count)
-    if getattr(interv_cntr, name) < count:
-        setattr(interv_cntr, name, count)
-        return True
-    else:
-        return False
-
 def get_action(states):
     a1, v1, logits1 = network.run_network(states, MODE)
     actions = np.reshape(a1, [NENV, num_blue])
@@ -247,9 +219,10 @@ def get_action(states):
 batch = []
 num_batch = 0
 while True:
-    log_on = interv_cntr(global_episodes, save_stat_frequency, 'log')
-    log_image_on = interv_cntr(global_episodes, save_image_frequency, 'im_log')
-    save_on = interv_cntr(global_episodes, save_network_frequency, 'save')
+    log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
+    log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
+    save_on = interval_flag(global_episodes, save_network_frequency, 'save')
+    reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     
     # Bootstrap
     if ALTERMODE:
@@ -313,7 +286,6 @@ while True:
     global_episodes += NENV
     sess.run(global_step_next)
     sess.run(subtrain_step_next[MODE])
-    # progbar.update(global_episodes)
 
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
