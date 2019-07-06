@@ -255,6 +255,8 @@ while True:
     if ALTERMODE:
         MODE = np.random.randint(3)
         s1 = envs.reset(config_path=setting_paths[MODE])
+    else:
+        s1 = envs.reset()
     if np.random.random() < 0.5:
         s1 = envs.reset(custom_board=call_map())
     num_blue = len(envs.get_team_blue()[0])
