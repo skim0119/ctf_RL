@@ -29,7 +29,6 @@ import math
 import policy
 
 # Data Processing Module
-from utility.dataModule import one_hot_encoder
 from utility.utils import MovingAverage as MA
 from utility.utils import discount_rewards
 from utility.buffer import Trajectory
@@ -40,7 +39,6 @@ from utility.RL_Wrapper import TrainedNetwork
 
 from method.ppo import PPO_multimodes as Network
 
-from method.base import initialize_uninitialized_vars as iuv
 
 MODE = int(sys.argv[-1])
 assert MODE in [0,1,2,3]
