@@ -59,6 +59,7 @@ TRAIN_NAME = 'golub_ppo_subpolicies2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
+NENV = multiprocessing.cpu_count()
 
 if OVERRIDE:
     #  Remove and reset log and model directory
@@ -107,7 +108,6 @@ action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
-nenv = config.getint('DEFAULT', 'NUM_ENV')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
@@ -134,7 +134,7 @@ def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
 
-envs = [make_env(map_size) for i in range(nenv)]
+envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
@@ -147,9 +147,9 @@ sess = tf.Session(config=config)
 progbar = tf.keras.utils.Progbar(total_episodes,interval=10)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, nenv)
+global_step_next = tf.assign_add(global_step, NENV)
 subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
-subtrain_step_next = [tf.assign_add(step, nenv) for step in subtrain_step]
+subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -205,12 +205,12 @@ red_policy = TrainedNetwork(
 
 
 def reward_shape(prev_red_alive, red_alive, done, idx=None):
-    prev_red_alive = np.reshape(prev_red_alive, [nenv, num_red])
-    red_alive = np.reshape(red_alive, [nenv, num_red])
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
     reward = []
     red_flags = envs.red_flag()
     blue_flags = envs.blue_flag()
-    for i in range(nenv):
+    for i in range(NENV):
         if idx == 0:
             # Attack (C/max enemy)
             num_prev_enemy = sum(prev_red_alive[i])
@@ -241,7 +241,7 @@ def interv_cntr(step, freq, name):
 
 def get_action(states):
     a1, v1, logits1 = network.run_network(states, MODE)
-    actions = np.reshape(a1, [nenv, num_blue])
+    actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
 batch = []
@@ -261,13 +261,13 @@ while True:
     num_red = len(envs.get_team_red()[0])
     
     # initialize parameters 
-    episode_rew = np.zeros(nenv)
-    prev_rew = np.zeros(nenv)
+    episode_rew = np.zeros(NENV)
+    prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
-    was_done = [False for env in range(nenv)]
+    was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*nenv)]
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     a1, v1, logits1, actions = get_action(s1)
 
@@ -308,7 +308,7 @@ while True:
         if np.all(done):
             break
 
-    global_episodes += nenv
+    global_episodes += NENV
     sess.run(global_step_next)
     sess.run(subtrain_step_next[MODE])
     # progbar.update(global_episodes)
@@ -323,7 +323,7 @@ while True:
         log_on = True
 
     steps = []
-    for env_id in range(nenv):
+    for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards.append(np.mean(episode_rew))
     global_length.append(np.mean(steps))
