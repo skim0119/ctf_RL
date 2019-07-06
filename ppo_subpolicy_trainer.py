@@ -130,6 +130,8 @@ global_episodes = 0
 ## Environment Initialization
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
 red_policy = policy.Roomba()
+if MODE == 2:
+    red_policy = policy.AStar()
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
 	config_path=setting_paths[MODE])
