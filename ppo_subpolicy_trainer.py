@@ -55,7 +55,7 @@ call_map = lambda: random.choice(map_list)
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'golub_ppo_subpolicies2'
+TRAIN_NAME = 'golub_ppo_subpolicies_backup'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
@@ -298,7 +298,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx]-env_reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
