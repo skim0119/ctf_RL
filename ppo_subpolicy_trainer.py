@@ -92,7 +92,7 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 8000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -282,7 +282,7 @@ while True:
     num_batch[MODE] += sum([len(traj) for traj in trajs])
 
     if num_batch[MODE] >= minbatch_size:
-        train(batch[MODE], network.global_update, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        train(batch[MODE], network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
         batch[MODE] = []
         num_batch[MODE] = 0
         MODE = np.argmin(sess.run(subtrain_step))
