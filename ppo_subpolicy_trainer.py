@@ -107,8 +107,7 @@ global_episodes = 0
 
 ## Environment Initialization
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policies[MODE],
-	config_path=setting_paths[MODE])
+    return lambda: gym.make('cap-v0', map_size=map_size)
 
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
@@ -221,9 +220,9 @@ while True:
     
     # Bootstrap
     if np.random.random() < 0.5: # by half chance, play on fair map
-        s1 = envs.reset(custom_board=call_map())
+        s1 = envs.reset(custom_board=call_map(), policy_red=red_policies[MODE])
     else:
-        s1 = envs.reset(config_path=setting_paths[MODE])
+        s1 = envs.reset(config_path=setting_paths[MODE], policy_red=red_policies[MODE])
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
     
