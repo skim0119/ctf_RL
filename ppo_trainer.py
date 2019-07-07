@@ -183,13 +183,6 @@ global_episodes = sess.run(global_step) # Reset the counter
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 # Red Policy (selfplay)
-'''red_policy = TrainedNetwork(
-            model_path=MODEL_PATH,
-            input_tensor='main/state:0',
-            output_tensor='main/actor/Softmax:0'
-        )
-'''
-
 print('Training Initiated:')
 
 def get_action(states):

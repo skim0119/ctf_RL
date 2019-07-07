@@ -38,17 +38,12 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-MODE = int(sys.argv[-1])
-assert MODE in [0,1,2,3]
 num_mode = 3
-if MODE == 3:
-    ALTERMODE = True
-    MODE = 0
-else:
-    ALTERMODE = False
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
-map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,4)]
+setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
+red_policies = [policy.Roomba(), policy.Roomba(), policy.AStar()]
+map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,5)]
 call_map = lambda: random.choice(map_list)
 
 ## Training Directory Reset
@@ -111,12 +106,8 @@ global_succeed = MA(moving_average_step)
 global_episodes = 0
 
 ## Environment Initialization
-setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
-red_policy = policy.Roomba()
-if MODE == 2:
-    red_policy = policy.AStar()
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policy,
+    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=red_policies[MODE],
 	config_path=setting_paths[MODE])
 
 envs = [make_env(map_size) for i in range(NENV)]
@@ -136,7 +127,7 @@ subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
 subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
-def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
+def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *argv):
     traj_buffer = defaultdict(list)
     buffer_size = 0
     for idx, traj in enumerate(trajs):
@@ -166,7 +157,7 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
             np.stack(traj_buffer['logit'])
         )
     for mdp_tuple in it:
-        network.update_global(*mdp_tuple, global_episodes, writer, log, MODE)
+        updater(*mdp_tuple, *argv, idx=MODE)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
@@ -186,7 +177,7 @@ red_policy = TrainedNetwork(
 '''
 
 
-def reward_shape(prev_red_alive, red_alive, done, idx=None):
+def reward_shape(prev_red_alive, red_alive, done, idx=None, additional_reward=None):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
     reward = []
@@ -208,7 +199,10 @@ def reward_shape(prev_red_alive, red_alive, done, idx=None):
                 reward.append(-1)
             else:
                 reward.append(0)
-    return np.array(reward)
+    if additional_reward is not None:
+        return np.array(reward) + additional_reward
+    else:
+        return np.array(reward)
 
 print('Training Initiated:')
 def get_action(states):
@@ -216,8 +210,9 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
-batch = []
-num_batch = 0
+batch = [[] for _ in range(num_mode)]
+num_batch = [0 for _ in range(num_mode)]
+MODE = np.argmin(sess.run(subtrain_step))
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -225,13 +220,10 @@ while True:
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     
     # Bootstrap
-    if ALTERMODE:
-        MODE = np.random.randint(3)
-        s1 = envs.reset(config_path=setting_paths[MODE])
-    else:
-        s1 = envs.reset()
-    if np.random.random() < 0.5:
+    if np.random.random() < 0.5: # by half chance, play on fair map
         s1 = envs.reset(custom_board=call_map())
+    else:
+        s1 = envs.reset(config_path=setting_paths[MODE])
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
     
@@ -287,14 +279,14 @@ while True:
     sess.run(global_step_next)
     sess.run(subtrain_step_next[MODE])
 
-    batch.extend(trajs)
-    num_batch += sum([len(traj) for traj in trajs])
+    batch[MODE].extend(trajs)
+    num_batch[MODE] += sum([len(traj) for traj in trajs])
 
-    if num_batch >= minbatch_size:
-        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        batch = []
-        num_batch = 0
-        log_on = True
+    if num_batch[MODE] >= minbatch_size:
+        train(batch[MODE], network.global_update, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        batch[MODE] = []
+        num_batch[MODE] = 0
+        MODE = np.argmin(sess.run(subtrain_step))
 
     steps = []
     for env_id in range(NENV):
