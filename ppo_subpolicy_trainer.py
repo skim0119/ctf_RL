@@ -48,11 +48,11 @@ call_map = lambda: random.choice(map_list)
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'golub_ppo_subpolicies_backup'
+TRAIN_NAME = 'golub_ppo_subp_bootstrap'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
-GPU_CAPACITY = 0.90
+GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count()
 
 ## Data Path
@@ -100,9 +100,9 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
-global_episode_rewards = MA(moving_average_step)
-global_length = MA(moving_average_step)
-global_succeed = MA(moving_average_step)
+global_episode_rewards = [MA(moving_average_step) for _ in range(num_mode)]
+global_length = [MA(moving_average_step) for _ in range(num_mode)]
+global_succeed = [MA(moving_average_step) for _ in range(num_mode)]
 global_episodes = 0
 
 ## Environment Initialization
@@ -211,15 +211,17 @@ def get_action(states):
 
 batch = [[] for _ in range(num_mode)]
 num_batch = [0 for _ in range(num_mode)]
-MODE = np.argmin(sess.run(subtrain_step))
 while True:
-    log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
+    MODE = np.argmin(sess.run(subtrain_step))
+    mode_episode = sess.run(subtrain_step[MODE])
+
+    log_on = interval_flag(mode_episode, save_stat_frequency, 'log{}'.format(MODE))
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     
     # Bootstrap
-    if np.random.random() < 0.5: # by half chance, play on fair map
+    if np.random.random() < 0.25: # by half chance, play on fair map
         s1 = envs.reset(custom_board=call_map(), policy_red=red_policies[MODE])
     else:
         s1 = envs.reset(config_path=setting_paths[MODE], policy_red=red_policies[MODE])
@@ -285,23 +287,24 @@ while True:
         train(batch[MODE], network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
         batch[MODE] = []
         num_batch[MODE] = 0
-        MODE = np.argmin(sess.run(subtrain_step))
 
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    global_episode_rewards.append(np.mean(episode_rew))
-    global_length.append(np.mean(steps))
-    global_succeed.append(np.mean(envs.blue_win()))
+    global_episode_rewards[MODE].append(np.mean(episode_rew))
+    global_length[MODE].append(np.mean(steps))
+    global_succeed[MODE].append(np.mean(envs.blue_win()))
+
 
     if log_on:
         step = sess.run(subtrain_step[MODE])
         record({
-            'Records/mean_length'+MODE_NAME(MODE): global_length(),
-            'Records/mean_succeed'+MODE_NAME(MODE): global_succeed(),
-            'Records/mean_episode_reward'+MODE_NAME(MODE): global_episode_rewards(),
+            'Records/mean_length'+MODE_NAME(MODE): global_length[MODE](),
+            'Records/mean_succeed'+MODE_NAME(MODE): global_succeed[MODE](),
+            'Records/mean_episode_reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
         }, writer, step)
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+
 
