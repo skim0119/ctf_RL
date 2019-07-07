@@ -126,7 +126,7 @@ subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
 subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
-def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *argv):
+def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, **kwargv):
     traj_buffer = defaultdict(list)
     buffer_size = 0
     for idx, traj in enumerate(trajs):
@@ -156,7 +156,7 @@ def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *
             np.stack(traj_buffer['logit'])
         )
     for mdp_tuple in it:
-        updater(*mdp_tuple, *argv, idx=MODE)
+        updater(*mdp_tuple, **kwargv, idx=MODE)
 
 # Resotre / Initialize
 saver = tf.train.Saver(max_to_keep=3)
