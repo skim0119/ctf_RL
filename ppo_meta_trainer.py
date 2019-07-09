@@ -6,10 +6,10 @@
 - No UAV
 '''
 
+import pickle
 import os
 import shutil
 import configparser
-import sys
 
 import signal
 import threading
@@ -20,28 +20,24 @@ import tensorflow as tf
 import time
 import gym
 import gym_cap
-import gym_cap.envs.const as CONST
 import numpy as np
 import random
 import math
+from collections import defaultdict
 
-# the modules that you can use to generate the policy. 
 import policy
 
-# Data Processing Module
-from utility.dataModule import one_hot_encoder
-from utility.utils import MovingAverage as MA
-from utility.utils import discount_rewards
+from utility.utils import MovingAverage
+from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
-from utility.gae import gae
+from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
-from utility.logger import record
 from utility.RL_Wrapper import TrainedNetwork
+from utility.logger import record
+from utility.gae import gae
 
-from method.ppo import PPO_multimodes as subNetwork
-from method.ppo import PPO as metaNetwork
-
-from method.base import initialize_uninitialized_vars as iuv
+from method.ppo import PPO as Network
+from method.ppo import PPO_multimodes as SubNetwork
 
 num_mode = 3
 MODE_NAME = ['attack', 'scout', 'defense']
