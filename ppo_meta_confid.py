@@ -401,9 +401,6 @@ while True:
     freq_list.append(mode_length.tolist())
     global_meta_freq.append(np.mean(np.mean(freq_list)))
 
-    print(global_episodes)
-    print(global_meta_freq())
-
     if log_on:
         record({
             'Records/mean_length': global_length(),
