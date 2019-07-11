@@ -148,8 +148,6 @@ class TrainedNetwork:
         input_tensor = self.input_tensor
         output_tensor = self.output_tensor
 
-        config = tf.ConfigProto(device_count={'GPU': 0})
-
         # Reset the weight to the newest saved weight.
         ckpt = tf.train.get_checkpoint_state(self.model_path)
         vprint(f'path find: {ckpt.model_checkpoint_path}')
@@ -157,7 +155,7 @@ class TrainedNetwork:
             vprint(f'path exist : {ckpt.model_checkpoint_path}')
             self.graph = tf.Graph()
             with self.graph.as_default():
-                self.sess = tf.Session(config=config)
+                self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
                 self.saver = tf.train.import_meta_graph(
                     ckpt.model_checkpoint_path + '.meta',
                     clear_devices=True

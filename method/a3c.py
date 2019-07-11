@@ -13,6 +13,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 import numpy as np
+import itertools
 
 from utility.utils import store_args
 
@@ -238,7 +239,8 @@ class a3c:
 
     @property
     def get_vars(self):
-        return self.a_vars + self.c_vars
+        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
+        
 
 class ActorCritic(a3c):
     """Actor Critic Network Implementation for A3C (Tensorflow)

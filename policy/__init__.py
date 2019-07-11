@@ -4,3 +4,4 @@ from policy.zeros import Zeros
 from policy.random import Random
 from policy.defense import Defense
 from policy.astar_flag import AStar
+from policy.policy_RL import PPO, PPO_multimodes

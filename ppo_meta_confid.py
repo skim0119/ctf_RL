@@ -46,7 +46,7 @@ SUBP_MODEL_PATH = './model/' + SUBP_TRAIN_NAME
 GPU_CAPACITY = 0.90
 
 NENV = multiprocessing.cpu_count()  
-LOGDEVICE = True
+LOGDEVICE = False
 ENV_SETTING_PATH = 'setting_ppo_meta.ini'
 
 ## Data Path
@@ -141,8 +141,7 @@ num_red = len(envs.get_team_red()[0])
 gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
 
-#sess = tf.Session(config=config, graph=tf.Graph())
-sess = tf.Session()
+sess = tf.Session(config=config)
 
 global_meta_step = tf.Variable(0, trainable=False, name='global_step')
 global_meta_step_next = tf.assign_add(global_meta_step, NENV)
@@ -160,7 +159,7 @@ meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes_met
 ## Prepare Subpolicies
 #with tf.device('/gpu:1'):
 subp_network = SubNetwork(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-subp_saver = tf.train.Saver()
+subp_saver = tf.train.Saver(var_list=subp_network.get_vars)
 subp_network.initiate(subp_saver, SUBP_MODEL_PATH)
 
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -276,6 +275,7 @@ playing_mode = np.zeros(NENV*num_blue, dtype=int)
 mode_length = np.ones(NENV*num_blue)
 freq_list = []
 def get_action(states, initial=False):
+    global mode_length, freq_list
     if initial:
         confid_value = np.ones((NENV, num_blue))
         mode_length = np.ones(NENV*num_blue)
@@ -298,12 +298,12 @@ def get_action(states, initial=False):
             mode_length[i] += 1
 
     # Run subp network
-    logits = sess.run(subp_network.actor,
+    sub_logit = sess.run(subp_network.actor,
             feed_dict={subp_network.state_input:states})
     actions = []
     for i in range(NENV*num_blue):
         mod = playing_mode[i]
-        prob = logits[mod][i]; prob=prob/sum(prob)
+        prob = sub_logit[mod][i]; prob=prob/sum(prob)
         actions.append(np.random.choice(action_space, p=prob))
     actions = np.reshape(actions, [NENV, num_blue])
 
@@ -353,7 +353,7 @@ while True:
         #reward = reward_shape(was_alive_red, is_alive_red, done, env_reward) - 0.01
         cumul_reward += env_reward
     
-        a1, v1, logits1, actions = get_action(s1, meta_a)
+        a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
@@ -364,7 +364,6 @@ while True:
             if was_alive[idx] and not was_done[env_idx]:
                 # Reselect meta
                 meta_trajs[idx].append([s0[idx], a[idx], env_reward[env_idx], v0[idx], logits[idx]])
-                a1, v1, logits1, actions = get_action(s1)
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -395,10 +394,11 @@ while True:
 
     steps = []
     for env_id in range(NENV):
-        steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
+        steps.append(max([len(traj) for traj in meta_trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards.append(np.mean(episode_rew))
     global_length.append(np.mean(steps))
     global_succeed.append(np.mean(envs.blue_win()))
+    freq_list.append(mode_length.tolist())
     global_meta_freq.append(np.mean(freq_list))
 
     if log_on:
@@ -410,7 +410,6 @@ while True:
         }, meta_writer, global_episodes_meta)
         
     if save_on:
-        network.save(saver, SUBP_MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
         meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes_meta)
 
     if play_save_on:
