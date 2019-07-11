@@ -152,9 +152,9 @@ meta_saver = tf.train.Saver(max_to_keep=3, var_list=meta_network.get_vars+[globa
 meta_network.initiate(meta_saver, MODEL_PATH)
 
 meta_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-global_episodes_meta = sess.run(global_meta_step) # Reset the counter
+global_episodes = sess.run(global_meta_step) # Reset the counter
 
-meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes_meta)
+meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 ## Prepare Subpolicies
 #with tf.device('/gpu:1'):
@@ -373,7 +373,7 @@ while True:
         if np.all(done):
             break
 
-    global_episodes_meta += NENV
+    global_episodes += NENV
     sess.run(global_meta_step_next)
 
     '''
@@ -388,7 +388,7 @@ while True:
     meta_batch.extend(meta_trajs)
     num_meta_batch += sum([len(traj) for traj in meta_trajs])
     if num_meta_batch >= batch_meta_memory_size:
-        meta_train(meta_batch, 0, epoch, minibatch_size, meta_writer, log_image_on, global_episodes_meta)
+        meta_train(meta_batch, 0, epoch, minibatch_size, meta_writer, log_image_on, global_episodes)
         meta_batch = []
         num_meta_batch = 0
 
@@ -407,10 +407,10 @@ while True:
             'Records/mean_succeed': global_succeed(),
             'Records/mean_episode_reward': global_episode_rewards(),
             'Records/mean_subp_length': global_meta_freq(),
-        }, meta_writer, global_episodes_meta)
+        }, meta_writer, global_episodes)
         
     if save_on:
-        meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes_meta)
+        meta_network.save(meta_saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
     if play_save_on:
         for i in range(NENV):
