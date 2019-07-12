@@ -76,6 +76,7 @@ class Policy:
         move_toward : Output corresponding action given two coordinates
         next_loc    : Output coordinate after action
         can_move    : Check if the move is possible from the position
+        distance    : Calculate distance between two point
         route_astar : Outputs route(coordinate) from start to end 
     """
     def move_toward(self, start, target):
@@ -133,7 +134,24 @@ class Policy:
             return False
         elif ny < 0 or ny >= 20:
             return False
-        return obs[nx][ny] != const.OBSTACLE
+        return self.free_map[nx][ny] != const.OBSTACLE
+
+    def distance(self, start, goal, euc=False):
+        """
+        Distance between two point
+        Use L1 norm distance for grid world
+
+        Args:
+            start (tuple)
+            end (tuple)
+            euc (boolean): Set true to make it Euclidean distance
+
+        return:
+            int
+        """
+        if euc:
+            return ((start[0]-goal[0])**2 + (start[1]-goal[1])**2) ** 0.5
+        return abs(start[0]-goal[0]) + abs(start[1]-goal[1])
 
     def route_astar(self, start, goal):
         """
@@ -152,7 +170,6 @@ class Policy:
                 Return None if path does not exist.
 
         """
-        hScore = lambda start, goal: abs(start[0]-goal[0]) + abs(start[1]-goal[1]) # Distance
 
         openSet = set([start])
         closedSet = set()
@@ -161,7 +178,7 @@ class Policy:
         gScore = {}
         if len(goal) == 0:
             return None
-        fScore[start] = hScore(start, goal)
+        fScore[start] = self.distance(start, goal)
         gScore[start] = 0
 
         while openSet:
@@ -204,6 +221,6 @@ class Policy:
                     continue
                 cameFrom[neighbour] = current
                 gScore[neighbour] = tentative_gScore
-                fScore[neighbour] = gScore[neighbour] + hScore(neighbour, goal)
+                fScore[neighbour] = gScore[neighbour] + self.distance(neighbour, goal)
 
         return None
