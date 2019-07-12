@@ -9,13 +9,18 @@ DOs/Denis Osipychev
     http://www.denisos.com
 """
 
+import numpy as np
+
+import gym_cap.envs.const as const
+
 class Policy:
     """Policy generator class for CtF env.
     
     This class can be used as a template for policy generator.
     Designed to summon an AI logic for the team of units.
+    Provides basic methods for building policy.
     
-    Methods:
+    Must-have Methods:
         initiate: Required method that runs everytime episode is initialized.
         gen_action: Required method to generate a list of actions.
     """
@@ -52,8 +57,8 @@ class Policy:
     def initiate(self, free_map, agent_list):
         """Initiation method
         
-        This method is called when the environment reset method is called.
-        Any initialization or initiation should be included here
+        This method is called when the environment reset
+        Any initialization or initiation for each game should be included here
         The new static-map and agent list is given as parameter
         
         Args:
@@ -62,3 +67,143 @@ class Policy:
         """
         self.free_map = free_map
         self.agent_list = agent_list
+
+    """
+    All the methods below can be used to build policy.
+    Methods can be used in gen_action() or initiate() methods.
+
+    Methods:
+        move_toward : Output corresponding action given two coordinates
+        next_loc    : Output coordinate after action
+        can_move    : Check if the move is possible from the position
+        route_astar : Outputs route(coordinate) from start to end 
+    """
+    def move_toward(self, start, target):
+        """
+        Output action to move from start to neighbor.
+        It is crude method to move in certain direction.
+        Due to the grid-environment, it does not move diagonally.
+
+        Args:
+            start (tuple): coordinate of staring location 
+            target (tuple): coordinate of targeting location
+
+        Return:
+            int : corresponding action to move towards the target
+        """
+        if target[1] - start[1] > 0:
+            return 3
+        elif target[1] - start[1] < 0:
+            return 1
+        elif target[0] - start[0] > 0:
+            return 2
+        elif target[0] - start[0] < 0:
+            return 4
+        else:
+            return 0  # Only when start==neighbor
+
+    def next_loc(self, position, move):
+        """
+        Return next coordinate
+
+        Args:
+            position (tuple)
+            move (int)
+
+        Return:
+            tuple
+        """
+        dir_x = [0, 0, 1, 0, -1]
+        dir_y = [0,-1, 0, 1,  0]
+        return (position[0]+dir_x[move], position[1]+dir_y[move])
+
+    def can_move(self, position, move):
+        """
+        Check if the movement is possible
+
+        Args:
+            position (tuple)
+            move (int)
+
+        Return:
+            bool
+        """
+        nx, ny = self.next_loc(position, move)
+        if nx < 0 or nx >= 20:
+            return False
+        elif ny < 0 or ny >= 20:
+            return False
+        return obs[nx][ny] != const.OBSTACLE
+
+    def route_astar(self, start, goal):
+        """
+        Finds route from start to goal.
+        Implemented A* algorithm
+
+        *The 1-norm distance was used
+
+        Args:
+            start (tuple): coordinate of start position
+            end (tuple): coordinate of end position
+
+        Return:
+            total_path (list):
+                List of coordinate in tuple.
+                Return None if path does not exist.
+
+        """
+        hScore = lambda start, goal: abs(start[0]-goal[0]) + abs(start[1]-goal[1]) # Distance
+
+        openSet = set([start])
+        closedSet = set()
+        cameFrom = {}
+        fScore = {}
+        gScore = {}
+        if len(goal) == 0:
+            return None
+        fScore[start] = hScore(start, goal)
+        gScore[start] = 0
+
+        while openSet:
+            min_score = min([fScore[c] for c in openSet])
+            for position in openSet:
+                if fScore.get(position,np.inf) == min_score:
+                    current = position
+                    break
+
+            if current == goal:
+                total_path = [current]
+                while current in cameFrom:
+                    current = cameFrom[current]
+                    total_path.append(current)
+                total_path.reverse()
+
+                return total_path
+
+            openSet.remove(current)
+            closedSet.add(current)
+
+            directions = [(1,0),(-1,0),(0,1),(0,-1)]
+            neighbours = []
+            for dx, dy in directions:
+                x2, y2 = current
+                x = x2 + dx
+                y = y2 + dy
+                if (x >= 0 and x < self.free_map.shape[0]) and \
+                   (y >= 0 and y < self.free_map.shape[1]) and \
+                   self.free_map[x,y] != const.OBSTACLE:
+                    neighbours.append((x, y))
+
+            for neighbour in neighbours:
+                if neighbour in closedSet:
+                    continue
+                tentative_gScore = gScore[current]  # + transition cost
+                if neighbour not in openSet:
+                    openSet.add(neighbour)
+                elif tentative_gScore >= gScore[neighbour]:
+                    continue
+                cameFrom[neighbour] = current
+                gScore[neighbour] = tentative_gScore
+                fScore[neighbour] = gScore[neighbour] + hScore(neighbour, goal)
+
+        return None

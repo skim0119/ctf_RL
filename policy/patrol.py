@@ -15,7 +15,6 @@ import numpy as np
 import gym_cap.envs.const as const
 
 from policy.policy import Policy
-from policy.astar_flag import AStar
 
 class Patrol(Policy):
     """Policy generator class for CtF env.
@@ -30,7 +29,6 @@ class Patrol(Policy):
 
     def __init__(self):
         super().__init__()
-        self.astar = AStar()
     
     def initiate(self, free_map, agent_list):
         self.team = agent_list[0].team
@@ -39,14 +37,12 @@ class Patrol(Policy):
 
         # Scan and list boarder location
         boarder = []
-        dir_x = [0, 0, 1, 0, -1] # dx for [stay, down, right, up, left]
-        dir_y = [0,-1, 0, 1,  0] # dy for [stay, down, right, up,left]
         for i in range(len(free_map)):
             for j in range(len(free_map[0])):
                 if free_map[i][j] == self.team:
                     count = 0
                     for move in range(1,5):
-                        nx, ny = i+dir_x[move], j+dir_y[move]
+                        nx, ny = self.next_loc((i,j), move)
                         if nx < 0 or nx >= len(free_map): continue
                         if ny < 0 or ny >= len(free_map[0]): continue
                         if free_map[nx][ny] == other_team:
@@ -64,7 +60,7 @@ class Patrol(Policy):
                 n = queue.pop()
                 visited.append(tuple(n))
                 for move in range(1,5):
-                    nx, ny = n[0]+dir_x[move], n[1]+dir_y[move]
+                    nx, ny = self.next_loc(n, move)
                     if (nx,ny) in boarder:
                         boarder.remove((nx,ny))
                         queue.append((nx,ny))
@@ -84,7 +80,7 @@ class Patrol(Policy):
         self.route = []
         for idx, agent in enumerate(agent_list):
             target = random.choice(grouped_boarder[self.assigned[idx]])
-            route = self.astar.astar_route(agent.get_loc(), target, free_map)
+            route = self.route_astar(agent.get_loc(), target)
             if route is None:
                 self.route.append(None)
             else: 
@@ -125,14 +121,7 @@ class Patrol(Policy):
             else: ## Navigate to boarder
                 step = route.index(cur_loc)
                 new_loc = route[step+1]
-                if new_loc[1] - cur_loc[1] > 0:   # move right
-                    action = 3
-                elif new_loc[1] - cur_loc[1] < 0: # move left
-                    action = 1
-                elif new_loc[0] - cur_loc[0] > 0: # move down
-                    action = 2
-                elif new_loc[0] - cur_loc[0] < 0: # move up
-                    action = 4
+                action = self.move_toward(cur_loc, new_loc)
                 action_out.append(action)
         return action_out
 
@@ -140,17 +129,10 @@ class Patrol(Policy):
         x,y = loc
         
         #patrol along the boarder.
-        dir_x = [0, 0, 1, 0, -1] # dx for [stay, down, right, up, left]
-        dir_y = [0,-1, 0, 1,  0] # dy for [stay, down, right, up,left]
-        def cannot_move(nx,ny):
-            if nx < 0 or nx >= 20: return True
-            elif ny < 0 or ny >= 20: return True
-            return obs[nx][ny]==8
         action = [0]
         for a in range(1,5):
-            nx = x + dir_x[a]
-            ny = y + dir_y[a]
-            if cannot_move(nx,ny): continue
+            nx, ny = self.next_loc(loc, a)
+            if not self.can_move(loc, a): continue
             if (nx,ny) in boarder:
                 action.append(a)
         return np.random.choice(action)

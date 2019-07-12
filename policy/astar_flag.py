@@ -40,7 +40,7 @@ class AStar(Policy):
         self.agent_steps = [0]*len(agent_list)
         for idx, agent in enumerate(agent_list):
             start = agent.get_loc()
-            self.agent_route.append(self.astar_route(start, flag, free_map))
+            self.agent_route.append(self.route_astar(start, flag))
             self.found_route.append(self.agent_route[idx] is not None)
 
 
@@ -86,83 +86,6 @@ class AStar(Policy):
 
         return action_out
 
-    def construct_path(self, cameFrom, current):
-        """
-        return route from start to goal
-        """
 
-        total_path = [current]
-        while current in cameFrom:
-            current = cameFrom[current]
-            total_path.append(current)
-        total_path.reverse()
 
-        return total_path
 
-    def hScore(self, start, goal):
-        """
-        Manhattan distance
-
-        """
-
-        dx_1, dy_1 = goal
-        dx_2, dy_2 = start
-        distance = abs(dx_1 - dx_2) + abs(dy_1 - dy_2)
-
-        return distance
-
-    def hCost(self, neighbour):
-        """
-        cost of moving to neighbour from current
-        """
-        return 0
-
-    def astar_route(self, start, goal, board):
-        """
-        finds route from start to goal
-        """
-
-        openSet = set([start])
-        closedSet = set()
-        cameFrom = {}
-        fScore = {}
-        gScore = {}
-        if len(goal) == 0:
-            raise IndexError("Flag is not found for AStar")
-        fScore[start] = self.hScore(start, goal)
-        gScore[start] = 0
-
-        while openSet:
-            min_score = min([fScore[c] for c in openSet])
-            for position in openSet:
-                if fScore.get(position,np.inf) == min_score:
-                    current = position
-                    break
-
-            if current == goal:
-                return self.construct_path(cameFrom, current)
-
-            openSet.remove(current)
-            closedSet.add(current)
-
-            directions = [(1,0),(-1,0),(0,1),(0,-1)] # directions for [right, left, down, up]
-            neighbours = []
-            for dx, dy in directions:
-                x2, y2 = current
-                x = x2 + dx
-                y = y2 + dy
-                if (x >= 0 and x < board.shape[0]) and (y >= 0 and y < board.shape[1]) and board[x,y] != 8:
-                    neighbours.append((x, y))
-
-            for neighbour in neighbours:
-                if neighbour in closedSet:
-                    continue
-                tentative_gScore = gScore[current] + self.hCost(neighbour)
-                if neighbour not in openSet:
-                    openSet.add(neighbour)
-                elif tentative_gScore >= gScore[neighbour]:
-                    continue
-                cameFrom[neighbour] = current
-                gScore[neighbour] = tentative_gScore
-                fScore[neighbour] = gScore[neighbour] + self.hScore(neighbour, goal)
-        return None
