@@ -399,7 +399,7 @@ while True:
     global_length.append(np.mean(steps))
     global_succeed.append(np.mean(envs.blue_win()))
     freq_list.append(mode_length.tolist())
-    global_meta_freq.append(np.mean(freq_list))
+    global_meta_freq.append(np.mean(np.mean(freq_list)))
 
     if log_on:
         record({
