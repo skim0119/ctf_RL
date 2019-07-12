@@ -20,7 +20,7 @@ class CloudpickleWrapper(object):
         import pickle
         self.x = pickle.loads(ob)
 
-def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1):
+def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1):
     # If continous == True, automatically reset once the game is over.
     parent_remote.close()
     env = env_fn_wrapper.x()
@@ -39,6 +39,7 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 if done:
                     pause = True
                     if continuous:
+                        ## TODO
                         ob = env.reset()
                         pause = False
                 ob = centering(ob, env.get_team_blue, 19)
@@ -49,6 +50,8 @@ def worker(remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1
                 remote.send((ob, reward, done, info))
         elif cmd == '_reset':
             pause = False
+            if 'policy_red' in data.keys():
+                data['policy_red'] = data['policy_red']()
             ob = env.reset(**data)
             ob = centering(ob, env.get_team_blue, 19)
             if ctrl_red:
@@ -86,9 +89,11 @@ class SubprocVecEnv:
 
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
         self.ps = []
+        idx = 0
         for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
             self.ps.append(Process(target=worker,
-                args=(work_remote, remote, CloudpickleWrapper(env_fn), False, keep_frame) ) )
+                args=(idx, work_remote, remote, CloudpickleWrapper(env_fn), False, keep_frame) ) )
+            idx += 1
 
         for p in self.ps:
             p.daemon = True # in case of crasehs, process end

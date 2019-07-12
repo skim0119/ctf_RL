@@ -122,7 +122,7 @@ def use_this_map(x, max_episode, max_prob):
         return None
 
 ## Policy Setting
-heur_policy_list = [policy.Patrol(), policy.Roomba(), policy.Defense(), policy.AStar()]
+heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.AStar]
 heur_weight = [1,2,1,1]
 heur_weight = np.array(heur_weight) / sum(heur_weight)
 def use_this_policy():
@@ -130,7 +130,7 @@ def use_this_policy():
 
 ## Environment Initialization
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size, policy_red=use_this_policy(),
+    return lambda: gym.make('cap-v0', map_size=map_size,
 	config_path=ENV_SETTING_PATH)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
