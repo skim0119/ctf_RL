@@ -121,7 +121,12 @@ class SubprocVecEnv:
         for remote in self.remotes:
             remote.send(('_reset', kwargs))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
-    
+
+    def get_static_map(self):
+        for remote in self.remotes:
+            remote.send(('_static_map', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
     def get_full_state(self):
         for remote in self.remotes:
             remote.send(('get_full_state', None))

@@ -18,6 +18,7 @@ import math
 from collections import defaultdict
 
 import policy
+from policy.policy import Policy
 
 from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
@@ -204,10 +205,13 @@ class heuristic_policy(Policy):
         elif mode == 2: # Defend
             goal = np.argwhere(free_map==7)[0]
         elif mode == 0: # Attack
-            enemy_locs = np.argwhere(state[:,:,4]==-1)
-            i = np.argmin([self.distance(loc, d, True) for d in enemy_locs])
-            goal = enemy_locs[i]
-        return move_toward(loc, goal)
+            enemy_locs = np.argwhere(np.array(state)==4)
+            if len(enemy_locs) == 0:
+                goal = loc
+            else:
+                i = np.argmin([self.distance(loc, d, True) for d in enemy_locs])
+                goal = enemy_locs[i]
+        return self.move_toward(loc, goal)
 
 subp = heuristic_policy()
 print('Training Initiated:')
@@ -240,11 +244,14 @@ def get_action(states, initial=False):
 
     # Run sub-policy
     actions = []
+    smap = envs.get_static_map()
+    fmap = envs.get_full_state()
+    bagent = envs.get_team_blue().flat
     for i in range(NENV*num_blue):
         env_id = i//num_blue
         agent_id = i % num_blue
         mod = playing_mode[i]
-        p = subp.gen_action(states[i], mod, envs[env_id]._static_map, envs[env_id]._team_blue[agent_id])
+        p = subp.gen_action(fmap[env_id], mod, smap[env_id], bagent[i])
         actions.append(p)
 
     actions = np.reshape(actions, [NENV, num_blue])
@@ -258,7 +265,7 @@ while True:
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
-    play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
+    play_save_on = interval_flag(global_episodes, 1000, 'replay_save')
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
@@ -317,6 +324,7 @@ while True:
 
     global_episodes += NENV
     sess.run(global_meta_step_next)
+    print(global_episodes)
 
     # Train meta
     meta_batch.extend(meta_trajs)
@@ -350,3 +358,4 @@ while True:
         for i in range(NENV):
             with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
                 pickle.dump(info[i], handle)
+        print('replay saved')
