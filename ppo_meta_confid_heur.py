@@ -119,7 +119,7 @@ def use_this_map(x, max_episode, max_prob):
 
 ## Policy Setting
 heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.AStar]
-heur_weight = [1,2,1,1, 1]
+heur_weight = [1,2,1,1]
 heur_weight = np.array(heur_weight) / sum(heur_weight)
 def use_this_policy():
     return np.random.choice(heur_policy_list, p=heur_weight)
