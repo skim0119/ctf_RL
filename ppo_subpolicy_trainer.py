@@ -42,7 +42,7 @@ num_mode = 3
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
-red_policies = [policy.Roomba(), policy.Roomba(), policy.AStar()]
+red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,5)]
 call_map = lambda: random.choice(map_list)
 
@@ -91,8 +91,8 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
-epoch = 2
-minbatch_size = 4000
+epoch = 4
+minbatch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -116,7 +116,7 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options)
+config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
@@ -196,6 +196,8 @@ def reward_shape(prev_red_alive, red_alive, done, idx=None, additional_reward=No
         if idx == 2:
             if blue_flags[i]:
                 reward.append(-1)
+            elif done[i]:
+                reward.append(1)
             else:
                 reward.append(0)
     if additional_reward is not None:
@@ -249,13 +251,15 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
-        env_reward = (raw_reward - prev_rew)/100
-        episode_rew += reward
 
         if step == max_ep:
-            env_reward[:] = -1
             done[:] = True
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        if step == max_ep:
+            env_reward[:] = -1
+        else:
+            env_reward = (raw_reward - prev_rew)/100
+        episode_rew += reward
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):

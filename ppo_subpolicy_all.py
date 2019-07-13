@@ -88,7 +88,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 2500
+minbatch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
