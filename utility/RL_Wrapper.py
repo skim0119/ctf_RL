@@ -113,9 +113,13 @@ class TrainedNetwork:
         input_tensor='global/state:0',
         output_tensor='global/actor/Softmax:0',
         action_space=5,
+        sess=None,
         *args,
         **kwargs
     ):
+        if sess is None:
+            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+
         self.model_path = 'model/' + model_name
 
         # Initialize Session and TF graph
@@ -153,23 +157,21 @@ class TrainedNetwork:
         vprint(f'path find: {ckpt.model_checkpoint_path}')
         if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
             vprint(f'path exist : {ckpt.model_checkpoint_path}')
-            self.graph = tf.Graph()
-            with self.graph.as_default():
-                self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+            with self.sess.graph.as_default():
                 self.saver = tf.train.import_meta_graph(
                     ckpt.model_checkpoint_path + '.meta',
                     clear_devices=True
                 )
                 self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-                vprint([n.name for n in self.graph.as_graph_def().node])
+                vprint([n.name for n in self.sess.graph.as_graph_def().node])
 
-                self.state = self.graph.get_tensor_by_name(input_tensor)
+                self.state = self.sess.graph.get_tensor_by_name(input_tensor)
 
                 try:
-                    self.action = self.graph.get_operation_by_name(output_tensor)
+                    self.action = self.sess.graph.get_operation_by_name(output_tensor)
                 except ValueError:
-                    self.action = self.graph.get_tensor_by_name(output_tensor)
-                    vprint([n.name for n in self.graph.as_graph_def().node])
+                    self.action = self.sess.graph.get_tensor_by_name(output_tensor)
+                    vprint([n.name for n in self.sess.graph.as_graph_def().node])
 
             vprint('Graph is succesfully loaded.', ckpt.model_checkpoint_path)
         else:
@@ -178,7 +180,7 @@ class TrainedNetwork:
 
     def _get_node(self, name):
         try:
-            node = self.graph.get_operation_by_name(name)
+            node = self.sess.graph.get_operation_by_name(name)
         except ValueError:
-            node = self.graph.get_tensor_by_name(name)
+            node = self.sess.graph.get_tensor_by_name(name)
         return node
