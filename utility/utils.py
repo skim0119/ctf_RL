@@ -82,6 +82,10 @@ def interval_flag(step, freq, name):
         return False
 
 def path_create(path, override=False):
+    """
+    Create directory
+    If override is true, remove the directory first
+    """
     if override:
         if os.path.exists(path):
             shutil.rmtree(path,ignore_errors=True)
