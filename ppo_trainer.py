@@ -6,7 +6,10 @@
 '''
 
 import pickle
+
 import os
+#os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+
 import shutil
 import configparser
 
@@ -39,14 +42,20 @@ from method.ppo import PPO as Network
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'ppo_flat_robust'
+TRAIN_NAME = 'adapt_train/ppo_flat'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
-NENV = multiprocessing.cpu_count()  
 
-env_setting_path = 'setting_ppo_flat.ini'
+MODEL_LOAD_PATH = './model/ppo_flat_robust/' # initialize values
+if MODEL_LOAD_PATH is None:
+    MODEL_LOAD_PATH = MODEL_PATH
+
+NENV = multiprocessing.cpu_count()  
+print('Number of cpu_count : {}'.format(NENV))
+
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)
@@ -71,7 +80,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -91,15 +100,14 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
-global_episode_rewards = MovingAverage(moving_average_step)
-global_length = MovingAverage(moving_average_step)
-global_succeed = MovingAverage(moving_average_step)
-global_episodes = 0
+log_episodic_reward = MovingAverage(moving_average_step)
+log_length = MovingAverage(moving_average_step)
+log_winrate = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_dir = 'fair_map/'
 map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
-max_epsilon = 0.75; max_at = 150000
+max_epsilon = 0.65; max_at = 150000
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
@@ -117,16 +125,19 @@ def use_this_map(x, max_episode, max_prob):
         return None
 
 ## Policy Setting
-heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.AStar]
-heur_weight = [1,2,1,1]
+heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.Random, policy.AStar]
+heur_weight = [1,1,1,1,1]
 heur_weight = np.array(heur_weight) / sum(heur_weight)
 def use_this_policy():
     return np.random.choice(heur_policy_list, p=heur_weight)
 
 ## Environment Initialization
 def make_env(map_size):
-    return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path=env_setting_path)
+    return lambda: gym.make(
+            'cap-v0',
+            map_size=map_size,
+            config_path=env_setting_path
+            )
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
@@ -137,11 +148,23 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options)
 
 sess = tf.Session(config=config)
+#sess = tf.Session()
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess)
 
+# Resotre / Initialize
+global_episodes = 0
+saver = tf.train.Saver(max_to_keep=3)
+network.initiate(saver, MODEL_LOAD_PATH)
+sess.run(tf.assign(global_step, 0)) # Reset the counter
+
+writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+
+
+### TRAINING ###
 def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
     buffer_size = 0
@@ -174,24 +197,11 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
     for mdp_tuple in it:
         network.update_global(*mdp_tuple, global_episodes, writer, log)
 
-# Resotre / Initialize
-saver = tf.train.Saver(max_to_keep=3)
-network.initiate(saver, MODEL_PATH)
-
-writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-global_episodes = sess.run(global_step) # Reset the counter
-network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
-
-# Red Policy (selfplay)
-print('Training Initiated:')
-
 def get_action(states):
     a1, v1, logits1 = network.run_network(states)
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
-batch = []
-num_batch = 0
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -205,10 +215,15 @@ while True:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
+    batch = []
+    num_batch = 0
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
+    if global_episodes > 20000:
+        env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
+            config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
@@ -255,19 +270,20 @@ while True:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    global_episode_rewards.append(np.mean(episode_rew))
-    global_length.append(np.mean(steps))
-    global_succeed.append(np.mean(envs.blue_win()))
+    
+    log_episodic_reward.extend(episode_rew.tolist())
+    log_length.extend(steps)
+    log_winrate.extend(envs.blue_win())
 
     global_episodes += NENV
     sess.run(global_step_next)
-    #progbar.update(global_episodes)
 
     if log_on:
+        tag = 'adapt_train_log/'
         record({
-            'Records/mean_length': global_length(),
-            'Records/mean_succeed': global_succeed(),
-            'Records/mean_episode_reward': global_episode_rewards(),
+            tag+'length': log_length(),
+            tag+'win-rate': log_winrate(),
+            tag+'reward': log_episodic_reward(),
         }, writer, global_episodes)
         
     if save_on:
