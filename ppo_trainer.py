@@ -48,8 +48,9 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.90
 
-MODEL_LOAD_PATH = './model/ppo_flat_robust/' # initialize values
-if MODEL_LOAD_PATH is None:
+if OVERRIDE:
+    MODEL_LOAD_PATH = './model/ppo_flat_robust/' # initialize values
+else:
     MODEL_LOAD_PATH = MODEL_PATH
 
 NENV = multiprocessing.cpu_count()  
@@ -158,7 +159,10 @@ network = Network(in_size=input_size, action_size=action_space, scope='main', se
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3)
 network.initiate(saver, MODEL_LOAD_PATH)
-sess.run(tf.assign(global_step, 0)) # Reset the counter
+if OVERRIDE:
+    sess.run(tf.assign(global_step, 0)) # Reset the counter
+else:
+    global_episodes = sess.run(global_step)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
