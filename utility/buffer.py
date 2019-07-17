@@ -129,6 +129,9 @@ class Trajectory:
             e_ -= trim_length
         return traj_list
 
+    def clear(self):
+        self.buffer = [[] for _ in range(self.depth)]
+
 class Trajectory_buffer:
     """Trajectory_buffer
 

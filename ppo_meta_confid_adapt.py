@@ -85,7 +85,6 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-batch_memory_size = 4000
 batch_meta_memory_size = 4000
 
 ## Setup
@@ -103,7 +102,7 @@ global_episodes = 0
 ## Map Setting
 map_dir = 'fair_map/'
 map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
-max_epsilon = 0.55; max_at = 150000
+max_epsilon = 0.55; max_at = 1
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
@@ -121,8 +120,8 @@ def use_this_map(x, max_episode, max_prob):
         return None
 
 ## Policy Setting
-heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.AStar]
-heur_weight = [1,2,1,1]
+heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.AStar, policy.Random]
+heur_weight = [1,1,1,1,1]
 heur_weight = np.array(heur_weight) / sum(heur_weight)
 def use_this_policy():
     return np.random.choice(heur_policy_list, p=heur_weight)
@@ -170,6 +169,7 @@ total_saver = tf.train.Saver(
         var_list=meta_network.get_vars+subp_network.get_vars+[global_step],
     )
 if OVERRIDE:
+    # Use pre-trained network weights to initialize
     meta_saver = tf.train.Saver(max_to_keep=3, var_list=meta_network.get_vars+[global_step])
     meta_network.initiate(meta_saver, META_LOAD_PATH)
     subp_saver = tf.train.Saver(var_list=subp_network.get_vars)
@@ -184,18 +184,19 @@ total_saver.save(sess, MODEL_PATH+'/ctf_policy.ckpt', global_step=global_episode
 
 log_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 
-
 ## Prepare Subpolicies
 minibatch_size = 128
 epoch = 2
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
+    sub_traj_buffer = [defaultdict(list) for _ in range(num_mode)]
     buffer_size = 0
     for idx, traj in enumerate(trajs):
         if len(traj) == 0:
             continue
         buffer_size += len(traj)
 
+        # Meta Trajectory
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
         
@@ -204,6 +205,34 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         traj_buffer['td_target'].extend(td_target)
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['logit'].extend(traj[4])
+
+        # Subp Trajectory
+        print(len(traj))
+        sub_traj = Trajectory(depth=5)
+        mode = traj[1][0] # Initial mode
+        for i in range(len(traj) + 1):
+            if i == len(traj) or traj[1][i] != mode:
+                sub_bootstrap = 0 if i==len(traj) else traj[9][i] # Next critic
+                td_target, advantages = gae(sub_traj[2], sub_traj[3], 0,
+                        gamma, lambd, normalize=False)
+                sub_traj_buffer[mode]['state'].extend(sub_traj[0])
+                sub_traj_buffer[mode]['action'].extend(sub_traj[1])
+                sub_traj_buffer[mode]['td_target'].extend(td_target)
+                sub_traj_buffer[mode]['advantage'].extend(advantages)
+                sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
+
+                print(' ',len(sub_traj))
+                sub_traj[mode].clear()
+                mode = traj[1][i]
+
+            sub_traj.append(
+                    traj[0][i], # State
+                    traj[6][i], # Action
+                    traj[10][i]+traj[2][i], # Reward (indiv + shared)
+                    traj[7][i], # Critic
+                    traj[8][i] # Prob
+                )
+        
 
     if buffer_size < 10:
         return
@@ -220,55 +249,10 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
     for mdp_tuple in it:
         meta_network.update_global(*mdp_tuple, global_episodes, writer, log)
 
-'''
-def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
-    def batch_iter(batch_size, states, actions, logits, tdtargets, advantages):
-        size = len(states)
-        for _ in range(size // batch_size):
-            rand_ids = np.random.randint(0, size, batch_size)
-            yield states[rand_ids, :], actions[rand_ids], logits[rand_ids], tdtargets[rand_ids], advantages[rand_ids]
+        #subp_network.update_global(state, action, tdtarget, advantage,
+        #    old_logit, global_episodes, writer, log, mode)
 
-    buffer_s, buffer_a, buffer_tdtarget, buffer_adv, buffer_logit = [[],[],[]], [[],[],[]], [[],[],[]], [[],[],[]], [[],[],[]]
-    for traj in trajs:
-        if len(traj) == 0:
-            continue
-        observations = traj[0]
-        actions = traj[1]
-        bootstrap = traj[6][-1]
-        mode = traj[5][0]
-        
-        td_target, advantages = gae(traj[2], traj[3], bootstrap,
-                gamma, lambd, normalize=False)
-
-        buffer_s[mode].extend(observations)
-        buffer_a[mode].extend(actions)
-        buffer_tdtarget[mode].extend(td_target)
-        buffer_adv[mode].extend(advantages)
-        buffer_logit[mode].extend(logits)
-
-    for mode in range(num_mode):
-        buffer_size = len(buffer_s[mode])
-        if buffer_size < 10:
-            return
-
-        for _ in range(epoch):
-            for state, action, old_logit, tdtarget, advantage in  \
-                batch_iter(batch_size, np.stack(buffer_s[mode]), np.stack(buffer_a[mode]),
-                        np.stack(buffer_logit[mode]), np.stack(buffer_tdtarget[mode]), np.stack(buffer_adv[mode])):
-                network.update_global(
-                    state, action, tdtarget, advantage, old_logit, global_episodes, writer, log, mode)
-'''
-
-# Red Policy (selfplay)
-'''
-red_policy = TrainedNetwork(
-            model_path='model/a3c_pretrained',
-            input_tensor='global/state:0',
-            output_tensor='global/actor/Softmax:0'
-        )
-'''
-
-def reward_shape(prev_red_alive, red_alive, done, env_reward):
+def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
     reward_list = []
@@ -290,7 +274,7 @@ def reward_shape(prev_red_alive, red_alive, done, env_reward):
             reward[2] = -1
         else:
             reward[2] = 0
-        reward_list.append(reward + env_reward[i])
+        reward_list.append(reward)
     return np.array(reward_list)
 
 print('Training Initiated:')
@@ -305,11 +289,17 @@ def get_action(states, initial=False):
         mode_length = np.ones(NENV*num_blue)
         freq_list = []
 
+    # Forward Propagation
+    feed_dict = {meta_network.state_input: states,
+                 subp_network.state_input: states}
+    ops = [meta_network.actor, meta_network.critic, meta_network.logits,
+           subp_network.actor, subp_network.critic, subp_network.logits]
+    probs, critic, logits, sub_prob, sub_critic, sub_logit = sess.run(obs, feed_dict)
+    action = np.array([np.random.choice(action_space, p=prob / sum(prob)) for prob in probs])
+
+
     # Run meta controller
-    action, critic, logits = meta_network.run_network(states)
-    prob = sess.run(meta_network.actor,
-            feed_dict={meta_network.state_input: states})
-    confids = -np.mean(prob * np.log(prob), axis=1) # Entropy
+    confids = -np.mean(probs * np.log(probs), axis=1) # Entropy
     for i in range(NENV*num_blue):
         confid = confids[i]
         old_confid = entering_confids[i]
@@ -322,19 +312,21 @@ def get_action(states, initial=False):
             mode_length[i] += 1
 
     # Run subp network
-    sub_logit = sess.run(subp_network.actor,
-            feed_dict={subp_network.state_input:states})
-    actions = []
+    subp_actions = []
+    subp_critics = []
+    subp_logits = []
     for i in range(NENV*num_blue):
         mod = playing_mode[i]
-        prob = sub_logit[mod][i]; prob=prob/sum(prob)
-        actions.append(np.random.choice(action_space, p=prob))
-    actions = np.reshape(actions, [NENV, num_blue])
+        prob = sub_prob[mod][i]; prob=prob/sum(prob)
+        subp_actions.append(np.random.choice(action_space, p=prob))
+        subp_critics.append(sub_critic[mod][i])
+        subp_logits.append(sub_logit[mod][i])
+    actions = np.reshape(subp_actions, [NENV, num_blue])
 
-    return action, critic, logits, actions
+    return action, critic, logits, actions, subp_actions, subp_critics, subp_logits 
 
-meta_batch = []
-num_meta_batch = 0
+traj_batch = []
+total_traj_len = 0
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -348,46 +340,64 @@ while True:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
-    meta_trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
+    trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
     
     # Bootstrap
+    if global_episodes > 20000:
+        env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
+            config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
-    a1, v1, logits1, actions = get_action(s1, initial=True)
+    a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
 
     # Rollout
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a, v0 = a1, v1
-        logits = logits1
+        a0, v0 = a1, v1
+        logits0 = logits1
+        sub_a0, sub_v0 = sub_a1, sub_v1
+        sub_logits0 = sub_logits1
 
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        env_reward = (raw_reward - prev_rew - 0.1*step)/100
+        env_reward = (raw_reward - prev_rew - 0.01*step)/100
         episode_rew += env_reward
 
         if step == max_ep:
             env_reward[:] = -1
             done[:] = True
 
-        #reward = reward_shape(was_alive_red, is_alive_red, done, env_reward) - 0.01
+        task_reward = reward_shape(was_alive_red, is_alive_red, done)
         cumul_reward += env_reward
     
-        a1, v1, logits1, actions = get_action(s1)
+        a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1)
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
+                sub_v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
                 # Reselect meta
-                meta_trajs[idx].append([s0[idx], a[idx], env_reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([
+                    s0[idx],
+                    a0[idx],
+                    env_reward[env_idx],
+                    v0[idx],
+                    logits0[idx],
+                    v1[idx],
+                    sub_a0[idx],
+                    sub_v0[idx],
+                    sub_logits0[idx],
+                    sub_v1[idx],
+                    task_reward[env_idx],
+                    ])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -400,25 +410,17 @@ while True:
     global_episodes += NENV
     sess.run(global_step_next)
 
-    '''
-    # Train sub
-    if num_batch >= batch_memory_size:
-        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        batch = []
-        num_batch = 0
-    '''
-
     # Train meta
-    meta_batch.extend(meta_trajs)
-    num_meta_batch += sum([len(traj) for traj in meta_trajs])
-    if num_meta_batch >= batch_meta_memory_size:
-        meta_train(meta_batch, 0, epoch, minibatch_size, log_writer, log_image_on, global_episodes)
-        meta_batch = []
-        num_meta_batch = 0
+    traj_batch.extend(trajs)
+    total_traj_len += sum([len(traj) for traj in trajs])
+    if total_traj_len >= batch_meta_memory_size:
+        meta_train(traj_batch, 0, epoch, minibatch_size, log_writer, log_image_on, global_episodes)
+        traj_batch = []
+        total_traj_len = 0
 
     steps = []
     for env_id in range(NENV):
-        steps.append(max([len(traj) for traj in meta_trajs[env_id*num_blue:(env_id+1)*num_blue]]))
+        steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     log_episodic_reward.append(np.mean(episode_rew))
     log_length.append(np.mean(steps))
     log_winrate.append(np.mean(envs.blue_win()))
