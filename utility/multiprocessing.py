@@ -52,6 +52,8 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_fr
             pause = False
             if 'policy_red' in data.keys():
                 data['policy_red'] = data['policy_red']()
+            if 'policy_blue' in data.keys():
+                data['policy_blue'] = data['policy_blue']()
             ob = env.reset(**data)
             ob = centering(ob, env.get_team_blue, 19)
             if ctrl_red:

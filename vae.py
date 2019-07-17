@@ -112,11 +112,12 @@ def make_env(map_size):
     return lambda: gym.make('cap-v0')
 envs = [make_env(20) for i in range(NENV)]
 envs = SubprocVecEnv(envs, 1)
+envs.reset(policy_red=policy.Roomba, policy_blue=policy.Roomba)
 
 stime = time.time()
 train_images = []
 while len(train_images) < 20000:
-    s1 = envs.reset(policy_red=policy.Roomba(), policy_blue=policy.Roomba())
+    s1 = envs.reset(policy_red=policy.Roomba, policy_blue=policy.Roomba)
     trajs = [[] for _ in range(4*NENV)]
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
