@@ -87,7 +87,7 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-batch_meta_memory_size = 4000
+batch_meta_memory_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
