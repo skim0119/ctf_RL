@@ -45,7 +45,7 @@ num_mode = 3
 env_setting_path = 'setting_full.ini'
 
 ## Training Directory Reset
-OVERRIDE = False;
+OVERRIDE = True
 TRAIN_NAME = 'adapt_train/ppo_subp'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
