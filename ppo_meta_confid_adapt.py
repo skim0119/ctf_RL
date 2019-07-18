@@ -33,10 +33,11 @@ from method.ppo import PPO_multimodes as SubNetwork
 from method.base import initialize_uninitialized_vars as iuv
 
 num_mode = 3
+PROGBAR = True
+TRAIN_SUBP = True
 
 ## Training Directory Reset
-PROGBAR = True
-OVERRIDE = True
+OVERRIDE = False
 TRAIN_NAME = 'adapt_train/confid'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -210,36 +211,37 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         traj_buffer['logit'].extend(traj[4])
 
         # Subp Trajectory
-        sub_traj = Trajectory(depth=5)
-        mode = traj[1][0] # Initial mode
-        for i in range(len(traj)):
-            if traj[1][i] != mode:
-                sub_bootstrap = traj[9][i] # Next critic
-                td_target, advantages = gae(sub_traj[2], sub_traj[3], sub_bootstrap,
-                        gamma, lambd, normalize=False)
-                sub_traj_buffer[mode]['state'].extend(sub_traj[0])
-                sub_traj_buffer[mode]['action'].extend(sub_traj[1])
-                sub_traj_buffer[mode]['td_target'].extend(td_target)
-                sub_traj_buffer[mode]['advantage'].extend(advantages)
-                sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
+        if TRAIN_SUBP: 
+            sub_traj = Trajectory(depth=5)
+            mode = traj[1][0] # Initial mode
+            for i in range(len(traj)):
+                if traj[1][i] != mode:
+                    sub_bootstrap = traj[9][i] # Next critic
+                    td_target, advantages = gae(sub_traj[2], sub_traj[3], sub_bootstrap,
+                            gamma, lambd, normalize=False)
+                    sub_traj_buffer[mode]['state'].extend(sub_traj[0])
+                    sub_traj_buffer[mode]['action'].extend(sub_traj[1])
+                    sub_traj_buffer[mode]['td_target'].extend(td_target)
+                    sub_traj_buffer[mode]['advantage'].extend(advantages)
+                    sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
-                sub_traj.clear()
-                mode = traj[1][i]
+                    sub_traj.clear()
+                    mode = traj[1][i]
 
-            sub_traj.append([
-                    traj[0][i], # State
-                    traj[6][i], # Action
-                    traj[10][i]+traj[2][i], # Reward (indiv + shared)
-                    traj[7][i], # Critic
-                    traj[8][i] # Prob
-                ])
-        td_target, advantages = gae(sub_traj[2], sub_traj[3], 0,
-                gamma, lambd, normalize=False)
-        sub_traj_buffer[mode]['state'].extend(sub_traj[0])
-        sub_traj_buffer[mode]['action'].extend(sub_traj[1])
-        sub_traj_buffer[mode]['td_target'].extend(td_target)
-        sub_traj_buffer[mode]['advantage'].extend(advantages)
-        sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
+                sub_traj.append([
+                        traj[0][i], # State
+                        traj[6][i], # Action
+                        traj[10][i]+traj[2][i], # Reward (indiv + shared)
+                        traj[7][i], # Critic
+                        traj[8][i] # Prob
+                    ])
+            td_target, advantages = gae(sub_traj[2], sub_traj[3], 0,
+                    gamma, lambd, normalize=False)
+            sub_traj_buffer[mode]['state'].extend(sub_traj[0])
+            sub_traj_buffer[mode]['action'].extend(sub_traj[1])
+            sub_traj_buffer[mode]['td_target'].extend(td_target)
+            sub_traj_buffer[mode]['advantage'].extend(advantages)
+            sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
     if buffer_size < 10:
         return
@@ -258,18 +260,19 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         meta_network.update_global(*mdp_tuple, global_episodes, writer, log)
 
     # Train Sub
-    for mode in range(num_mode):
-        it = batch_sampler(
-                batch_size,
-                epoch,
-                np.stack(sub_traj_buffer[mode]['state']),
-                np.stack(sub_traj_buffer[mode]['action']),
-                np.stack(sub_traj_buffer[mode]['td_target']),
-                np.stack(sub_traj_buffer[mode]['advantage']),
-                np.stack(sub_traj_buffer[mode]['logit'])
-            )
-        for mdp_tuple in it:
-            subp_network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
+    if TRAIN_SUBP: 
+        for mode in range(num_mode):
+            it = batch_sampler(
+                    batch_size,
+                    epoch,
+                    np.stack(sub_traj_buffer[mode]['state']),
+                    np.stack(sub_traj_buffer[mode]['action']),
+                    np.stack(sub_traj_buffer[mode]['td_target']),
+                    np.stack(sub_traj_buffer[mode]['advantage']),
+                    np.stack(sub_traj_buffer[mode]['logit'])
+                )
+            for mdp_tuple in it:
+                subp_network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
 
 def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
