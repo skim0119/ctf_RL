@@ -13,6 +13,7 @@ import numpy as np
 
 BATCH_SIZE = 100
 
+mirrored_strategy = tf.distribute.MirroredStrategy()
 
 class CVAE(tf.keras.Model):
     def __init__(self, latent_dim):
@@ -116,7 +117,7 @@ envs.reset(policy_red=policy.Roomba, policy_blue=policy.Roomba)
 
 stime = time.time()
 train_images = []
-while len(train_images) < 20000:
+while len(train_images) < 40000:
     s1 = envs.reset(policy_red=policy.Roomba, policy_blue=policy.Roomba)
     trajs = [[] for _ in range(4*NENV)]
     was_alive = [True for agent in envs.get_team_blue().flat]
@@ -151,7 +152,7 @@ print('{} bit'.format(sys.getsizeof(train_images)))
 
 train_dataset = tf.data.Dataset.from_tensor_slices(train_images).batch(BATCH_SIZE)
 
-epochs = 200
+epochs = 1000
 for epoch in range(1, epochs + 1):
     start_time = time.time()
     for train_x in train_dataset:
