@@ -45,14 +45,14 @@ num_mode = 3
 env_setting_path = 'setting_full.ini'
 
 ## Training Directory Reset
-OVERRIDE = True
+OVERRIDE = False
 TRAIN_NAME = 'adapt_train/fixed_subpolicy'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count() // 2
 
 if OVERRIDE:
     MODEL_LOAD_PATH = './model/ppo_subp_robust/' # initialize values
