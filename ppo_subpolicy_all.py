@@ -82,7 +82,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -94,7 +94,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 6000
+minbatch_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -335,9 +335,9 @@ while True:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    log_episodic_reward.append(np.mean(episode_rew))
-    log_length.append(np.mean(steps))
-    log_winrate.append(np.mean(envs.blue_win()))
+    log_episodic_reward.extend(episode_rew.tolist())
+    log_length.extend(steps)
+    log_winrate.extend(envs.blue_win())
 
     if log_on:
         step = sess.run(global_step)

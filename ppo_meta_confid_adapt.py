@@ -87,7 +87,7 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-batch_meta_memory_size = 2000
+batch_meta_memory_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -376,7 +376,6 @@ while True:
     a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
 
     # Rollout
-    cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
         a0, v0 = a1, v1
@@ -395,7 +394,6 @@ while True:
             done[:] = True
 
         task_reward = reward_shape(was_alive_red, is_alive_red, done)
-        cumul_reward += env_reward
     
         a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1)
         for idx, d in enumerate(done):
@@ -446,11 +444,11 @@ while True:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    log_episodic_reward.append(np.mean(episode_rew))
-    log_length.append(np.mean(steps))
-    log_winrate.append(np.mean(envs.blue_win()))
+    log_episodic_reward.extend(episode_rew.tolist())
+    log_length.extend(steps)
+    log_winrate.extend(envs.blue_win())
     freq_list.extend(mode_length.tolist())
-    log_meta_freq.append(np.mean(freq_list))
+    log_meta_freq.extend(freq_list)
 
     if log_on:
         tag = 'adapt_train_log/'
