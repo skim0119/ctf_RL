@@ -201,8 +201,8 @@ def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
     r = []
-    red_flags = envs.red_flag()
-    blue_flags = envs.blue_flag()
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
     for i in range(NENV):
         # Attack (C/max enemy)
         num_prev_enemy = sum(prev_red_alive[i])
