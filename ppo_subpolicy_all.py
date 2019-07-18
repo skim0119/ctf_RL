@@ -274,7 +274,7 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        env_reward = (raw_reward-prev_rew-0.01)/100.0
+        env_reward = (raw_reward-prev_rew-0.01*step)/100.0
 
         if step == max_ep:
             env_reward[:] = -1
