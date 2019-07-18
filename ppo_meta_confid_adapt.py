@@ -38,7 +38,7 @@ TRAIN_SUBP = True
 
 ## Training Directory Reset
 OVERRIDE = False
-TRAIN_NAME = 'adapt_train/confid'
+TRAIN_NAME = 'adapt_train/meta_confid'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
