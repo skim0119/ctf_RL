@@ -108,7 +108,7 @@ log_winrate = MovingAverage(moving_average_step)
 ## Map Setting
 map_dir = 'fair_map/'
 map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
-max_epsilon = 0.65; max_at = 150000
+max_epsilon = 0.55; max_at = 1
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
