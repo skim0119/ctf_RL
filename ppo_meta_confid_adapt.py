@@ -455,6 +455,7 @@ while True:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
+            tag+'meta_frequency': log_meta_freq(),
         }, log_writer, global_episodes)
         
     if save_on:
