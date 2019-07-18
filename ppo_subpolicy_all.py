@@ -255,7 +255,10 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
+    if global_episodes > 20000:
+        env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
+            config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
