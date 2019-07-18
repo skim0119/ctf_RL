@@ -46,7 +46,7 @@ env_setting_path = 'setting_full.ini'
 
 ## Training Directory Reset
 OVERRIDE = True
-TRAIN_NAME = 'adapt_train/ppo_subp'
+TRAIN_NAME = 'adapt_train/fixed_subpolicy'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -94,7 +94,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 5000
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
