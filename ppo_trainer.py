@@ -40,8 +40,10 @@ from utility.gae import gae
 
 from method.ppo import PPO as Network
 
+OVERRIDE = True
+PROGBAR = True
+
 ## Training Directory Reset
-OVERRIDE = False;
 TRAIN_NAME = 'adapt_train/ppo_flat'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -147,6 +149,9 @@ num_red = len(envs.get_team_red()[0])
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
 config = tf.ConfigProto(gpu_options=gpu_options)
+
+if PROGBAR:
+    progbar = tf.keras.utils.Progbar(None)
 
 sess = tf.Session(config=config)
 #sess = tf.Session()
@@ -281,6 +286,8 @@ while True:
 
     global_episodes += NENV
     sess.run(global_step_next)
+    if PROGBAR:
+        progbar.update(global_episodes)
 
     if log_on:
         tag = 'adapt_train_log/'
