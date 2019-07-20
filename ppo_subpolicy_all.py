@@ -41,12 +41,14 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
+OVERRIDE = True
+PROGBAR = True
+
 num_mode = 3
 env_setting_path = 'setting_full.ini'
 
 ## Training Directory Reset
-OVERRIDE = True
-TRAIN_NAME = 'adapt_train/fixed_subpolicy'
+TRAIN_NAME = 'adapt_train/fixed_subpolicy_run2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -94,7 +96,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 2000
+minbatch_size = 3000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -145,6 +147,9 @@ num_red = len(envs.get_team_red()[0])
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
 config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
+
+if PROGBAR:
+    progbar = tf.keras.utils.Progbar(None)
 
 sess = tf.Session(config=config)
 
@@ -304,6 +309,8 @@ while True:
 
     global_episodes += NENV
     sess.run(global_step_next)
+    if PROGBAR:
+        progbar.update(global_episodes)
     for i in range(num_mode):
         sess.run(subtrain_step_next[i])
     
