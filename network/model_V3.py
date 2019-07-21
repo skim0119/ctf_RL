@@ -32,11 +32,17 @@ class Spatial_VAE(tf.keras.Model):
             self.inference_net = tf.keras.Sequential([
                     tf.keras.layers.InputLayer(input_shape=input_shape, name='state_input'),
                     tf.keras.layers.Conv2D(
-                        filters=32, kernel_size=5, strides=(3, 3), activation='relu'),
+                        filters=32, kernel_size=5, strides=(3, 3)),
+                    #tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Activation("relu"),
                     tf.keras.layers.Conv2D(
-                        filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
+                        filters=64, kernel_size=3, strides=(2, 2)),
+                    #tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Activation("relu"),
                     tf.keras.layers.Conv2D(
-                        filters=64, kernel_size=2, strides=(1, 1), activation='relu'),
+                        filters=64, kernel_size=2, strides=(1, 1)),
+                    #tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Activation("relu"),
 
                     tf.keras.layers.Flatten(),
                     # No activation
@@ -246,10 +252,9 @@ def build_network(input_hold, output_size=128, return_layers=False):
     spatial_encoded = []
 
     vae_train_pipe = tf.placeholder(tf.float32, shape=[None,39,39,6])
-    vae = Spatial_VAE((39,39,6), vae_train_pipe, scope='vae')
+    vae = Spatial_VAE((39,39,6), vae_train_pipe, scope='vae', lr=1e-4)
 
-    input_ph = tf.placeholder(tf.float32, [None,39,39,6*keep_dim])
-    for frame in tf.split(input_ph, num_or_size_splits=keep_dim, axis=3):
+    for frame in tf.split(input_hold, num_or_size_splits=keep_dim, axis=3):
         z = vae.build_pipeline(frame)
         spatial_encoded.append(z)
 
@@ -263,7 +268,8 @@ def build_network(input_hold, output_size=128, return_layers=False):
     #    print(variable)
 
     spatial_matrix = tf.stack(spatial_encoded, axis=-1)  # (None, 128, 4)
-    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='tvae')
+    spatial_matrix = tf.stop_gradient(spatial_matrix)
+    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='tvae', lr=1e-4)
     #for layer in tvae.inference_net.layers:
     #    print(layer._name, layer.input_shape, layer.output_shape)
     #for layer in tvae.generative_net.layers:
@@ -275,7 +281,7 @@ def build_network(input_hold, output_size=128, return_layers=False):
 
     train_ops = [vae.update, tvae.update]
 
-    return attention, train_ops
+    return attention, train_ops, vae_train_pipe
 
 if __name__ == '__main__':
     #data = np.random.sample((100,2))
