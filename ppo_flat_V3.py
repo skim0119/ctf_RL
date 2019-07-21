@@ -42,7 +42,7 @@ from method.ppo import PPO_V3 as Network
 
 OVERRIDE = False
 PROGBAR = True
-LOG_DEVICE = False
+LOG_DEVICE = True
 
 ## Training Directory Reset
 TRAIN_NAME = 'PPO_V3_Test'

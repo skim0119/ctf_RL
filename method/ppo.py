@@ -484,13 +484,17 @@ class PPO_V3(a3c):
         return actions, critics, logits
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
+        vae_state = np.copy(state_input[:,:,:,-6:])
+        vae_state[:,:,:,(1,2,4,5)] *= 0.5
+        vae_state[:,:,:,(1,2,4,5)] += 0.5
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
                      self.advantage_: advantage,
                      self.old_logits_: old_logit,
-                     self.vae_pipe: state_input[:,:,:,-6:]}
+                     self.vae_pipe: vae_state}
         self.sess.run([self.update_ops, self.vae_updater], feed_dict)
+        #self.sess.run(self.update_ops, feed_dict)
 
         ops = [self.actor_loss, self.critic_loss, self.entropy]
         aloss, closs, entropy = self.sess.run(ops, feed_dict)
