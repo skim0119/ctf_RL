@@ -12,7 +12,6 @@ import sys
 sys.path.append('/Users/skim0119/github/raide_rl')
 
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tensorflow.contrib.layers as layers
 
 import numpy as np
