@@ -41,8 +41,8 @@ from utility.gae import gae
 from method.ppo import PPO_V3 as Network
 
 OVERRIDE = False
-PROGBAR = True
-LOG_DEVICE = True
+PROGBAR = False
+LOG_DEVICE = False
 
 ## Training Directory Reset
 TRAIN_NAME = 'PPO_V3_Test'
