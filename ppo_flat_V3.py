@@ -150,7 +150,6 @@ num_red = len(envs.get_team_red()[0])
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
 config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE)
-#config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
