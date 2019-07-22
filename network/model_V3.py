@@ -280,7 +280,7 @@ def build_network(input_hold, output_size=128, return_layers=False):
     attention = self_attention(feature, 128, output_size)
 
     #train_ops = [vae.update, tvae.update]
-    train_ops = [vae.update, tf.print(vae.elbo_loss)]
+    train_ops = [vae.update]
 
     return attention, train_ops, vae_train_pipe
 
