@@ -41,7 +41,7 @@ from utility.gae import gae
 from method.ppo import PPO_V3 as Network
 
 OVERRIDE = False
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset

@@ -513,13 +513,13 @@ class PPO_V3(a3c):
             summary.value.add(tag='summary/entropy', simple_value=entropy)
 
             # Check vanish gradient
-            grads = self.sess.run(self.gradients, feed_dict)
+            '''grads = self.sess.run(self.gradients, feed_dict)
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
                 total_counter += np.prod(grad.shape) 
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
-            summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
+            summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)'''
             
             writer.add_summary(summary,global_episodes)
 
