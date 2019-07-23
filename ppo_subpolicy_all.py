@@ -54,7 +54,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 
 if OVERRIDE:
     MODEL_LOAD_PATH = './model/ppo_subp_robust/' # initialize values
@@ -96,7 +96,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 3000
+minbatch_size = 1000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
