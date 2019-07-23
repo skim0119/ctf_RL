@@ -41,9 +41,9 @@ def self_attention(data, hidden_dim, output_dim, residual=True):
         attention = tf.nn.softmax(attention, axis=-1)  # [batch_size, sequence_length, sequence_length]
         return attention
 
-    Q = tf.layers.dense(data, hidden_dim)  # [batch_size, sequence_length, hidden_dim]
-    K = tf.layers.dense(data, hidden_dim)  # [batch_size, sequence_length, hidden_dim]
-    V = tf.layers.dense(data, output_dim)  # [batch_size, sequence_length, output_dim]
+    Q = tf.layers.dense(data, hidden_dim, name='query')  # [batch_size, sequence_length, hidden_dim]
+    K = tf.layers.dense(data, hidden_dim, name='key')  # [batch_size, sequence_length, hidden_dim]
+    V = tf.layers.dense(data, output_dim, name='value')  # [batch_size, sequence_length, output_dim]
 
     attention = scaled_dot_product(Q, K)  # [batch_size, sequence_length, sequence_length]
     output = tf.matmul(attention, V)  # [batch_size, sequence_length, output_dim]

@@ -23,6 +23,7 @@ from method.base import put_channels_on_grid
 
 
 #from network.attention_ctf import build_network
+from network.attention import self_attention
 from network.model_V2 import build_network
 from network.model_V3 import build_network as build_network_V3
 
@@ -485,8 +486,6 @@ class PPO_V3(a3c):
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
         vae_state = np.copy(state_input[:,:,:,-6:])
-        vae_state[:,:,:,(1,2,4,5)] *= 0.5
-        vae_state[:,:,:,(1,2,4,5)] += 0.5
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
@@ -513,13 +512,13 @@ class PPO_V3(a3c):
             summary.value.add(tag='summary/entropy', simple_value=entropy)
 
             # Check vanish gradient
-            '''grads = self.sess.run(self.gradients, feed_dict)
+            grads = self.sess.run(self.gradients, feed_dict)
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
                 total_counter += np.prod(grad.shape) 
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
-            summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)'''
+            summary.value.add(tag='summary/rl_grad_vanish_rate', simple_value=vanish_counter/total_counter)
             
             writer.add_summary(summary,global_episodes)
 
@@ -527,18 +526,22 @@ class PPO_V3(a3c):
 
     def _build_network(self, input_hold):
         encoder_name = self.scope + '/encoder'
+        attention_name = self.scope + '/attention'
         actor_name = self.scope + '/actor'
         critic_name = self.scope + '/critic'
 
-        image_summary = [] 
-        def add_image(net, name, Y=-1, X=8):
-            grid = put_channels_on_grid(net[0], Y, X)
-            image_summary.append(tf.summary.image(name, grid, max_outputs=1))
+        #image_summary = [] 
+        #def add_image(net, name, Y=-1, X=8):
+        #    grid = put_channels_on_grid(net[0], Y, X)
+        #    image_summary.append(tf.summary.image(name, grid, max_outputs=1))
 
         # Feature encoder
         with tf.variable_scope('encoder'):
             feature, self.vae_updater, self.vae_pipe = build_network_V3(input_hold)
             feature = tf.stop_gradient(feature)
+
+        with tf.variable_scope('attention'):
+            attention = self_attention(feature, 128, 128)
 
         # Actor 
         with tf.variable_scope('actor'):
@@ -559,7 +562,7 @@ class PPO_V3(a3c):
             critic = tf.reshape(critic, [-1])
 
         # Collect Variable
-        e_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=encoder_name)
+        e_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=attention_name)
         a_vars = e_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 

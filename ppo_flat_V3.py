@@ -42,7 +42,7 @@ from method.ppo import PPO_V3 as Network
 
 OVERRIDE = False
 PROGBAR = True
-LOG_DEVICE = False
+LOG_DEVICE = True
 
 ## Training Directory Reset
 TRAIN_NAME = 'PPO_V3_Test'
@@ -144,6 +144,8 @@ def make_env(map_size):
             )
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
+nchannel = envs.observation_space.shape[-1]
+print(nchannel)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
@@ -155,7 +157,6 @@ if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
 
 sess = tf.Session(config=config)
-#sess = tf.Session()
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
@@ -213,10 +214,10 @@ def get_action(states):
     return a1, v1, logits1, actions
 
 while True:
-    log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
+    log_on       = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-    save_on = interval_flag(global_episodes, save_network_frequency, 'save')
-    reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
+    save_on      = interval_flag(global_episodes, save_network_frequency, 'save')
+    reload_on    = False     # interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
     
     # initialize parameters 
@@ -230,7 +231,7 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
-    #if global_episodes > 20000:
+    #if global_episodes > 20000: # Partial transition
     #    env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
             config_path=env_setting_path,

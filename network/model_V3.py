@@ -81,8 +81,9 @@ class Spatial_VAE(tf.keras.Model):
             # Loss
             with tf.name_scope('loss'):
                 self.x_logit = self.decode(self.z)
-                cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
-                logpx_z = -tf.reduce_sum(cross_entropy, axis=[1, 2, 3])
+                #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
+                mse = tf.losses.mean_squared_error(predictions==self.x_logit, labels=input_placeholder)
+                logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(self.z, 0., 0.)
                 logqz_x = self.log_normal_pdf(self.z, self.mean, self.logvar)
                 self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
@@ -110,7 +111,7 @@ class Spatial_VAE(tf.keras.Model):
     def sample(self, eps=None):
         if eps is None:
             eps = tf.random.normal(shape=[100, self.latent_dim])
-        return self.decode(eps, apply_sigmoid=True)
+        return self.decode(eps, apply_tanh=True)
 
     def encode(self, x):
         mean, logvar = tf.split(self.inference_net(x), num_or_size_splits=2, axis=1)
@@ -121,10 +122,10 @@ class Spatial_VAE(tf.keras.Model):
         eps = tf.random.normal(shape=[num, self.latent_dim])
         return eps * tf.exp(logvar * .5) + mean
 
-    def decode(self, z, apply_sigmoid=False):
+    def decode(self, z, apply_tanh=False):
         logits = self.generative_net(z)
-        if apply_sigmoid:
-            probs = tf.sigmoid(logits)
+        if apply_tanh:
+            probs = tf.tanh(logits)
             return probs
 
         return logits
@@ -193,8 +194,9 @@ class Temporal_VAE(tf.keras.Model):
             with tf.name_scope('loss'):
                 self.x_logit = self.decode(blinded_z)
                 self.x_logit = tf.squeeze(self.x_logit, axis=-1)
-                cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=future)
-                logpx_z = -tf.reduce_sum(cross_entropy, axis=[1, 2])
+                #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
+                mse = tf.losses.mean_squared_error(predictions==self.x_logit, labels=input_placeholder)
+                logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(blinded_z, 0., 0.)
                 logqz_x = self.log_normal_pdf(blinded_z, blinded_mean, blinded_logvar)
                 self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
@@ -222,7 +224,7 @@ class Temporal_VAE(tf.keras.Model):
     def sample(self, eps=None):
         if eps is None:
             eps = tf.random.normal(shape=[100, self.latent_dim])
-        return self.decode(eps, apply_sigmoid=True)
+        return self.decode(eps, apply_tanh=True)
 
     def encode(self, x):
         mean, logvar = tf.split(self.inference_net(x), num_or_size_splits=2, axis=1)
@@ -233,10 +235,10 @@ class Temporal_VAE(tf.keras.Model):
         eps = tf.random.normal(shape=[num, self.latent_dim])
         return eps * tf.exp(logvar * .5) + mean
 
-    def decode(self, z, apply_sigmoid=False):
+    def decode(self, z, apply_tanh=False):
         logits = self.generative_net(z)
-        if apply_sigmoid:
-            probs = tf.sigmoid(logits)
+        if apply_tanh:
+            probs = tf.tanh(logits)
             return probs
 
         return logits
@@ -258,31 +260,18 @@ def build_network(input_hold, output_size=128, return_layers=False):
         z = vae.build_pipeline(frame)
         spatial_encoded.append(z)
 
-
-    #for layer in vae.inference_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
-    #for layer in vae.generative_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
-
-    #for variable in vae.trainable_variables:
-    #    print(variable)
-
     spatial_matrix = tf.stack(spatial_encoded, axis=-1)  # (None, 128, 4)
     spatial_matrix = tf.stop_gradient(spatial_matrix)
     tvae = Temporal_VAE((128, 4), spatial_matrix, scope='tvae', lr=1e-4)
-    #for layer in tvae.inference_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
-    #for layer in tvae.generative_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
 
     feature = tf.concat([z, tvae.z], axis=1) # (None, 192)
 
-    attention = self_attention(feature, 128, output_size)
+    #attention = self_attention(feature, 128, output_size)
 
-    #train_ops = [vae.update, tvae.update]
-    train_ops = [vae.update]
+    train_ops = [vae.update, tvae.update]
+    #train_ops = [vae.update]
 
-    return attention, train_ops, vae_train_pipe
+    return feature, train_ops, vae_train_pipe
 
 if __name__ == '__main__':
     #data = np.random.sample((100,2))
