@@ -82,8 +82,8 @@ class Spatial_VAE(tf.keras.Model):
             with tf.name_scope('loss'):
                 self.x_logit = self.decode(self.z)
                 #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
-                mse = tf.losses.mean_squared_error(predictions==self.x_logit, labels=input_placeholder)
-                logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
+                logpx_z = -tf.losses.mean_squared_error(predictions=self.x_logit, labels=input_placeholder)
+                #logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(self.z, 0., 0.)
                 logqz_x = self.log_normal_pdf(self.z, self.mean, self.logvar)
                 self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
@@ -194,9 +194,9 @@ class Temporal_VAE(tf.keras.Model):
             with tf.name_scope('loss'):
                 self.x_logit = self.decode(blinded_z)
                 self.x_logit = tf.squeeze(self.x_logit, axis=-1)
-                #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
-                mse = tf.losses.mean_squared_error(predictions==self.x_logit, labels=input_placeholder)
-                logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
+                #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=future)
+                logpx_z = -tf.losses.mean_squared_error(predictions=self.x_logit, labels=future)
+                #logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(blinded_z, 0., 0.)
                 logqz_x = self.log_normal_pdf(blinded_z, blinded_mean, blinded_logvar)
                 self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
