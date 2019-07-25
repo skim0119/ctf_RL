@@ -292,7 +292,7 @@ while True:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'adapt_train_log/'
+        tag = 'V3/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

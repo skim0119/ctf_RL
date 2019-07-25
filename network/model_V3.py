@@ -25,7 +25,7 @@ from utility.utils import store_args
 
 class Spatial_VAE(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, input_placeholder, latent_dim=128, lr=1e-4, scope=None, reuse=tf.AUTO_REUSE):
+    def __init__(self, input_shape, input_placeholder, latent_dim=128, lr=1e-4, num_stacked=4, scope=None, reuse=tf.AUTO_REUSE):
         super().__init__()
         with tf.variable_scope(scope, 'vae', reuse=reuse) as scope:
             # Graph
@@ -70,9 +70,15 @@ class Spatial_VAE(tf.keras.Model):
                         filters=6, kernel_size=5, strides=(3, 3), padding="SAME", activation='tanh'),
                     ], name='decoder')
 
-            with tf.name_scope('data_pipe'):
-                self.mean, self.logvar = self.encode(input_placeholder)
-                self.z = self.reparameterize(self.mean, self.logvar)
+            # Build data frame pipe (keep last)
+            self.z_list = []
+            frames = tf.split(input_placeholder, num_or_size_splits=num_stacked, axis=3)
+            for frame in frames:
+                z, mean, logvar = self.build_pipeline(frame, pipe_name='frame_pipe')
+                self.z_list.append(z)
+            self.z = z
+            self.mean = mean
+            self.logvar = logvar
 
             # Sample
             with tf.name_scope('sample'):
@@ -82,7 +88,7 @@ class Spatial_VAE(tf.keras.Model):
             with tf.name_scope('loss'):
                 self.x_logit = self.decode(self.z)
                 #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
-                logpx_z = -tf.losses.mean_squared_error(predictions=self.x_logit, labels=input_placeholder)
+                logpx_z = -tf.losses.mean_squared_error(predictions=self.x_logit, labels=frames[-1])
                 #logpx_z = -tf.reduce_sum(cross_entropy, axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(self.z, 0., 0.)
                 logqz_x = self.log_normal_pdf(self.z, self.mean, self.logvar)
@@ -100,7 +106,7 @@ class Spatial_VAE(tf.keras.Model):
         with tf.name_scope(pipe_name):
             mean, logvar = self.encode(input_placeholder)
             z = self.reparameterize(mean, logvar)
-        return z
+        return z, mean, logvar
 
     def build_external_loss(self, loss, pipe_name='extern_loss'):
         with tf.name_scope(pipe_name):
@@ -249,31 +255,23 @@ class Temporal_VAE(tf.keras.Model):
               -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
               axis=raxis)
 
-def build_network(input_hold, output_size=128, return_layers=False):
-    keep_dim = 4
-    spatial_encoded = []
+def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
+    vae = Spatial_VAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
 
-    frames = tf.split(input_hold, num_or_size_splits=keep_dim, axis=3)
-    #vae_train_pipe = tf.placeholder(tf.float32, shape=[None,39,39,6])
-    vae = Spatial_VAE((39,39,6), frames[-1], scope='vae', lr=1e-4)
+    spatial_matrix = tf.stack(vae.z_list, axis=-1)  # (None, 128, 4)
+    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
 
-    for frame in frames[:-1]:
-        z = vae.build_pipeline(frame)
-        spatial_encoded.append(z)
-    spatial_encoded.append(vae.z)
-
-    spatial_matrix = tf.stack(spatial_encoded, axis=-1)  # (None, 128, 4)
-    spatial_matrix = tf.stop_gradient(spatial_matrix)
-    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='tvae', lr=1e-4)
-
-    feature = tf.concat([z, tvae.z], axis=1) # (None, 192)
-
-    #attention = self_attention(feature, 128, output_size)
+    feature = tf.concat([vae.z, tvae.z], axis=1) # (None, 192)
 
     train_ops = [vae.update, tvae.update]
-    #train_ops = [vae.update]
 
-    return feature, train_ops
+    loss = {
+            'svae': vae.elbo_loss,
+            'tvae': tvae.elbo_loss
+            }
+    encoding_var = vae.trainable_variables + tvae.trainable_variables
+
+    return feature, train_ops, loss, encoding_var
 
 if __name__ == '__main__':
     #data = np.random.sample((100,2))

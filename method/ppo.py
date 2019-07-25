@@ -466,7 +466,6 @@ class PPO_V3(a3c):
                     return_gradient=True,
                     single_loss=True
                 )
-                print(self.gradients)
 
             # Summary
             #grad_summary = []
@@ -494,8 +493,9 @@ class PPO_V3(a3c):
         self.sess.run([self.update_ops, self.vae_updater], feed_dict)
         #self.sess.run(self.update_ops, feed_dict)
 
-        ops = [self.actor_loss, self.critic_loss, self.entropy]
-        aloss, closs, entropy = self.sess.run(ops, feed_dict)
+        ops = [self.actor_loss, self.critic_loss, self.entropy,
+                self.vae_loss['svae'], self.vae_loss['tvae']]
+        aloss, closs, entropy, vae1_elbo, vae2_elbo = self.sess.run(ops, feed_dict)
 
         if log:
             #log_ops = [
@@ -509,12 +509,15 @@ class PPO_V3(a3c):
             summary.value.add(tag='summary/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/critic_loss', simple_value=closs)
             summary.value.add(tag='summary/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/vae1_elbo', simple_value=vae1_elbo)
+            summary.value.add(tag='summary/vae2_elbo', simple_value=vae2_elbo)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients, feed_dict)
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
+                if grad is None: continue
                 total_counter += np.prod(grad.shape) 
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/rl_grad_vanish_rate', simple_value=vanish_counter/total_counter)
@@ -536,8 +539,7 @@ class PPO_V3(a3c):
 
         # Feature encoder
         with tf.variable_scope('encoder'):
-            feature, self.vae_updater = build_network_V3(input_hold)
-            feature = tf.stop_gradient(feature)
+            feature, self.vae_updater, self.vae_loss, e_vars = build_network_V3(input_hold)
 
         with tf.variable_scope('attention'):
             attention = self_attention(feature, 128, 128)
@@ -561,8 +563,8 @@ class PPO_V3(a3c):
             critic = tf.reshape(critic, [-1])
 
         # Collect Variable
-        e_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=attention_name)
-        a_vars = e_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
+        attention_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=attention_name)
+        a_vars = e_vars+attention_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
         # Collect Summary
