@@ -41,16 +41,10 @@ def oh_to_rgb(state):
     elements = [UNKNOWN, DEAD, TEAM1_BACKGROUND, TEAM2_BACKGROUND,
                  TEAM1_UGV, TEAM2_UGV, TEAM1_UAV, TEAM2_UAV,
                  TEAM1_FLAG, TEAM2_FLAG, OBSTACLE]
-    map_color = {UNKNOWN: 1, DEAD: 0,
-                 TEAM1_BACKGROUND: 0, TEAM2_BACKGROUND: 1,
-                 TEAM1_UGV: 1, TEAM2_UGV: -1,
-                 TEAM1_UAV: 1, TEAM2_UAV: -1,
-                 TEAM1_FLAG: 1, TEAM2_FLAG: -1,
-                 OBSTACLE: 1}
     
     for element in elements:
-        channel = SIX_MAP_CHANNEL[element]
-        color = map_color[element]
+        channel = CHANNEL[element]
+        color = REPRESENT[element]
         image[state[:,:,:,channel]==color] = np.array(COLOR_DICT[element])
         
     return image

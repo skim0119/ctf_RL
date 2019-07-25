@@ -67,7 +67,7 @@ class Spatial_VAE(tf.keras.Model):
                         activation='relu'),
                     # No activation
                     tf.keras.layers.Conv2DTranspose(
-                        filters=6, kernel_size=5, strides=(3, 3), padding="SAME"),
+                        filters=6, kernel_size=5, strides=(3, 3), padding="SAME", activation='tanh'),
                     ], name='decoder')
 
             with tf.name_scope('data_pipe'):
@@ -83,10 +83,10 @@ class Spatial_VAE(tf.keras.Model):
                 self.x_logit = self.decode(self.z)
                 #cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.x_logit, labels=input_placeholder)
                 logpx_z = -tf.losses.mean_squared_error(predictions=self.x_logit, labels=input_placeholder)
-                #logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
+                #logpx_z = -tf.reduce_sum(cross_entropy, axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(self.z, 0., 0.)
                 logqz_x = self.log_normal_pdf(self.z, self.mean, self.logvar)
-                self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
+                self.elbo_loss = -tf.reduce_mean(logpx_z + 0.001*(logpz - logqz_x))
 
             # Gradient
             self.grads = tf.gradients(self.elbo_loss, self.trainable_variables)
@@ -110,7 +110,7 @@ class Spatial_VAE(tf.keras.Model):
 
     def sample(self, eps=None):
         if eps is None:
-            eps = tf.random.normal(shape=[100, self.latent_dim])
+            eps = tf.random.normal(shape=[4, self.latent_dim])
         return self.decode(eps, apply_tanh=True)
 
     def encode(self, x):
@@ -199,7 +199,7 @@ class Temporal_VAE(tf.keras.Model):
                 #logpx_z = -tf.reduce_sum(mse , axis=[1, 2, 3])
                 logpz = self.log_normal_pdf(blinded_z, 0., 0.)
                 logqz_x = self.log_normal_pdf(blinded_z, blinded_mean, blinded_logvar)
-                self.elbo_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
+                self.elbo_loss = -tf.reduce_mean(logpx_z + 0.001*(logpz - logqz_x))
 
             # Gradient
             self.grads = tf.gradients(self.elbo_loss, self.trainable_variables)
