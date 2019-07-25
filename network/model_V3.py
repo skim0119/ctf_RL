@@ -253,12 +253,14 @@ def build_network(input_hold, output_size=128, return_layers=False):
     keep_dim = 4
     spatial_encoded = []
 
-    vae_train_pipe = tf.placeholder(tf.float32, shape=[None,39,39,6])
-    vae = Spatial_VAE((39,39,6), vae_train_pipe, scope='vae', lr=1e-4)
+    frames = tf.split(input_hold, num_or_size_splits=keep_dim, axis=3)
+    #vae_train_pipe = tf.placeholder(tf.float32, shape=[None,39,39,6])
+    vae = Spatial_VAE((39,39,6), frames[-1], scope='vae', lr=1e-4)
 
-    for frame in tf.split(input_hold, num_or_size_splits=keep_dim, axis=3):
+    for frame in frames[:-1]:
         z = vae.build_pipeline(frame)
         spatial_encoded.append(z)
+    spatial_encoded.append(vae.z)
 
     spatial_matrix = tf.stack(spatial_encoded, axis=-1)  # (None, 128, 4)
     spatial_matrix = tf.stop_gradient(spatial_matrix)
@@ -271,7 +273,7 @@ def build_network(input_hold, output_size=128, return_layers=False):
     train_ops = [vae.update, tvae.update]
     #train_ops = [vae.update]
 
-    return feature, train_ops, vae_train_pipe
+    return feature, train_ops
 
 if __name__ == '__main__':
     #data = np.random.sample((100,2))

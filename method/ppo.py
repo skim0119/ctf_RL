@@ -485,13 +485,11 @@ class PPO_V3(a3c):
         return actions, critics, logits
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
-        vae_state = np.copy(state_input[:,:,:,-6:])
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
                      self.advantage_: advantage,
-                     self.old_logits_: old_logit,
-                     self.vae_pipe: vae_state}
+                     self.old_logits_: old_logit}
         self.sess.run([self.update_ops, self.vae_updater], feed_dict)
         #self.sess.run(self.update_ops, feed_dict)
 
@@ -537,7 +535,7 @@ class PPO_V3(a3c):
 
         # Feature encoder
         with tf.variable_scope('encoder'):
-            feature, self.vae_updater, self.vae_pipe = build_network_V3(input_hold)
+            feature, self.vae_updater = build_network_V3(input_hold)
             feature = tf.stop_gradient(feature)
 
         with tf.variable_scope('attention'):
