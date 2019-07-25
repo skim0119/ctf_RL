@@ -466,6 +466,7 @@ class PPO_V3(a3c):
                     return_gradient=True,
                     single_loss=True
                 )
+                print(self.gradients)
 
             # Summary
             #grad_summary = []
@@ -544,7 +545,7 @@ class PPO_V3(a3c):
         # Actor 
         with tf.variable_scope('actor'):
             logits = layers.fully_connected(
-                feature, self.action_size,
+                attention, self.action_size,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
                 activation_fn=None)
@@ -553,7 +554,7 @@ class PPO_V3(a3c):
         # Critic
         with tf.variable_scope('critic'):
             critic = layers.fully_connected(
-                feature, 1,
+                attention, 1,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
                 activation_fn=None)

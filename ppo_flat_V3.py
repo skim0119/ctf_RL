@@ -42,7 +42,7 @@ from method.ppo import PPO_V3 as Network
 
 OVERRIDE = False
 PROGBAR = True
-LOG_DEVICE = True
+LOG_DEVICE = False
 
 ## Training Directory Reset
 TRAIN_NAME = 'PPO_V3_Test'
@@ -84,7 +84,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
