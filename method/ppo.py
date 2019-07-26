@@ -466,6 +466,7 @@ class PPO_V3(a3c):
                     return_gradient=True,
                     single_loss=True
                 )
+                self.gradients = [g for g in self.gradients if g is not None]
 
             # Summary
             #grad_summary = []
