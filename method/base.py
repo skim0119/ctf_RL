@@ -37,6 +37,24 @@ def initialize_uninitialized_vars(sess):
         sess.run(tf.variables_initializer(not_initialized_vars))
         print('Initialized all non-initialized variables')
 
+def put_ctf_state_on_grid(images, pad=1):
+    # image : [num_image, y, x, num_channel]
+    # Regularize
+    i_min = tf.reduce_min(tf.reduce_min(images, axis=1, keepdims=True), axis=2, keepdims=True)
+    i_max = tf.reduce_max(tf.reduce_max(images, axis=1, keepdims=True), axis=2, keepdims=True)
+    images = (images - i_min) / (i_max - i_min)
+    
+    padding = tf.constant([[0,0], [pad,pad], [pad,pad], [0,0]])
+    images = tf.pad(images, padding, mode='CONSTANT')
+    images = tf.transpose(images, (0,3,1,2)) # [num_image, num_channel, y, x]
+
+    images = tf.concat(images, axis=2) # [num_channel, num_image*y, x]
+    images = tf.concat(images, axis=2) * [num_image*y, num_channel*x]
+
+    # scale to [0, 255] and convert to uint8
+    return tf.image.convert_image_dtype(images, dtype = tf.uint8) 
+    
+
 def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):
 
     '''Visualize conv. features as an image (mostly for the 1st layer).
@@ -64,7 +82,8 @@ def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):
     kernel1 = (kernel - x_min) / (x_max - x_min)
 
     # pad X and Y
-    x1 = tf.pad(kernel1, tf.constant( [[pad,pad],[pad, pad],[0,0],[0,0]] ), mode = 'CONSTANT')
+    padding = tf.constant([[pad, pad],[pad,pad], [0,0], [0,0]])
+    x1 = tf.pad(kernel1, padding, mode = 'CONSTANT')
 
     # X and Y dimensions, w.r.t. padding
     Y = kernel1.get_shape()[0] + 2 * pad
