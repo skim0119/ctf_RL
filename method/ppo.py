@@ -20,6 +20,7 @@ from method.pg import Backpropagation
 
 from method.a3c import a3c
 from method.base import put_channels_on_grid
+from method.base import put_ctf_state_on_grid
 
 
 #from network.attention_ctf import build_network
@@ -492,20 +493,19 @@ class PPO_V3(a3c):
                      self.advantage_: advantage,
                      self.old_logits_: old_logit}
         self.sess.run([self.update_ops, self.vae_updater], feed_dict)
-        #self.sess.run(self.update_ops, feed_dict)
 
         ops = [self.actor_loss, self.critic_loss, self.entropy,
                 self.vae_loss['svae'], self.vae_loss['tvae']]
         aloss, closs, entropy, vae1_elbo, vae2_elbo = self.sess.run(ops, feed_dict)
 
         if log:
-            #log_ops = [
-            #       #self.cnn_summary,
+            log_ops = [
+                   self.cnn_summary]
             #       self.merged_grad_summary_op,
             #       self.merged_summary_op]
-            #summaries = self.sess.run(log_ops, feed_dict)
-            #for summary in summaries:
-            #    writer.add_summary(summary, global_episodes)
+            summaries = self.sess.run(log_ops, feed_dict)
+            for summary in summaries:
+                writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
             summary.value.add(tag='summary/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/critic_loss', simple_value=closs)
@@ -533,14 +533,17 @@ class PPO_V3(a3c):
         actor_name = self.scope + '/actor'
         critic_name = self.scope + '/critic'
 
-        #image_summary = [] 
+        image_summary = [] 
         #def add_image(net, name, Y=-1, X=8):
         #    grid = put_channels_on_grid(net[0], Y, X)
         #    image_summary.append(tf.summary.image(name, grid, max_outputs=1))
 
         # Feature encoder
         with tf.variable_scope('encoder'):
-            feature, self.vae_updater, self.vae_loss, e_vars = build_network_V3(input_hold)
+            feature, self.vae_updater, self.vae_loss, e_vars, sampler = build_network_V3(input_hold)
+            sampled_image = put_ctf_state_on_grid(sampler)
+            image_summary.append(tf.summary.image('svae_sample', sampled_image, max_outputs=1))
+
 
         with tf.variable_scope('attention'):
             attention = self_attention(feature, 128, 128)
@@ -569,6 +572,6 @@ class PPO_V3(a3c):
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
         # Collect Summary
-        #self.cnn_summary = tf.summary.merge(image_summary)
+        self.cnn_summary = tf.summary.merge(image_summary)
         
         return logits, actor, critic, a_vars, c_vars

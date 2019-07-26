@@ -256,22 +256,27 @@ class Temporal_VAE(tf.keras.Model):
               axis=raxis)
 
 def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
-    vae = Spatial_VAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
+    svae = Spatial_VAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
 
-    spatial_matrix = tf.stack(vae.z_list, axis=-1)  # (None, 128, 4)
+    spatial_matrix = tf.stack(svae.z_list, axis=-1)  # (None, 128, 4)
+    spatial_matrix = tf.stop_gradient(spatial_matrix)
     tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
 
-    feature = tf.concat([vae.z, tvae.z], axis=1) # (None, 192)
+    feature = tf.concat([svae.z, tvae.z], axis=1) # (None, 192)
 
-    train_ops = [vae.update, tvae.update]
+    train_ops = [svae.update, tvae.update]
 
     loss = {
-            'svae': vae.elbo_loss,
+            'svae': svae.elbo_loss,
             'tvae': tvae.elbo_loss
             }
-    encoding_var = vae.trainable_variables + tvae.trainable_variables
+    encoding_var = svae.trainable_variables + tvae.trainable_variables
 
-    return feature, train_ops, loss, encoding_var
+    sampler = {
+            'svae': svae.random_sample()
+            }
+
+    return feature, train_ops, loss, encoding_var, sampler
 
 if __name__ == '__main__':
     #data = np.random.sample((100,2))
