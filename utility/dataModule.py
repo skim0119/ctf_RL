@@ -2,7 +2,7 @@ import numpy as np
 import collections
 from gym_cap.envs.const import *
 
-def centering(obs, agents, vision_range, padder=[1,0,0,1,0,0]):
+def centering(obs, agents, vision_range, padder=[0,0,0,1,0,0]):
     assert obs.shape[-1] == len(padder)
 
     length = vision_range*2+1

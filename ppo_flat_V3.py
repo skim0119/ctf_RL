@@ -83,8 +83,8 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_stat_frequency    = 256 #config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 256 #config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -94,9 +94,10 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
-epoch = 2
-minimum_batch_size = 5000
+pretrain_vae_ep = 0
+minibatch_size = 512
+epoch = 1  # PPO is on-policy, but 2,3 epoch seems to converge due to constraint
+minimum_batch_size = 7000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -107,6 +108,8 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
+log_looptime = MovingAverage(moving_average_step)
+log_traintime = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_dir = 'fair_map/'
@@ -213,6 +216,56 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
+#### main ####
+# Pretrain VAE
+if PROGBAR:
+    pretrain_progbar = tf.keras.utils.Progbar(pretrain_vae_ep)
+for ep in range(pretrain_vae_ep//NENV):
+    if PROGBAR:
+        pretrain_progbar.update(ep*NENV)
+    
+    batch = []
+    num_batch = 0
+    was_alive = [True for agent in envs.get_team_blue().flat]
+    was_done = [False for env in range(NENV)]
+    
+    s1 = envs.reset(
+            config_path=env_setting_path,
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=policy.Random,
+            policy_blue=policy.Random
+        )
+    done = np.full((NENV,), True)
+
+    # Rollout
+    for step in range(max_ep+1):
+        s0 = s1
+        s1, _, done, _= envs.step()
+        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+
+        if step == max_ep:
+            done[:] = True
+
+
+        # push to buffer
+        for idx, agent in enumerate(envs.get_team_blue().flat):
+            env_idx = idx // num_blue
+            if was_alive[idx] and not was_done[env_idx]:
+                batch.append(s0[idx])
+
+        was_alive = is_alive
+        was_done = done
+
+        if np.all(done):
+            break
+    batch = np.stack(batch)
+
+    it = batch_sampler(512, 1, batch)
+    for minibatch in it:
+        feed_dict = {network.state_input: minibatch[0]}
+        sess.run(network.vae_updater, feed_dict)
+
+# Rollout-train
 while True:
     log_on       = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -241,6 +294,7 @@ while True:
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
+    stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a, v0 = a1, v1
@@ -248,7 +302,7 @@ while True:
         
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.01*step)/100.0
+        reward = (raw_reward - prev_rew - 0.01)/100.0
 
         if step == max_ep:
             reward[:] = -1
@@ -270,13 +324,17 @@ while True:
 
         if np.all(done):
             break
+    etime_roll = time.time()
             
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
+        stime_train = time.time()
         train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        etime_train = time.time()
         batch = []
         num_batch = 0
+        log_traintime.append(etime_train - stime_train)
 
     steps = []
     for env_id in range(NENV):
@@ -285,6 +343,7 @@ while True:
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
+    log_looptime.append(etime_roll - stime_roll)
 
     global_episodes += NENV
     sess.run(global_step_next)
@@ -297,6 +356,8 @@ while True:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
+            tag+'rollout_time': log_looptime(),
+            tag+'train_time': log_traintime(),
         }, writer, global_episodes)
         
     if save_on:

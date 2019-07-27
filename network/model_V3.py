@@ -9,10 +9,11 @@ Mainly used for:
 
 import os
 import sys
-sys.path.append('/Users/skim0119/github/raide_rl')
+sys.path.append('/home/skim449/github/raide_rl')
+sys.path.append('/Users/namsong/github/raide_rl')
 
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
+import tensorflow.keras.layers as keras_layers
 
 import numpy as np
 
@@ -25,54 +26,53 @@ from utility.utils import store_args
 
 class Spatial_VAE(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, input_placeholder, latent_dim=128, lr=1e-4, num_stacked=4, scope=None, reuse=tf.AUTO_REUSE):
+    def __init__(self, input_shape, input_placeholder, latent_dim=128, lr=1e-4, num_stack=4, scope=None):
         super().__init__()
-        with tf.variable_scope(scope, 'vae', reuse=reuse) as scope:
+        with tf.variable_scope(scope, 'vae') as scope:
             # Graph
             self.inference_net = tf.keras.Sequential([
-                    tf.keras.layers.InputLayer(input_shape=input_shape, name='state_input'),
-                    tf.keras.layers.Conv2D(
-                        filters=32, kernel_size=5, strides=(3, 3)),
-                    #tf.keras.layers.BatchNormalization(),
-                    tf.keras.layers.Activation("relu"),
-                    tf.keras.layers.Conv2D(
-                        filters=64, kernel_size=3, strides=(2, 2)),
-                    #tf.keras.layers.BatchNormalization(),
-                    tf.keras.layers.Activation("relu"),
-                    tf.keras.layers.Conv2D(
-                        filters=64, kernel_size=2, strides=(1, 1)),
-                    #tf.keras.layers.BatchNormalization(),
-                    tf.keras.layers.Activation("relu"),
+                    keras_layers.InputLayer(input_shape=input_shape, name='state_input'),
+                    keras_layers.Conv2D(filters=32, kernel_size=5, activation='elu'),
+                    #keras_layers.BatchNormalization(),
+                    keras_layers.AvgPool2D((3,3)),
+                    #keras_layers.Conv2D(filters=64, kernel_size=3),
+                    #keras_layers.BatchNormalization(),
+                    #keras_layers.Activation("elu"),
+                    #keras_layers.AvgPool2D((2,2)),
+                    keras_layers.Conv2D(filters=64, kernel_size=3, activation='elu'),
+                    keras_layers.AvgPool2D((2,2)),
+                    #keras_layers.BatchNormalization(),
 
-                    tf.keras.layers.Flatten(),
+                    keras_layers.Flatten(),
                     # No activation
-                    tf.keras.layers.Dense(latent_dim + latent_dim),
+                    keras_layers.Dense(latent_dim + latent_dim),
                     ], name='encoder')
-
+            
             self.generative_net = tf.keras.Sequential( [
-                    tf.keras.layers.InputLayer(input_shape=(latent_dim,), name='latent_input'),
-                    tf.keras.layers.Dense(units=4*4*64, activation=tf.nn.relu),
-                    tf.keras.layers.Reshape(target_shape=(4, 4, 64)),
-                    tf.keras.layers.Conv2DTranspose(
-                        filters=64,
-                        kernel_size=3,
-                        strides=(1, 1),
-                        #padding="SAME",
-                        activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(
+                    keras_layers.InputLayer(input_shape=(latent_dim,), name='latent_input'),
+                    keras_layers.Dense(units=4*4*64, activation=tf.nn.elu),
+                    keras_layers.Reshape(target_shape=(4, 4, 64)),
+                    keras_layers.UpSampling2D((2,2)),
+                    keras_layers.ZeroPadding2D((1,1)),
+                    keras_layers.Conv2DTranspose(
                         filters=32,
                         kernel_size=3,
-                        strides=(2, 2),
                         #padding="SAME",
-                        activation='relu'),
+                        activation='elu'),
+                    keras_layers.UpSampling2D((3,3)),
                     # No activation
-                    tf.keras.layers.Conv2DTranspose(
-                        filters=6, kernel_size=5, strides=(3, 3), padding="SAME", activation='tanh'),
+                    keras_layers.Conv2DTranspose(
+                        filters=6,
+                        kernel_size=5,
+                        #padding="SAME",
+                        activation='tanh',
+                        ),
+                    keras_layers.Cropping2D(cropping=((1,0),(1,0))),
                     ], name='decoder')
 
             # Build data frame pipe (keep last)
             self.z_list = []
-            frames = tf.split(input_placeholder, num_or_size_splits=num_stacked, axis=3)
+            frames = tf.split(input_placeholder, num_or_size_splits=num_stack, axis=3)
             for frame in frames:
                 z, mean, logvar = self.build_pipeline(frame, pipe_name='frame_pipe')
                 self.z_list.append(z)
@@ -137,6 +137,7 @@ class Spatial_VAE(tf.keras.Model):
         return logits
 
     def log_normal_pdf(self, sample, mean, logvar, raxis=1):
+        # log normal probability distribution function
         log2pi = tf.math.log(2. * np.pi)
         return tf.reduce_sum(
               -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
@@ -145,34 +146,34 @@ class Spatial_VAE(tf.keras.Model):
 class Temporal_VAE(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, input_placeholder,
-            latent_dim=64, lr=1e-4, scope=None, reuse=tf.AUTO_REUSE):
+            latent_dim=64, lr=1e-4, scope=None):
         super().__init__()
-        with tf.variable_scope(scope, 'vae', reuse=reuse) as scope:
+        with tf.variable_scope(scope, 'vae') as scope:
             # Graph
             self.inference_net = tf.keras.Sequential([
-                    tf.keras.layers.InputLayer(input_shape=input_shape, name='state_input'),
-                    tf.keras.layers.Conv1D(
-                        filters=8, kernel_size=5, strides=3, activation='relu'),
-                    tf.keras.layers.Conv1D(
-                        filters=16, kernel_size=3, strides=2, activation='relu'),
+                    keras_layers.InputLayer(input_shape=input_shape, name='state_input'),
+                    keras_layers.Conv1D(
+                        filters=8, kernel_size=5, strides=3, activation='elu'),
+                    keras_layers.Conv1D(
+                        filters=16, kernel_size=3, strides=2, activation='elu'),
 
                     # No activation
-                    tf.keras.layers.Flatten(),
-                    tf.keras.layers.Dense(latent_dim + latent_dim),
+                    keras_layers.Flatten(),
+                    keras_layers.Dense(latent_dim + latent_dim),
                     ], name='encoder')
 
             self.generative_net = tf.keras.Sequential( [
-                    tf.keras.layers.InputLayer(input_shape=(latent_dim,), name='latent_input'),
-                    tf.keras.layers.Dense(units=336, activation=tf.nn.relu),
-                    tf.keras.layers.Reshape(target_shape=(21, 1, 16)),
-                    tf.keras.layers.Conv2DTranspose(
+                    keras_layers.InputLayer(input_shape=(latent_dim,), name='latent_input'),
+                    keras_layers.Dense(units=336, activation=tf.nn.elu),
+                    keras_layers.Reshape(target_shape=(21, 1, 16)),
+                    keras_layers.Conv2DTranspose(
                         filters=8,
                         kernel_size=(3, 1),
                         strides=(2, 1),
                         padding="SAME",
-                        activation='relu'),
+                        activation='elu'),
                     # No activation
-                    tf.keras.layers.Conv2DTranspose(
+                    keras_layers.Conv2DTranspose(
                         filters=1,
                         kernel_size=(5, 1),
                         strides=(3, 1),
@@ -262,7 +263,8 @@ def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
     spatial_matrix = tf.stop_gradient(spatial_matrix)
     tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
 
-    feature = tf.concat([svae.z, tvae.z], axis=1) # (None, 192)
+    #feature = tf.concat([svae.z, tvae.z], axis=1) # (None, 192)
+    feature = tf.concat([svae.z], axis=1) # (None, 192)
 
     train_ops = [svae.update, tvae.update]
 
@@ -273,7 +275,7 @@ def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
     encoding_var = svae.trainable_variables + tvae.trainable_variables
 
     sampler = {
-            'svae': svae.random_sample()
+            'svae': svae.random_sample
             }
 
     return feature, train_ops, loss, encoding_var, sampler
@@ -287,52 +289,50 @@ if __name__ == '__main__':
     #    sess.run(iter.initializer, feed_dict={ x: data }) 
     #    print(sess.run(el)) # output [ 0.52374458  0.71968478]
 
-    keep_dim = 4
-    spatial_encoded = []
+    input_hold = tf.placeholder(dtype=tf.float32, shape=[None, 39, 39, 24])
+    svae = Spatial_VAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4, num_stack=4)
 
-    vae_train_pipe = tf.placeholder(tf.float32, shape=[None,39,39,6])
-    vae = Spatial_VAE((39,39,6), vae_train_pipe, scope='vae')
+    spatial_matrix = tf.stack(svae.z_list, axis=-1)  # (None, 128, 4)
+    spatial_matrix = tf.stop_gradient(spatial_matrix)
+    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
 
-    input_ph = tf.placeholder(tf.float32, [None,39,39,6*keep_dim])
-    for frame in tf.split(input_ph, num_or_size_splits=keep_dim, axis=3):
-        z = vae.build_pipeline(frame)
-        spatial_encoded.append(z)
+    for layer in svae.inference_net.layers:
+        print(layer._name, layer.input_shape, layer.output_shape)
+    for layer in svae.generative_net.layers:
+        print(layer._name, layer.input_shape, layer.output_shape)
 
+    print(spatial_matrix.get_shape())
 
-    #for layer in vae.inference_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
-    #for layer in vae.generative_net.layers:
-    #    print(layer._name, layer.input_shape, layer.output_shape)
+    for layer in tvae.inference_net.layers:
+        print(layer._name, layer.input_shape, layer.output_shape)
+    for layer in tvae.generative_net.layers:
+        print(layer._name, layer.input_shape, layer.output_shape)
 
-    #for variable in vae.trainable_variables:
-    #    print(variable)
+    for variable in svae.trainable_variables:
+        print(variable)
 
-    spatial_matrix = tf.stack(spatial_encoded, axis=-1)  # (None, 128, 4)
-    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='tvae')
     #for layer in tvae.inference_net.layers:
     #    print(layer._name, layer.input_shape, layer.output_shape)
     #for layer in tvae.generative_net.layers:
     #    print(layer._name, layer.input_shape, layer.output_shape)
 
-    feature = tf.concat([z, tvae.z], axis=1) # (None, 192)
 
-    attention = self_attention(feature, 128, 128)
-
-    checkpoint_directory = "./tmp/training_checkpoints"
-    checkpoint_prefix = os.path.join(checkpoint_directory, "ckpt")
-
-    checkpoint = tf.train.Checkpoint()
-
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        checkpoint.save(file_prefix=checkpoint_prefix, session=sess)
-        I = np.random.random(size=(2,39,39,24))
-        feed_dict = {input_ph:I}
-        update_feed_dict = {vae_train_pipe:np.random.random(size=(2,39,39,6))}
-        sess.run(vae.update, update_feed_dict)
-        sess.run(vae.update, update_feed_dict)
-        sess.run(vae.update, update_feed_dict)
-        file_writer = tf.summary.FileWriter(logdir='./tmp/logs/test', graph=sess.graph)
-
+#     
+#     checkpoint_directory = "./tmp/training_checkpoints"
+#     checkpoint_prefix = os.path.join(checkpoint_directory, "ckpt")
+# 
+#     checkpoint = tf.train.Checkpoint()
+# 
+#     with tf.Session() as sess:
+#         sess.run(tf.global_variables_initializer())
+#         checkpoint.save(file_prefix=checkpoint_prefix, session=sess)
+#         I = np.random.random(size=(2,39,39,24))
+#         feed_dict = {input_ph:I}
+#         update_feed_dict = {vae_train_pipe:np.random.random(size=(2,39,39,6))}
+#         sess.run(vae.update, update_feed_dict)
+#         sess.run(vae.update, update_feed_dict)
+#         sess.run(vae.update, update_feed_dict)
+#         file_writer = tf.summary.FileWriter(logdir='./tmp/logs/test', graph=sess.graph)
+# 
 
     print('graph build done') 

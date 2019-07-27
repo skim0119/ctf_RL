@@ -46,13 +46,13 @@ def put_ctf_state_on_grid(images, pad=1):
     
     padding = tf.constant([[0,0], [pad,pad], [pad,pad], [0,0]])
     images = tf.pad(images, padding, mode='CONSTANT')
-    images = tf.transpose(images, (0,3,1,2)) # [num_image, num_channel, y, x]
 
-    images = tf.concat(images, axis=2) # [num_channel, num_image*y, x]
-    images = tf.concat(images, axis=2) * [num_image*y, num_channel*x]
+    images = tf.concat(tf.unstack(images, axis=0), axis=0) # [num_image*y, x, num_channel]
+    images = tf.concat(tf.unstack(images, axis=-1), axis=-1) # [num_image*y, num_channel*x]
 
     # scale to [0, 255] and convert to uint8
-    return tf.image.convert_image_dtype(images, dtype = tf.uint8) 
+    images = tf.image.convert_image_dtype(images, dtype = tf.uint8) 
+    return tf.expand_dims(tf.expand_dims(images, -1), 0)
     
 
 def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):

@@ -541,7 +541,7 @@ class PPO_V3(a3c):
         # Feature encoder
         with tf.variable_scope('encoder'):
             feature, self.vae_updater, self.vae_loss, e_vars, sampler = build_network_V3(input_hold)
-            sampled_image = put_ctf_state_on_grid(sampler)
+            sampled_image = put_ctf_state_on_grid(sampler['svae'])
             image_summary.append(tf.summary.image('svae_sample', sampled_image, max_outputs=1))
 
 
