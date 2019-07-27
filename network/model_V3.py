@@ -276,6 +276,7 @@ def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
 
     sampler = {
             'svae': svae.random_sample
+            'tvae': tvae.random_sample
             }
 
     return feature, train_ops, loss, encoding_var, sampler
