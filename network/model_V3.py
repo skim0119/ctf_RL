@@ -275,7 +275,7 @@ def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
     encoding_var = svae.trainable_variables + tvae.trainable_variables
 
     sampler = {
-            'svae': svae.random_sample
+            'svae': svae.random_sample,
             'tvae': tvae.random_sample
             }
 
