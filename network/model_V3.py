@@ -10,6 +10,7 @@ Mainly used for:
 import os
 import sys
 sys.path.append('/home/skim449/github/raide_rl')
+sys.path.append('/Users/skim0119/github/raide_rl')
 sys.path.append('/Users/namsong/github/raide_rl')
 
 import tensorflow as tf
@@ -18,6 +19,7 @@ import tensorflow.keras.layers as keras_layers
 import numpy as np
 
 from network.attention import self_attention
+from network.attention import Non_local_nn
 from network.core import layer_normalization
 
 from method.base import put_channels_on_grid
@@ -32,15 +34,18 @@ class Spatial_VAE(tf.keras.Model):
             # Graph
             self.inference_net = tf.keras.Sequential([
                     keras_layers.InputLayer(input_shape=input_shape, name='state_input'),
-                    keras_layers.Conv2D(filters=32, kernel_size=5, activation='elu'),
+                    keras_layers.SeparableConv2D(filters=32, kernel_size=4, strides=2,
+                        depth_multiplier=4, activation='elu'),
+                    Non_local_nn(32),
                     #keras_layers.BatchNormalization(),
-                    keras_layers.AvgPool2D((3,3)),
+                    #keras_layers.AvgPool2D((3,3)),
                     #keras_layers.Conv2D(filters=64, kernel_size=3),
                     #keras_layers.BatchNormalization(),
                     #keras_layers.Activation("elu"),
                     #keras_layers.AvgPool2D((2,2)),
-                    keras_layers.Conv2D(filters=64, kernel_size=3, activation='elu'),
-                    keras_layers.AvgPool2D((2,2)),
+                    keras_layers.Conv2D(filters=64, kernel_size=3, strides=2, activation='elu'),
+                    keras_layers.Conv2D(filters=64, kernel_size=2, strides=2, activation='elu'),
+                    #keras_layers.AvgPool2D((2,2)),
                     #keras_layers.BatchNormalization(),
 
                     keras_layers.Flatten(),
@@ -95,12 +100,14 @@ class Spatial_VAE(tf.keras.Model):
                 self.elbo_loss = -tf.reduce_mean(logpx_z + 0.001*(logpz - logqz_x))
 
             # Gradient
-            self.grads = tf.gradients(self.elbo_loss, self.trainable_variables)
+            #self.grads = tf.gradients(self.elbo_loss, self.trainable_variables)
+            self.grads = tf.gradients(self.elbo_loss, self.generative_net.trainable_variables)
 
             # Optimizer
             with tf.name_scope('trainer'):
                 self.optimizer = tf.train.AdamOptimizer(lr)
-                self.update = [self.optimizer.apply_gradients(zip(self.grads, self.trainable_variables))]
+                #self.update = [self.optimizer.apply_gradients(zip(self.grads, self.trainable_variables))]
+                self.update = [self.optimizer.apply_gradients(zip(self.grads, self.generative_net.trainable_variables))]
 
     def build_pipeline(self, input_placeholder, pipe_name='pipe'):
         with tf.name_scope(pipe_name):
@@ -266,13 +273,15 @@ def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
     #feature = tf.concat([svae.z, tvae.z], axis=1) # (None, 192)
     feature = tf.concat([svae.z], axis=1) # (None, 192)
 
-    train_ops = [svae.update, tvae.update]
+    #train_ops = [svae.update, tvae.update]
+    train_ops = [svae.update]
 
     loss = {
             'svae': svae.elbo_loss,
             'tvae': tvae.elbo_loss
             }
-    encoding_var = svae.trainable_variables + tvae.trainable_variables
+    #encoding_var = svae.trainable_variables + tvae.trainable_variables
+    encoding_var = svae.inference_net.trainable_variables 
 
     sampler = {
             'svae': svae.random_sample,

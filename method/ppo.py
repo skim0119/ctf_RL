@@ -545,8 +545,8 @@ class PPO_V3(a3c):
             image_summary.append(tf.summary.image('svae_sample', sampled_image, max_outputs=1))
 
 
-        with tf.variable_scope('attention'):
-            attention = self_attention(feature, 128, 128)
+        #with tf.variable_scope('attention'):
+        #    attention = self_attention(feature, 128, 128)
 
         # Actor 
         with tf.variable_scope('actor'):
@@ -567,8 +567,9 @@ class PPO_V3(a3c):
             critic = tf.reshape(critic, [-1])
 
         # Collect Variable
-        attention_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=attention_name)
-        a_vars = e_vars+attention_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
+        #attention_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=attention_name)
+        #a_vars = e_vars+attention_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
+        a_vars = e_vars+tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=actor_name)
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
         # Collect Summary

@@ -118,7 +118,7 @@ def non_local_nn_2d(data, hidden_dim=None, pool=False, use_dense=False, normaliz
     else:
         return output
 
-def non_local_nn(data, hidden_dim, pool=False, name='non_local'):
+def non_local_nn_3d(data, hidden_dim, pool=False, name='non_local'):
     # data shape : [Batch, T, H, W, Channel]
     # output dim : [Batch, T, H, W, Channel]
     with tf.variable_scope(name):
@@ -172,4 +172,61 @@ def multiheaded_attention(data, hidden_dim, att_output_dim, output_dim, num_atte
     output = tf.concat(each_attention, axis=1)
     output = tf.layers.dense(output, output_dim)
     return output
+
+class Non_local_nn(tf.keras.layers.Layer):
+    def __init__(self, channels, pool=False, residual=True, name='non_local'):
+        super(Non_local_nn, self).__init__(name=name)
+
+        self.channels = channels
+        self.residual = residual
+        self.pool = pool
+        
+    def build(self, input_shape):
+        # Define layers
+        with tf.variable_scope(self.name):
+            self.f_conv = tf.keras.layers.Conv2D(filters=self.channels//4, kernel_size=1, strides=1, name='f_conv')
+            self.f_conv_pool = tf.keras.layers.MaxPool2D(name='f_conv_pool')
+            self.g_conv = tf.keras.layers.Conv2D(filters=self.channels//4, kernel_size=1, strides=1, name='g_conv')
+            self.h_conv = tf.keras.layers.Conv2D(filters=self.channels//2, kernel_size=1, strides=1, name='h_conv')
+            self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
+            self.att_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name=self.name+'att_conv')
+            self.gamma = tf.get_variable("att_gamma", [1], initializer=tf.constant_initializer(0.0))
+
+    def call(self, input_layer):
+        batch_size, height, width, num_channels = input_layer.get_shape().as_list()
+
+        f = self.f_conv(input_layer)
+        g = self.g_conv(input_layer)
+        h = self.h_conv(input_layer)
+        if self.pool:
+            f = self.f_conv_pool(f)
+            h = self.h_conv_pool(h)
+        print(f)
+        print(g)
+        print(h)
+
+        _, x, y, channel = f.get_shape().as_list()
+        f = tf.reshape(f, [-1, x*y, channel])
+        _, x, y, channel = g.get_shape().as_list()
+        g = tf.reshape(g, [-1, x*y, channel])
+        _, x, y, channel = h.get_shape().as_list()
+        h = tf.reshape(h, [-1, x*y, channel])
+        dot = tf.matmul(g, f, transpose_b=True)  # [bs, N, N]
+        print(dot)
+
+        beta = tf.nn.softmax(dot)  # attention map
+
+        o = tf.matmul(beta, h)  # [bs, N, C]
+        print(o)
+        o = tf.reshape(o, shape=[-1, height, width, num_channels // 2])  # [bs, h, w, C]
+        print(o)
+        o = self.att_conv(o)
+        print(o)
+
+        if self.residual:
+            return self.gamma * o + x
+        else:
+            return o
+
+
 
