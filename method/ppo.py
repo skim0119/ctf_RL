@@ -546,12 +546,12 @@ class PPO_V3(a3c):
 
 
         #with tf.variable_scope('attention'):
-        #    attention = self_attention(feature, 128, 128)
+        #    feature = self_attention(feature, 128, 128)
 
         # Actor 
         with tf.variable_scope('actor'):
             logits = layers.fully_connected(
-                attention, self.action_size,
+                feature, self.action_size,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
                 activation_fn=None)
@@ -560,7 +560,7 @@ class PPO_V3(a3c):
         # Critic
         with tf.variable_scope('critic'):
             critic = layers.fully_connected(
-                attention, 1,
+                feature, 1,
                 weights_initializer=layers.xavier_initializer(),
                 biases_initializer=tf.zeros_initializer(),
                 activation_fn=None)
