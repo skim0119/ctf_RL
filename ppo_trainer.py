@@ -45,7 +45,7 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'adapt_train/ppo_flat'
+TRAIN_NAME = 'kerasModelTest'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -292,7 +292,7 @@ while True:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'adapt_train_log/'
+        tag = 'kerasTest/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

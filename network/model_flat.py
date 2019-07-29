@@ -49,9 +49,9 @@ class Flat_NN(tf.keras.Model):
                 self.z_list.append(z)
             self.z = z
 
-    def build_pipeline(self, input_placeholder, pipe_name='pipe'):
+    def build_pipeline(self, input_ph, pipe_name='pipe'):
         with tf.name_scope(pipe_name):
-            z = self.encode(input_placeholder)
+            z = self.net(input_ph)
         return z
 
 def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):

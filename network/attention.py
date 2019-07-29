@@ -184,9 +184,9 @@ class Non_local_nn(tf.keras.layers.Layer):
     def build(self, input_shape):
         # Define layers
         with tf.variable_scope(self.name):
-            self.f_conv = tf.keras.layers.Conv2D(filters=self.channels//4, kernel_size=1, strides=1, name='f_conv')
+            self.f_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='f_conv')
             self.f_conv_pool = tf.keras.layers.MaxPool2D(name='f_conv_pool')
-            self.g_conv = tf.keras.layers.Conv2D(filters=self.channels//4, kernel_size=1, strides=1, name='g_conv')
+            self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
             self.h_conv = tf.keras.layers.Conv2D(filters=self.channels//2, kernel_size=1, strides=1, name='h_conv')
             self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
             self.att_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name=self.name+'att_conv')
@@ -201,9 +201,6 @@ class Non_local_nn(tf.keras.layers.Layer):
         if self.pool:
             f = self.f_conv_pool(f)
             h = self.h_conv_pool(h)
-        print(f)
-        print(g)
-        print(h)
 
         _, x, y, channel = f.get_shape().as_list()
         f = tf.reshape(f, [-1, x*y, channel])
@@ -212,19 +209,15 @@ class Non_local_nn(tf.keras.layers.Layer):
         _, x, y, channel = h.get_shape().as_list()
         h = tf.reshape(h, [-1, x*y, channel])
         dot = tf.matmul(g, f, transpose_b=True)  # [bs, N, N]
-        print(dot)
 
         beta = tf.nn.softmax(dot)  # attention map
 
         o = tf.matmul(beta, h)  # [bs, N, C]
-        print(o)
-        o = tf.reshape(o, shape=[-1, height, width, num_channels // 2])  # [bs, h, w, C]
-        print(o)
+        o = tf.reshape(o, shape=[-1, height, width, num_channels//2])  # [bs, h, w, C]
         o = self.att_conv(o)
-        print(o)
 
         if self.residual:
-            return self.gamma * o + x
+            return self.gamma * o + input_layer
         else:
             return o
 

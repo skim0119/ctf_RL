@@ -98,7 +98,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 pretrain_vae_ep = 0
 minibatch_size = 512
 epoch = 1  # PPO is on-policy, but 2,3 epoch seems to converge due to constraint
-minimum_batch_size = 7000
+minimum_batch_size = 3000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -235,7 +235,7 @@ for ep in range(pretrain_vae_ep//NENV):
             policy_red=policy.Random,
             policy_blue=policy.Random
         )
-    done = np.full((NENV,), True)
+    done = np.full((NENV,), False)
 
     # Rollout
     for step in range(max_ep+1):
