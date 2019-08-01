@@ -187,9 +187,8 @@ class Non_local_nn(tf.keras.layers.Layer):
             self.f_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='f_conv')
             self.f_conv_pool = tf.keras.layers.MaxPool2D(name='f_conv_pool')
             self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
-            self.h_conv = tf.keras.layers.Conv2D(filters=self.channels//2, kernel_size=1, strides=1, name='h_conv')
+            self.h_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='h_conv')
             self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
-            self.att_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name=self.name+'att_conv')
             self.gamma = tf.get_variable("att_gamma", [1], initializer=tf.constant_initializer(0.0))
 
     def call(self, input_layer):
@@ -213,8 +212,15 @@ class Non_local_nn(tf.keras.layers.Layer):
         beta = tf.nn.softmax(dot)  # attention map
 
         o = tf.matmul(beta, h)  # [bs, N, C]
-        o = tf.reshape(o, shape=[-1, height, width, num_channels//2])  # [bs, h, w, C]
-        o = self.att_conv(o)
+        o = tf.reshape(o, shape=[-1, height, width, self.channels])  # [bs, h, w, C]
+        if self.channels != num_channels:
+            o = tf.keras.layers.Conv2D(
+                    filters=num_channels,
+                    kernel_size=1,
+                    strides=1,
+                    name=self.name+'att_conv'
+                )
+        self._attention_map = o
 
         if self.residual:
             return self.gamma * o + input_layer

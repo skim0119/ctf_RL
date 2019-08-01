@@ -21,22 +21,52 @@ from method.base import put_channels_on_grid
 
 class V2(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, input_placeholder, output_size=128, scope='V2'):
-        super(V2, self).__init__()
-        x = keras_layers.InputLayer(input_shape=input_shape, name='state_input')(input_placeholder)
-        x = keras_layers.SeparableConv2D(filters=32, kernel_size=4, strides=2,
-            padding='valid', depth_multiplier=4, activation='relu')(x)
-        x = Non_local_nn(32)(x)
-        x = keras_layers.Conv2D(filters=64, kernel_size=3, strides=2, activation='relu')(x)
-        x = keras_layers.Conv2D(filters=64, kernel_size=2, strides=2, activation='relu')(x)
-        x = keras_layers.Flatten()(x)
-        x = keras_layers.Dense(output_size, activation=None)(x)
+    def __init__(self, output_size=128, name='V2'):
+        super(V2, self).__init__(name=name)
+        self.sep_conv2d = keras_layers.SeparableConv2D(
+                filters=32,
+                kernel_size=4,
+                strides=2,
+                padding='valid',
+                depth_multiplier=4,
+                activation='relu',
+            )
+        self.non_local = Non_local_nn(32)
+        self.conv1 = keras_layers.Conv2D(filters=64, kernel_size=3, strides=2, activation='relu')
+        self.conv2 = keras_layers.Conv2D(filters=64, kernel_size=2, strides=2, activation='relu')
+        self.flat  = keras_layers.Flatten()
+        self.dense1 = keras_layers.Dense(output_size, activation=None)
 
-        self.z = x
+    def call(self, inputs):
+        net = input_hold
+        _layers = {'input': net}
 
-def build_network2(input_hold, return_layers=False):
-    network = V2([39,39,24], input_hold)
-    return network.z
+        # Block 1 : Separable CNN
+        net = self.sep_conv2d(net)
+        _layers['sepCNN1'] = net
+
+        # Block 2 : Attention (with residual connection)
+        net = self.non_local(net)
+        _layers['attention'] = self.non_local._attention_map
+        _layers['NLNN'] = net
+
+        # Block 3 : Convolution
+        net = self.conv1(net)
+        _layers['CNN1'] = net
+        net = self.conv2(net)
+        _layers['CNN2'] = net
+
+        # Block 4 : Feature Vector
+        net = self.flat(net)
+        _layers['flat'] = net
+        net = self.dense1(net)
+        _layers['dense1'] = net
+
+        return net, _layers
+
+def build_network2(input_hold):
+    network, layer_snapshot = V2(input_hold)
+    return network, layer_snapshot
 
 
 def build_network(input_hold, output_size=128, return_layers=False):
