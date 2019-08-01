@@ -49,6 +49,7 @@ TRAIN_NAME = 'kerasModelTest'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
+MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 
 if OVERRIDE:
@@ -109,9 +110,8 @@ log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
 
 ## Map Setting
-map_dir = 'fair_map/'
-map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
-max_epsilon = 0.55; max_at = 1
+map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
+max_epsilon = 0.75; max_at = 1
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
