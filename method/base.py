@@ -127,7 +127,8 @@ def put_channels_on_grid (image, grid_Y, grid_X, pad = 1):
     return put_kernels_on_grid (image, grid_Y, grid_X, pad = pad)
 
 def put_flat_on_grid (image, grid_Y, grid_X, pad=1):
-    image.tf.expand_dims(image, 1)
+    image = tf.expand_dims(image, 1)
+    image = tf.expand_dims(image, 1)
     return put_channels_on_grid (image, grid_Y, grid_X, pad = pad)
 
 class Deep_layer:

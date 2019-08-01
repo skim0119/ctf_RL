@@ -20,8 +20,7 @@ from utility.utils import store_args
 from method.base import put_channels_on_grid
 
 class V2(tf.keras.Model):
-    @store_args
-    def __init__(self, output_size=128, name='V2'):
+    def __init__(self, name='V2'):
         super(V2, self).__init__(name=name)
         self.sep_conv2d = keras_layers.SeparableConv2D(
                 filters=32,
@@ -35,10 +34,10 @@ class V2(tf.keras.Model):
         self.conv1 = keras_layers.Conv2D(filters=64, kernel_size=3, strides=2, activation='relu')
         self.conv2 = keras_layers.Conv2D(filters=64, kernel_size=2, strides=2, activation='relu')
         self.flat  = keras_layers.Flatten()
-        self.dense1 = keras_layers.Dense(output_size, activation=None)
+        self.dense1 = keras_layers.Dense(units=128)
 
     def call(self, inputs):
-        net = input_hold
+        net = inputs
         _layers = {'input': net}
 
         # Block 1 : Separable CNN
@@ -62,11 +61,13 @@ class V2(tf.keras.Model):
         net = self.dense1(net)
         _layers['dense1'] = net
 
-        return net, _layers
+        self._layers_snapshot = _layers
+
+        return net 
 
 def build_network2(input_hold):
-    network, layer_snapshot = V2(input_hold)
-    return network, layer_snapshot
+    network = V2()
+    return network(input_hold), network._layers_snapshot
 
 
 def build_network(input_hold, output_size=128, return_layers=False):

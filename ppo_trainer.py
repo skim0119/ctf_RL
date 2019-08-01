@@ -38,14 +38,14 @@ from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record
 from utility.gae import gae
 
-from method.ppo import PPO as Network
+from method.ppo2 import PPO as Network
 
 OVERRIDE = False
 PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'kerasModelTest'
+TRAIN_NAME = 'kerasModelTest2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME

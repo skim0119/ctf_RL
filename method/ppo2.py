@@ -187,14 +187,14 @@ class PPO(a3c):
 
         # Feature encoder
         with tf.variable_scope('encoder'):
-            feature, _layers = build_network(input_hold, return_layers=True)
+            feature, _layers = build_network(input_hold)
             add_image(_layers['input'], '1_input', X=6)
             add_image(_layers['sepCNN1'], '2_sepCNN')
             add_image(_layers['attention'], '3_attention')
             add_image(_layers['NLNN'], '4_nonlocal')
             add_image(_layers['CNN1'], '5_CNN')
             add_image(_layers['CNN2'], '6_CNN')
-            _grid = put_flat_on_grid(_layers['dense1'], 1, 1)
+            _grid = put_flat_on_grid(_layers['dense1'][0], 1, 1)
             image_summary.append(tf.summary.image('7_FC1', _grid, max_outputs=1))
 
         # Actor 
