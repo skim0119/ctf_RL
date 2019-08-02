@@ -45,7 +45,7 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'kerasModelTest2'
+TRAIN_NAME = 'kerasModelTest3'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -95,8 +95,8 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
-epoch = 1
+minibatch_size = 512
+epoch = 3
 minimum_batch_size = 5000
 
 ## Setup
@@ -108,12 +108,13 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
+log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
-max_epsilon = 0.75; max_at = 10000
+max_epsilon = 0.01; max_at = 1
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
@@ -215,6 +216,8 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
+batch = []
+num_batch = 0
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -228,8 +231,6 @@ while True:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
-    batch = []
-    num_batch = 0
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
@@ -251,7 +252,7 @@ while True:
         
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.01*step)/100.0
+        reward = (raw_reward - prev_rew - 0.01)/100.0
 
         if step == max_ep:
             reward[:] = -1
@@ -292,6 +293,7 @@ while True:
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
+    log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
     global_episodes += NENV
@@ -304,6 +306,7 @@ while True:
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
+            tag+'redwin-rate': log_redwinrate(),
             tag+'reward': log_episodic_reward(),
             tag+'rollout_time': log_looptime(),
             tag+'train_time': log_traintime(),
