@@ -7,6 +7,10 @@ Mainly used for:
     VAE
 """
 
+import os
+import sys
+sys.path.append('/home/namsong/github/raide_rl')
+
 from functools import partial
 
 import tensorflow as tf
@@ -20,7 +24,8 @@ from utility.utils import store_args
 from method.base import put_channels_on_grid
 
 class V2(tf.keras.Model):
-    def __init__(self, name='V2'):
+    @store_args
+    def __init__(self, trainable=True, name='V2'):
         super(V2, self).__init__(name=name)
         self.sep_conv2d = keras_layers.SeparableConv2D(
                 filters=32,
@@ -62,15 +67,21 @@ class V2(tf.keras.Model):
         _layers['dense1'] = net
 
         self._layers_snapshot = _layers
+        
+        if self.trainable:
+            return net 
+        else:
+            return tf.stop_gradient(net)
 
-        return net 
+    def build_loss(self):
+        pass
 
 def build_network2(input_hold):
     network = V2()
     return network(input_hold), network._layers_snapshot
 
 
-def build_network(input_hold, output_size=128, return_layers=False):
+def build_network(input_hold):
     net = input_hold
     _layers = {'input': net}
 
@@ -101,14 +112,17 @@ def build_network(input_hold, output_size=128, return_layers=False):
     _layers['flat'] = net
     net = layers.fully_connected(
             net,
-            output_size,
+            128,
             activation_fn=None,
         )
     _layers['dense1'] = net
 
+    return net, _layers
 
-    if return_layers:
-        return net, _layers
-    else:
-        return net
+if __name__=='__main__':
+    network = V2()
+    z = network(tf.placeholder(tf.float32, [None, 39, 39, 24]))
 
+    network.summary()
+    print(network.layers)
+    print(network.trainable_variables)
