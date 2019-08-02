@@ -84,8 +84,8 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_stat_frequency    = 256 # config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 256 # config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -95,8 +95,8 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
-epoch = 2
+minibatch_size = 256
+epoch = 1
 minimum_batch_size = 5000
 
 ## Setup
@@ -108,10 +108,12 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
+log_looptime = MovingAverage(moving_average_step)
+log_traintime = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
-max_epsilon = 0.75; max_at = 1
+max_epsilon = 0.75; max_at = 10000
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
@@ -231,8 +233,8 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
-    if global_episodes > 20000:
-        env_setting_path = 'setting_partial.ini'
+    #if global_episodes > 20000:
+    #    env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
             config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
@@ -241,6 +243,7 @@ while True:
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
+    stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a, v0 = a1, v1
@@ -270,13 +273,17 @@ while True:
 
         if np.all(done):
             break
+    etime_roll = time.time()
             
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
+        stime_train = time.time()
         train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        etime_train = time.time()
         batch = []
         num_batch = 0
+        log_traintime.append(etime_train - stime_train)
 
     steps = []
     for env_id in range(NENV):
@@ -285,6 +292,7 @@ while True:
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
+    log_looptime.append(etime_roll - stime_roll)
 
     global_episodes += NENV
     sess.run(global_step_next)
@@ -297,6 +305,8 @@ while True:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
+            tag+'rollout_time': log_looptime(),
+            tag+'train_time': log_traintime(),
         }, writer, global_episodes)
         
     if save_on:
