@@ -150,6 +150,11 @@ class SubprocVecEnv:
             remote.send(('blue_win', None))
         return np.stack([remote.recv() for remote in self.remotes])
 
+    def red_win(self):
+        for remote in self.remotes:
+            remote.send(('red_win', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
     def blue_flag_captured(self):
         for remote in self.remotes:
             remote.send(('blue_flag_captured', None))
