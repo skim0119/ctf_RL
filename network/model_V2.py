@@ -14,7 +14,7 @@ sys.path.append('/home/namsong/github/raide_rl')
 from functools import partial
 
 import tensorflow as tf
-#import tensorflow.contrib.layers as layers
+import tensorflow.contrib.layers as layers
 import tensorflow.keras.layers as keras_layers
 
 from network.attention import non_local_nn_2d

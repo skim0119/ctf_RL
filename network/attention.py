@@ -191,7 +191,7 @@ class Non_local_nn(tf.keras.layers.Layer):
             self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
             self.gamma = tf.get_variable("att_gamma", [1], initializer=tf.constant_initializer(0.0))
 
-    def call(self, input_layer):
+    def call(self, input_layer, normalize=True):
         batch_size, height, width, num_channels = input_layer.get_shape().as_list()
 
         f = self.f_conv(input_layer)
@@ -208,6 +208,9 @@ class Non_local_nn(tf.keras.layers.Layer):
         _, x, y, channel = h.get_shape().as_list()
         h = tf.reshape(h, [-1, x*y, channel])
         dot = tf.matmul(g, f, transpose_b=True)  # [bs, N, N]
+        if normalize:
+            d_k = tf.cast(tf.shape(f)[-1], dtype=tf.float32)
+            dot = tf.divide(dot, tf.sqrt(d_k))
 
         beta = tf.nn.softmax(dot)  # attention map
 

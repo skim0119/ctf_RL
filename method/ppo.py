@@ -25,7 +25,7 @@ from method.base import put_ctf_state_on_grid
 
 #from network.attention_ctf import build_network
 from network.attention import self_attention
-from network.model_V2 import build_network2 as build_network
+from network.model_V2 import build_network as build_network
 from network.model_V3 import build_network as build_network_V3
 from network.model_flat import build_network as build_network_fc
 
@@ -150,7 +150,7 @@ class PPO(a3c):
         aloss, closs, entropy = self.sess.run(ops, feed_dict)
 
         if log:
-            log_ops = [#self.cnn_summary,
+            log_ops = [self.cnn_summary,
                        self.merged_grad_summary_op,
                        self.merged_summary_op]
             summaries = self.sess.run(log_ops, feed_dict)
@@ -186,14 +186,13 @@ class PPO(a3c):
 
         # Feature encoder
         with tf.variable_scope('encoder'):
-            #feature, _layers = build_network(input_hold, return_layers=True)
-            feature = build_network(input_hold, return_layers=False)
-            #add_image(_layers['input'], '1_input', X=6)
-            #add_image(_layers['sepCNN1'], '2_sepCNN')
-            #add_image(_layers['attention'], '3_attention')
-            #add_image(_layers['NLNN'], '4_nonlocal')
-            #add_image(_layers['CNN1'], '5_CNN')
-            #add_image(_layers['CNN2'], '6_CNN')
+            feature, _layers = build_network(input_hold)
+            add_image(_layers['input'], '1_input', X=6)
+            add_image(_layers['sepCNN1'], '2_sepCNN')
+            add_image(_layers['attention'], '3_attention')
+            add_image(_layers['NLNN'], '4_nonlocal')
+            add_image(_layers['CNN1'], '5_CNN')
+            add_image(_layers['CNN2'], '6_CNN')
 
         # Actor 
         with tf.variable_scope('actor'):
@@ -219,7 +218,7 @@ class PPO(a3c):
         c_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=critic_name)
 
         # Collect Summary
-        #self.cnn_summary = tf.summary.merge(image_summary)
+        self.cnn_summary = tf.summary.merge(image_summary)
         
         # Visualization
         #self.feature_static = _layers['sepCNN1']
