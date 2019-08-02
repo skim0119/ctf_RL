@@ -174,12 +174,13 @@ def multiheaded_attention(data, hidden_dim, att_output_dim, output_dim, num_atte
     return output
 
 class Non_local_nn(tf.keras.layers.Layer):
-    def __init__(self, channels, pool=False, residual=True, name='non_local'):
+    def __init__(self, channels, pool=False, residual=True, train_gamma=False, name='non_local'):
         super(Non_local_nn, self).__init__(name=name)
 
         self.channels = channels
         self.residual = residual
         self.pool = pool
+        self.train_gamma = train_gamma
         
     def build(self, input_shape):
         # Define layers
@@ -189,7 +190,8 @@ class Non_local_nn(tf.keras.layers.Layer):
             self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
             self.h_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='h_conv')
             self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
-            self.gamma = tf.get_variable("att_gamma", [1], initializer=tf.constant_initializer(0.0))
+            self.gamma = tf.get_variable("att_gamma", [1], trainable=self.train_gamma,
+                    initializer=tf.constant_initializer(1.0))
 
     def call(self, input_layer, normalize=True):
         batch_size, height, width, num_channels = input_layer.get_shape().as_list()
