@@ -190,7 +190,7 @@ class Non_local_nn(tf.keras.layers.Layer):
             self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
             self.h_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='h_conv')
             self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
-            self.gamma = tf.get_variable("att_gamma", [1], trainable=self.train_gamma,
+            self.gamma = tf.get_variable(tf.get_default_graph().get_name_scope()+"att_gamma", [1], trainable=self.train_gamma,
                     initializer=tf.constant_initializer(1.0))
 
     def call(self, input_layer, normalize=True):

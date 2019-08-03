@@ -60,7 +60,8 @@ class PPO:
 
                 # Build Target
                 if target_network is None:
-                    self.target_network = V2_PPO()(self.state_input)
+                    self.target_network = V2_PPO(name='target')
+                    self.target_network(self.state_input)
 
                 # Build Trainer
                 optimizer = tf.keras.optimizers.Adam(lr)

@@ -11,7 +11,7 @@ def centering(obs, agents, H, W, padder=[0,0,0,1,0,0]):
     states[:,:,:] = np.array(padder)
     for idx, agent in enumerate(agents):
         x, y = agent.get_loc()
-        states[idx, max(cx-x,0):min(cx-x+olx,W-1), max(cy-y,0):min(cy-y+oly,H-1), :] = obs
+        states[idx, max(cx-x,0):min(cx-x+olx,W), max(cy-y,0):min(cy-y+oly,H), :] = obs
 
     return states
 

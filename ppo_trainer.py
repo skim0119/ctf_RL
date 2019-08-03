@@ -45,7 +45,7 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'kerasModelTest3'
+TRAIN_NAME = 'kerasModelTest_targ'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
