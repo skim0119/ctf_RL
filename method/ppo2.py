@@ -39,7 +39,6 @@ class PPO:
         lr=1e-4,
         sess=None,
         target_network=None,
-        tau=None,
         **kwargs
     ):
         assert sess is not None, "TF Session is not given."
@@ -59,9 +58,18 @@ class PPO:
                 model.feature_network.summary()
                 model.summary()
 
+                # Build Target
+                if target_network is None:
+                    self.target_network = V2_PPO()(self.state_input)
+
+                # Build Trainer
                 optimizer = tf.keras.optimizers.Adam(lr)
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
-                self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
+                self.target_update_ops = optimizer.apply_gradients(zip(self.gradients, self.target_network.trainable_variables))
+                with tf.name_scope('pull'):
+                    self.update_ops = [
+                            main_var.assign(targ_var) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
+                        ]
 
             # Summary
             #grad_summary = []
@@ -78,18 +86,26 @@ class PPO:
         actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
         return actions, critics, logits
 
-    def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
+    def compute_batch_gradient(self, state_input, action, td_target, advantage, old_logit):
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
                      self.advantage_: advantage,
                      self.old_logits_: old_logit}
-        self.sess.run(self.update_ops, feed_dict)
+        self.sess.run(self.target_update_ops, feed_dict)
 
-        ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
-        aloss, closs, entropy = self.sess.run(ops, feed_dict)
-
+    def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
+        self.sess.run(self.update_ops)
         if log:
+            feed_dict = {self.state_input: state_input,
+                         self.action_: action,
+                         self.td_target_: td_target,
+                         self.advantage_: advantage,
+                         self.old_logits_: old_logit}
+
+            ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
+            aloss, closs, entropy = self.sess.run(ops, feed_dict)
+
             log_ops = [self.cnn_summary]
                        #self.merged_grad_summary_op,
                        #self.merged_summary_op]
