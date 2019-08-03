@@ -24,9 +24,11 @@ from utility.utils import store_args
 from method.base import put_channels_on_grid
 
 class V2(tf.keras.Model):
+
     @store_args
     def __init__(self, trainable=True, name='V2'):
         super(V2, self).__init__(name=name)
+
         self.sep_conv2d = keras_layers.SeparableConv2D(
                 filters=32,
                 kernel_size=4,
@@ -35,7 +37,7 @@ class V2(tf.keras.Model):
                 depth_multiplier=4,
                 activation='relu',
             )
-        self.non_local = Non_local_nn(32)
+        self.non_local = Non_local_nn(16)
         self.conv1 = keras_layers.Conv2D(filters=64, kernel_size=3, strides=2, activation='relu')
         self.conv2 = keras_layers.Conv2D(filters=64, kernel_size=2, strides=2, activation='relu')
         self.flat  = keras_layers.Flatten()
@@ -73,13 +75,90 @@ class V2(tf.keras.Model):
         else:
             return tf.stop_gradient(net)
 
-    def build_loss(self):
-        pass
 
-def build_network2(input_hold):
-    network = V2()
-    return network(input_hold), network._layers_snapshot
+class V2_PPO(tf.keras.Model):
+    @store_args
+    def __init__(self, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
+        super(V2_PPO, self).__init__(name=name)
 
+        # Feature Encoder
+        self.feature_network = V2()
+
+        # Actor
+        self.actor_dense1 = keras_layers.Dense(5)
+        self.sftmx = keras_layers.Activation('softmax')
+        self.log_sftmx = keras_layers.Activation('log_softmax')
+
+        # Critic
+        self.critic_dense1 = keras_layers.Dense(1)
+
+    def call(self, inputs):
+        net = self.feature_network(inputs)
+
+        logits = self.actor_dense1(net) 
+        actor = self.sftmx(logits)
+        log_logits = self.log_sftmx(logits)
+
+        critic = self.critic_dense1(net)
+        critic = tf.reshape(critic, [-1])
+
+        self.actor = actor
+        self.logits = logits
+        self.log_logits = log_logits
+        self.critic = critic
+
+        return actor, logits, log_logits, critic
+
+    def build_loss(self, old_log_logit, action, advantage, td_target):
+        def _log(val):
+            return tf.log(tf.clip_by_value(val, 1e-10, 10.0))
+
+        with tf.name_scope('trainer'):
+            # Entropy
+            entropy = -tf.reduce_mean(self.actor * _log(self.actor), name='entropy')
+
+            # Critic Loss
+            td_error = td_target - self.critic
+            critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
+
+            # Actor Loss
+            action_OH = tf.one_hot(action, 5, dtype=tf.float32)
+            log_prob = tf.reduce_sum(self.log_logits * action_OH, 1)
+            old_log_prob = tf.reduce_sum(old_log_logits * action_OH, 1)
+
+            # Clipped surrogate function
+            ratio = tf.exp(log_prob - old_log_prob)
+            #ratio = log_prob / old_log_prob
+            surrogate = ratio * advantage
+            clipped_surrogate = tf.clip_by_value(ratio, 1-self.eps, 1+self.eps) * advantage
+            surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
+            actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
+
+            total_loss = actor_loss
+            if self.entropy_beta != 0:
+                total_loss = actor_loss - entropy * self.entropy_beta
+            if self.critic_beta != 0:
+                total_loss = actor_loss + critic_loss * self.critic_beta
+
+            self.actor_loss = actor_loss
+            self.critic_loss = critic_loss
+            self.entropy = entropy
+
+        return total_loss
+
+    def _kl_entropy(self):
+        # NOT FINISHED
+        with tf.name_scope('kl_divergence'):
+            target_logits = self.global_network.logits
+
+            a0 = self.logits - tf.reduce_max(self.logits, axis=-1, keepdims=True)
+            a1 = target_logits - tf.reduce_max(target_logits, axis=-1, keepdims=True)
+            ea0 = tf.exp(a0)
+            ea1 = tf.exp(a1)
+            z0 = tf.reduce_sum(ea0, keepdims=True)
+            z1 = tf.reduce_sum(ea1, keepdims=True)
+            p0 = ea0 / z0
+            return tf.reduce_sum(p0 * (a0 - tf.log(z0) - a1 + tf.log(z1)))
 
 def build_network(input_hold):
     net = input_hold
