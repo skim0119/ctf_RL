@@ -69,7 +69,7 @@ class PPO:
                 self.target_update_ops = optimizer.apply_gradients(zip(self.gradients, self.target_network.trainable_variables))
                 with tf.name_scope('pull'):
                     self.update_ops = [
-                            main_var.assign(targ_var) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
+                            tf.assign(main_var, targ_var, validate_shape=True) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
                         ]
 
             # Summary
