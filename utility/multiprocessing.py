@@ -42,9 +42,9 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_fr
                         ## TODO
                         ob = env.reset()
                         pause = False
-                ob = centering(ob, env.get_team_blue, 19)
+                ob = centering(ob, env.get_team_blue, 39, 39)
                 if ctrl_red:
-                    rob = centering(env.get_obs_red, env.get_team_red, 19)
+                    rob = centering(env.get_obs_red, env.get_team_red, 39, 39)
                     ob = np.concatenate([ob, rob], axis=0)
                 ob = stacked_state(ob)
                 remote.send((ob, reward, done, info))
@@ -55,9 +55,9 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_fr
             if 'policy_blue' in data.keys():
                 data['policy_blue'] = data['policy_blue']()
             ob = env.reset(**data)
-            ob = centering(ob, env.get_team_blue, 19)
+            ob = centering(ob, env.get_team_blue, 39, 39)
             if ctrl_red:
-                rob = centering(env.get_obs_red, env.get_team_red, 19)
+                rob = centering(env.get_obs_red, env.get_team_red, 39, 39)
                 initial_map = np.concatenate([ob, rob], axis=0)
             else:
                 initial_map = ob

@@ -2,16 +2,16 @@ import numpy as np
 import collections
 from gym_cap.envs.const import *
 
-def centering(obs, agents, vision_range, padder=[0,0,0,1,0,0]):
-    assert obs.shape[-1] == len(padder)
+def centering(obs, agents, H, W, padder=[0,0,0,1,0,0]):
+    olx, oly, ch = obs.shape
+    assert ch == len(padder)
 
-    length = vision_range*2+1
-    states = np.zeros([len(agents), length, length, len(padder)])
-    for ch, pad in enumerate(padder):
-        states[:,:,:,ch] = pad
+    cx, cy = (W-1)//2, (H-1)//2
+    states = np.zeros([len(agents), H, W, len(padder)])
+    states[:,:,:] = np.array(padder)
     for idx, agent in enumerate(agents):
         x, y = agent.get_loc()
-        states[idx, vision_range-x:length-x, vision_range-y:length-y, :] = obs
+        states[idx, max(cx-x,0):min(cx-x+olx,W-1), max(cy-y,0):min(cy-y+oly,H-1), :] = obs
 
     return states
 

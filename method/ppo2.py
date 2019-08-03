@@ -172,7 +172,6 @@ class PPO:
             if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
                 saver.restore(self.sess, ckpt.model_checkpoint_path)
                 print("Load Model : ", ckpt.model_checkpoint_path)
-                iuv(self.sess)
             else:
                 self.sess.run(tf.global_variables_initializer())
                 print("Initialized Variables")
