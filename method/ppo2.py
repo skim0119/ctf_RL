@@ -68,8 +68,9 @@ class PPO:
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
                 self.target_update_ops = optimizer.apply_gradients(zip(self.gradients, self.target_network.trainable_variables))
                 with tf.name_scope('pull'):
+                    tau = 0.01
                     self.update_ops = [
-                            tf.assign(main_var, targ_var, validate_shape=True) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
+                            tf.assign(main_var, (1-tau)*main_var + tau*targ_var, validate_shape=True) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
                         ]
 
             # Summary
@@ -93,7 +94,7 @@ class PPO:
                      self.td_target_: td_target,
                      self.advantage_: advantage,
                      self.old_logits_: old_logit}
-        grads, self.sess.run([self.gradients, self.target_update_ops], feed_dict)
+        grads, _ = self.sess.run([self.gradients, self.target_update_ops], feed_dict)
 
         # Compute gradient loss
         total_counter = 0
