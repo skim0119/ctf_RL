@@ -209,7 +209,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['logit'])
         )
     for mdp_tuple in it:
-        print(network.compute_batch_gradient(*mdp_tuple))
+        network.compute_batch_gradient(*mdp_tuple)
     network.update_network(*mdp_tuple, global_episodes, writer, log)
 
 def get_action(states):
