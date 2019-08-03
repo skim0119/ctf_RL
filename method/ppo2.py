@@ -93,7 +93,15 @@ class PPO:
                      self.td_target_: td_target,
                      self.advantage_: advantage,
                      self.old_logits_: old_logit}
-        self.sess.run(self.target_update_ops, feed_dict)
+        grads, self.sess.run([self.gradients, self.target_update_ops], feed_dict)
+
+        # Compute gradient loss
+        total_counter = 0
+        vanish_counter = 0
+        for grad in grads:
+            total_counter += np.prod(grad.shape) 
+            vanish_counter += (np.absolute(grad)<1e-10).sum()
+        return vanish_counter / total_counter
 
     def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
         self.sess.run(self.update_ops)
