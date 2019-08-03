@@ -87,7 +87,6 @@ class V2_PPO(tf.keras.Model):
         # Actor
         self.actor_dense1 = keras_layers.Dense(5)
         self.sftmx = keras_layers.Activation('softmax')
-        self.log_sftmx = keras_layers.Activation('log_softmax')
 
         # Critic
         self.critic_dense1 = keras_layers.Dense(1)
@@ -97,7 +96,7 @@ class V2_PPO(tf.keras.Model):
 
         logits = self.actor_dense1(net) 
         actor = self.sftmx(logits)
-        log_logits = self.log_sftmx(logits)
+        log_logits = tf.nn.log_softmax(logits)
 
         critic = self.critic_dense1(net)
         critic = tf.reshape(critic, [-1])
@@ -124,7 +123,7 @@ class V2_PPO(tf.keras.Model):
             # Actor Loss
             action_OH = tf.one_hot(action, 5, dtype=tf.float32)
             log_prob = tf.reduce_sum(self.log_logits * action_OH, 1)
-            old_log_prob = tf.reduce_sum(old_log_logits * action_OH, 1)
+            old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
 
             # Clipped surrogate function
             ratio = tf.exp(log_prob - old_log_prob)

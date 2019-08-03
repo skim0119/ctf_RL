@@ -224,7 +224,7 @@ class Non_local_nn(tf.keras.layers.Layer):
                     kernel_size=1,
                     strides=1,
                     name=self.name+'att_conv'
-                )
+                )(o)
         self._attention_map = o
 
         if self.residual:

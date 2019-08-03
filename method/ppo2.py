@@ -54,13 +54,14 @@ class PPO:
 
                 # Build Network
                 model = V2_PPO();  self.model = model
-                model.summary()
                 self.actor, self.logits, self.log_logits, self.critic = model(self.state_input)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
+                model.feature_network.summary()
+                model.summary()
 
                 optimizer = tf.keras.optimizers.Adam(lr)
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
-                self.update_ops = optimizer.apply_gradients(zip(grads, model.trainable_variables))
+                self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
             # Summary
             #grad_summary = []
@@ -69,7 +70,7 @@ class PPO:
             #self.merged_grad_summary_op = tf.summary.merge(grad_summary)
             #self.merged_summary_op = self._build_summary(model.trainable_variables)
 
-                self.cnn_summary = _build_kernel_summary(model.feature_network._layers_snapshot)
+                self.cnn_summary = self._build_kernel_summary(model.feature_network._layers_snapshot)
 
     def run_network(self, states):
         feed_dict = {self.state_input: states}
