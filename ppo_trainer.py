@@ -163,7 +163,7 @@ sess = tf.Session(config=config)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess)
+network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
