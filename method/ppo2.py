@@ -58,20 +58,10 @@ class PPO:
                 model.feature_network.summary()
                 model.summary()
 
-                # Build Target
-                if target_network is None:
-                    self.target_network = V2_PPO(name='target')
-                    self.target_network(self.state_input)
-
                 # Build Trainer
                 optimizer = tf.keras.optimizers.Adam(lr)
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
-                self.target_update_ops = optimizer.apply_gradients(zip(self.gradients, self.target_network.trainable_variables))
-                with tf.name_scope('pull'):
-                    tau = 0.01
-                    self.update_ops = [
-                            tf.assign(main_var, (1-tau)*main_var + tau*targ_var, validate_shape=True) for main_var, targ_var in zip(model.trainable_variables, self.target_network.trainable_variables)
-                        ]
+                self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
             # Summary
             #grad_summary = []
@@ -88,31 +78,15 @@ class PPO:
         actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
         return actions, critics, logits
 
-    def compute_batch_gradient(self, state_input, action, td_target, advantage, old_logit):
+    def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
         feed_dict = {self.state_input: state_input,
                      self.action_: action,
                      self.td_target_: td_target,
                      self.advantage_: advantage,
                      self.old_logits_: old_logit}
-        grads, _ = self.sess.run([self.gradients, self.target_update_ops], feed_dict)
+        self.sess.run(self.update_ops, feed_dict)
 
-        # Compute gradient loss
-        total_counter = 0
-        vanish_counter = 0
-        for grad in grads:
-            total_counter += np.prod(grad.shape) 
-            vanish_counter += (np.absolute(grad)<1e-10).sum()
-        return vanish_counter / total_counter
-
-    def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
-        self.sess.run(self.update_ops)
         if log:
-            feed_dict = {self.state_input: state_input,
-                         self.action_: action,
-                         self.td_target_: td_target,
-                         self.advantage_: advantage,
-                         self.old_logits_: old_logit}
-
             ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
             aloss, closs, entropy = self.sess.run(ops, feed_dict)
 
