@@ -56,7 +56,7 @@ def put_ctf_state_on_grid(images, pad=1):
     return tf.expand_dims(tf.expand_dims(images, -1), 0)
     
 
-def put_kernels_on_grid (kernel, grid_X, grid_Y, pad = 1):
+def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):
 
     '''Visualize conv. features as an image (mostly for the 1st layer).
     https://gist.github.com/kukuruza/03731dc494603ceab0c5
@@ -87,8 +87,8 @@ def put_kernels_on_grid (kernel, grid_X, grid_Y, pad = 1):
     x1 = tf.pad(kernel1, padding, mode = 'CONSTANT')
 
     # X and Y dimensions, w.r.t. padding
-    Y = kernel1.get_shape()[0] + 2 * pad
-    X = kernel1.get_shape()[1] + 2 * pad
+    X = kernel1.get_shape()[0] + 2 * pad
+    Y = kernel1.get_shape()[1] + 2 * pad
 
     channels = kernel1.get_shape()[2]
 
