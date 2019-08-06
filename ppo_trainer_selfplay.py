@@ -1,10 +1,3 @@
-'''
-- Self-play
-- Flat
-- PPO
-- No UAV
-'''
-
 import pickle
 
 import os
@@ -40,7 +33,6 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-OVERRIDE = False
 PROGBAR = True
 LOG_DEVICE = False
 
@@ -52,27 +44,17 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 
-if OVERRIDE:
-    MODEL_LOAD_PATH = './model/ppo_flat_robust/' # initialize values
-else:
-    MODEL_LOAD_PATH = MODEL_PATH
-
 NENV = 8#multiprocessing.cpu_count()  
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_full.ini'
-
-## Data Path
-path_create(LOG_PATH, override=OVERRIDE)
-path_create(MODEL_PATH, override=OVERRIDE)
-path_create(SAVE_PATH, override=OVERRIDE)
+env_setting_path = 'setting_full_selfplay.ini'
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 # Training
-total_episodes = 100000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 300000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -103,6 +85,7 @@ minimum_batch_size = 3000
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
+selfplay_reload = 10000
 
 ## Logger Initialization 
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -114,19 +97,9 @@ log_traintime = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
-max_epsilon = 0.70; max_at = 1
-def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
-    x = (x-lowx) / (highx-lowx)
-    if x < 0:
-        val = 0
-    elif x > 1:
-        val = 1
-    else:
-        val = x * x * (3 - 2 * x)
-    return val*(highy-lowy)+lowy
-def use_this_map(x, max_episode, max_prob):
-    prob = smoothstep(x, highx=max_episode, highy=max_prob)
-    if np.random.random() < prob:
+max_epsilon = 0.70;
+def use_this_map():
+    if np.random.random() < max_epsilon:
         return random.choice(map_list)
     else:
         return None
@@ -161,7 +134,8 @@ sess = tf.Session(config=config)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+with tf.device('/gpu:0'):
+    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -175,6 +149,18 @@ else:
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
+## Make Red's Policy
+with tf.device('/gpu:1'):
+    forward_network = TrainedNetwork(
+            model_name=TRAIN_NAME,
+            input_tensor='main/state:0',
+            output_tensor='main/PPO/activation/Softmax:0',
+            sess=sess
+        )
+
+def prob2act(prob):
+    action_out = [np.random.choice(5, p=p/sum(p)) for pin prob]
+    return action_out
 
 ### TRAINING ###
 def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -216,10 +202,11 @@ def get_action(states):
 
 batch = []
 num_batch = 0
-for _ in range(total_episodes):
+while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
+    reload_on = interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
     
     # initialize parameters 
@@ -233,7 +220,7 @@ for _ in range(total_episodes):
     # Bootstrap
     s1 = envs.reset(
             config_path=env_setting_path,
-            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            custom_board=use_this_map(),
             policy_red=use_this_policy()
         )
     a1, v1, logits1, actions = get_action(s1)
@@ -309,6 +296,9 @@ for _ in range(total_episodes):
         
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+
+    if reload_on:
+        forward_network.reset_network_weight()
 
     if play_save_on:
         for i in range(NENV):

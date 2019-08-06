@@ -22,6 +22,7 @@ from method.a3c import a3c
 from method.base import put_channels_on_grid
 from method.base import put_flat_on_grid
 from method.base import put_ctf_state_on_grid
+from method.base import initialize_uninitialized_vars as iuv
 
 
 #from network.attention_ctf import build_network

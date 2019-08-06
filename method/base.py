@@ -8,6 +8,7 @@ from math import sqrt
 
 from utility.utils import store_args
 
+from itertools import compress
 
 """ Basic template for building new network module.
 
@@ -16,7 +17,7 @@ Notes:
 """
 
 
-def initialize_uninitialized_vars(sess):
+def initialize_uninitialized_vars(sess, global_vars=None):
     """
     Initialize uninitialized variables
 
@@ -24,8 +25,8 @@ def initialize_uninitialized_vars(sess):
     ----------------
     sess : [tensorflow.Session()] 
     """
-    from itertools import compress
-    global_vars = tf.global_variables()
+    if global_vars is None:
+        global_vars = tf.global_variables()
     is_not_initialized = sess.run([~(tf.is_variable_initialized(var)) \
                                    for var in global_vars])
     not_initialized_vars = list(compress(global_vars, is_not_initialized))
