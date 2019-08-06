@@ -2,7 +2,7 @@ import numpy as np
 import collections
 from gym_cap.envs.const import *
 
-def centering(obs, agents, H, W, padder=[0,0,0,1,0,0]):
+def centering(obs, agents, H, W, padder=[0,0,0,1,0,0,0]):
     olx, oly, ch = obs.shape
     assert ch == len(padder)
 

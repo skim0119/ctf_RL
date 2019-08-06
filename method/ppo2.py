@@ -121,7 +121,7 @@ class PPO:
             grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
 
-        add_image(snapshot['input'], '1_input', X=6)
+        add_image(snapshot['input'], '1_input', X=7)
         add_image(snapshot['sepCNN1'], '2_sepCNN')
         add_image(snapshot['attention'], '3_attention')
         add_image(snapshot['NLNN'], '4_nonlocal')

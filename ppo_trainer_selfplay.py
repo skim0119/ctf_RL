@@ -125,7 +125,7 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
@@ -139,12 +139,9 @@ with tf.device('/gpu:0'):
 
 # Resotre / Initialize
 global_episodes = 0
-saver = tf.train.Saver(max_to_keep=3)
-network.initiate(saver, MODEL_LOAD_PATH)
-if OVERRIDE:
-    sess.run(tf.assign(global_step, 0)) # Reset the counter
-else:
-    global_episodes = sess.run(global_step)
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
+network.initiate(saver, MODEL_PATH)
+global_episodes = sess.run(global_step)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
@@ -159,7 +156,7 @@ with tf.device('/gpu:1'):
         )
 
 def prob2act(prob):
-    action_out = [np.random.choice(5, p=p/sum(p)) for pin prob]
+    action_out = [np.random.choice(5, p=p/sum(p)) for p in prob]
     return action_out
 
 ### TRAINING ###
@@ -196,9 +193,23 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         network.update_network(*mdp_tuple, global_episodes, writer, log)
 
 def get_action(states):
-    a1, v1, logits1 = network.run_network(states)
-    actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, logits1, actions
+    blue_index = np.arange(len(states)).reshape((NENV,num_blue*num_red))[:,:num_blue].reshape([-1])
+    red_index = np.arange(len(states)).reshape((NENV,num_blue*num_red))[:,-num_red:].reshape([-1])
+    blue_state = states[blue_index]
+    red_state = states[red_index]
+
+    feed_dict={network.state_input: blue_state, forward_network.state: red_state}
+    ops = [network.actor, network.critic, network.log_logits, forward_network.action]
+    blue_logit, v1, logits1, red_logit = sess.run(ops, feed_dict)
+
+    blue_a = prob2act(blue_logit)
+    red_a = prob2act(red_logit)
+
+    blue_a = np.reshape(blue_a, [NENV, num_blue])
+    red_a = np.reshape(red_a, [NENV, num_red])
+    actions = np.concatenate([blue_a, red_a], axis=1)
+
+    return blue_a, v1, logits1, actions, blue_state
 
 batch = []
 num_batch = 0
@@ -223,7 +234,7 @@ while True:
             custom_board=use_this_map(),
             policy_red=use_this_policy()
         )
-    a1, v1, logits1, actions = get_action(s1)
+    a1, v1, logits1, actions, s1 = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
@@ -242,7 +253,7 @@ while True:
 
         episode_rew += reward
 
-        a1, v1, logits1, actions = get_action(s1)
+        a1, v1, logits1, actions, s1 = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
