@@ -7,6 +7,8 @@ import tensorflow as tf
 from utility.utils import store_args
 from utility.utils import discount_rewards
 
+from method.base import initialize_uninitialized_vars as iuv
+
 
 class Subgraph:
     """Subgraph
@@ -114,11 +116,17 @@ class TrainedNetwork:
         output_tensor='global/actor/Softmax:0',
         action_space=5,
         sess=None,
+        device=None,
+        import_scope='',
         *args,
         **kwargs
     ):
+        self.input_tensor = import_scope + '/' + input_tensor
+        self.output_tensor = import_scope + '/' + output_tensor
         if sess is None:
-            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+            self.graph = tf.Graph()
+            self.graph.device(device)
+            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True), graph=self.graph)
 
         self.model_path = 'model/' + model_name
 
@@ -160,9 +168,10 @@ class TrainedNetwork:
             with self.sess.graph.as_default():
                 self.saver = tf.train.import_meta_graph(
                     ckpt.model_checkpoint_path + '.meta',
-                    clear_devices=True
+                    clear_devices=True,
+                    import_scope=self.import_scope
                 )
-                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+                self.saver.restore(self.sess, ckpt.model_checkpoint_path, )
                 vprint([n.name for n in self.sess.graph.as_graph_def().node])
 
                 self.state = self.sess.graph.get_tensor_by_name(input_tensor)
@@ -174,6 +183,7 @@ class TrainedNetwork:
                     vprint([n.name for n in self.sess.graph.as_graph_def().node])
 
             vprint('Graph is succesfully loaded.', ckpt.model_checkpoint_path)
+            #iuv(self.sess)
         else:
             vprint('Error : Graph is not loaded')
             raise NameError

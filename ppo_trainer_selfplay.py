@@ -34,7 +34,7 @@ from utility.gae import gae
 from method.ppo2 import PPO as Network
 
 PROGBAR = True
-LOG_DEVICE = True
+LOG_DEVICE = False
 
 ## Training Directory Reset
 TRAIN_NAME = 'ppo_robust_target'
@@ -147,13 +147,13 @@ writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 ## Make Red's Policy
-with tf.device('/gpu:1'):
-    forward_network = TrainedNetwork(
-            model_name=TRAIN_NAME,
-            input_tensor='main/state:0',
-            output_tensor='main/PPO/activation/Softmax:0',
-            sess=sess
-        )
+forward_network = TrainedNetwork(
+        model_name=TRAIN_NAME,
+        input_tensor='main/state:0',
+        output_tensor='main/PPO/activation/Softmax:0',
+        import_scope='forward',
+        device='/device:GPU:1'
+    )
 
 def prob2act(prob):
     action_out = [np.random.choice(5, p=p/sum(p)) for p in prob]
@@ -198,9 +198,11 @@ def get_action(states):
     blue_state = states[blue_index]
     red_state = states[red_index]
 
-    feed_dict={network.state_input: blue_state, forward_network.state: red_state}
-    ops = [network.actor, network.critic, network.log_logits, forward_network.action]
-    blue_logit, v1, logits1, red_logit = sess.run(ops, feed_dict)
+    feed_dict={network.state_input: blue_state}
+    ops = [network.actor, network.critic, network.log_logits]
+    blue_logit, v1, logits1 = sess.run(ops, feed_dict)
+    red_logit = forward_network.sess.run(forward_network.action,
+            feed_dict={forward_network.state: red_state})
 
     blue_a = prob2act(blue_logit)
     red_a = prob2act(red_logit)
