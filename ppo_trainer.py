@@ -72,7 +72,7 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 # Training
-total_episodes = 100000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 50000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -216,7 +216,7 @@ def get_action(states):
 
 batch = []
 num_batch = 0
-for _ in range(total_episodes):
+while global_episodes < total_episodes:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
