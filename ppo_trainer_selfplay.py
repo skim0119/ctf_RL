@@ -34,7 +34,7 @@ from utility.gae import gae
 from method.ppo2 import PPO as Network
 
 PROGBAR = True
-LOG_DEVICE = False
+LOG_DEVICE = True
 
 ## Training Directory Reset
 TRAIN_NAME = 'ppo_robust_target'
@@ -193,8 +193,8 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         network.update_network(*mdp_tuple, global_episodes, writer, log)
 
 def get_action(states):
-    blue_index = np.arange(len(states)).reshape((NENV,num_blue*num_red))[:,:num_blue].reshape([-1])
-    red_index = np.arange(len(states)).reshape((NENV,num_blue*num_red))[:,-num_red:].reshape([-1])
+    blue_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,:num_blue].reshape([-1])
+    red_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,-num_red:].reshape([-1])
     blue_state = states[blue_index]
     red_state = states[red_index]
 
@@ -205,11 +205,13 @@ def get_action(states):
     blue_a = prob2act(blue_logit)
     red_a = prob2act(red_logit)
 
+    a1 = blue_a
+
     blue_a = np.reshape(blue_a, [NENV, num_blue])
     red_a = np.reshape(red_a, [NENV, num_red])
     actions = np.concatenate([blue_a, red_a], axis=1)
 
-    return blue_a, v1, logits1, actions, blue_state
+    return a1, v1, logits1, actions, blue_state
 
 batch = []
 num_batch = 0
