@@ -26,6 +26,7 @@ from method.base import put_channels_on_grid
 
 from utility.utils import store_args
 
+
 class Spatial_VAE(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, input_placeholder, latent_dim=128, lr=1e-4, num_stack=4, scope=None):
@@ -150,6 +151,120 @@ class Spatial_VAE(tf.keras.Model):
               -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
               axis=raxis)
 
+class Spatial_VQVAE(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, input_placeholder, latent_dim=256, lr=1e-4, num_stack=4, scope=None, beta=0.1):
+        super().__init__()
+        with tf.variable_scope(scope, 'vae') as scope:
+            self.embeds = tf.Variable(name='embeds', shape=[20, latent_dim], validate_shape=False,
+                    initial_value=tf.truncated_normal_initializer(stddev=0.02)(shape=[20,latent_dim]))
+
+            # Graph
+            self.inference_net = tf.keras.Sequential([
+                    keras_layers.InputLayer(input_shape=input_shape, name='state_input'),
+                    keras_layers.SeparableConv2D(filters=32, kernel_size=4, strides=1,
+                        depth_multiplier=4, activation='elu'),
+                    #keras_layers.BatchNormalization(),
+                    keras_layers.MaxPool2D((2,2)),
+                    Non_local_nn(16),
+                    #keras_layers.BatchNormalization(),
+                    #keras_layers.AvgPool2D((3,3)),
+                    #keras_layers.Conv2D(filters=64, kernel_size=3),
+                    #keras_layers.BatchNormalization(),
+                    #keras_layers.Activation("elu"),
+                    #keras_layers.AvgPool2D((2,2)),
+                    keras_layers.Conv2D(filters=64, kernel_size=3, strides=1, activation='elu'),
+                    keras_layers.MaxPool2D((2,2)),
+                    keras_layers.Conv2D(filters=64, kernel_size=2, strides=1, activation='elu'),
+                    keras_layers.MaxPool2D((2,2)),
+                    keras_layers.Flatten(),
+                    keras_layers.Dense(256),
+                    ], name='encoder')
+            
+            self.generative_net = tf.keras.Sequential( [
+                    keras_layers.InputLayer(input_shape=(256,), name='latent_input'),
+                    keras_layers.Dense(1024),
+                    keras_layers.Reshape(target_shape=(4, 4, 64)),
+                    keras_layers.UpSampling2D((2,2)),
+                    keras_layers.ZeroPadding2D((1,1)),
+                    keras_layers.Conv2DTranspose(
+                        filters=32,
+                        kernel_size=3,
+                        #padding="SAME",
+                        activation='elu'),
+                    keras_layers.UpSampling2D((3,3)),
+                    # No activation
+                    keras_layers.Conv2DTranspose(
+                        filters=6,
+                        kernel_size=5,
+                        #padding="SAME",
+                        activation='tanh',
+                        ),
+                    keras_layers.Cropping2D(cropping=((1,0),(1,0))),
+                    ], name='decoder')
+
+            # Build data frame pipe (keep last)
+            z_q_list = []
+            z_e_list = []
+            frames = tf.split(input_placeholder, num_or_size_splits=num_stack, axis=3)
+            for frame in frames:
+                z_e = self.build_pipeline(frame, pipe_name='frame_pipe')
+                z_e_list.append(z_e)
+                norm = tf.norm(tf.expand_dims(z_e, axis=-2) - self.embeds, axis=-1)
+                k = tf.argmin(norm, axis=-1)
+                z_q = tf.gather(self.embeds, k)
+                z_q_list.append(z_q)
+            self.z = z_q
+            self.z_e = z_e_list[0]
+            self.x_logit = self.generative_net(z_q)
+
+            # Sample
+            with tf.name_scope('sample'):
+                self.random_sample = self.sample()
+
+            # Loss
+            with tf.name_scope('loss'):
+                self.recon_loss = tf.losses.mean_squared_error(predictions=self.x_logit, labels=frames[-1])
+                self.vq_loss = tf.reduce_mean(
+                        tf.norm(tf.stop_gradient(self.z_e) - z_q, axis=-1)**2, axis=[0,1,2])
+                self.commit_loss = tf.reduce_mean(
+                        tf.norm(self.z_e - tf.stop_gradient(z_q), axis=-1)**2, axis=[0,1,2])
+                self.total_loss = self.recon_loss + self.vq_loss + beta * self.commit_loss
+
+
+            # Gradient
+            decoder_vars = self.generative_net.trainable_variables
+            decoder_grads = list(zip(tf.gradients(self.total_loss, decoder_vars), decoder_vars))
+            encoder_vars = self.inference_net.trainable_variables
+            grad_z = tf.gradients(self.recon_loss, z_q)
+            encoder_grads = [(tf.gradients(self.z_e, var, grad_z)[0] + beta*tf.gradients(self.commit_loss, var)[0], var)
+                    for var in encoder_vars]
+            embed_grads = list(zip(tf.gradients(self.vq_loss, embeds), [embeds]))
+
+            # Optimizer
+            with tf.name_scope('trainer'):
+                self.optimizer = tf.train.AdamOptimizer(lr)
+                self.update = self.optimizer.apply_gradients(decoder_grads+encoder_grads+embed_grads)
+
+    def build_pipeline(self, input_placeholder, pipe_name='pipe'):
+        with tf.name_scope(pipe_name):
+            return self.inference_net(input_placeholder)
+
+    def build_external_loss(self, loss, pipe_name='extern_loss'):
+        with tf.name_scope(pipe_name):
+            grad = tf.gradients(self.total_loss, self.trainable_variables)
+            update = self.optimizer.apply_gradient(zip(grad, self.trainable_variables))
+            self.update.append(update)
+
+    def sample(self, eps=None):
+        if eps is None:
+            eps = tf.random.normal(shape=[4, self.latent_dim])
+        return self.decode(eps, apply_tanh=True)
+
+    def decode(self, z):
+        logits = self.generative_net(z)
+        return logits
+
 class Temporal_VAE(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, input_placeholder,
@@ -263,29 +378,29 @@ class Temporal_VAE(tf.keras.Model):
               -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
               axis=raxis)
 
-def build_network(input_hold, output_size=128, return_layers=False, keep_dim=4):
-    svae = Spatial_VAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
+def build_network(input_hold, keep_dim=4):
+    svae = Spatial_VQVAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
 
-    spatial_matrix = tf.stack(svae.z_list, axis=-1)  # (None, 128, 4)
-    spatial_matrix = tf.stop_gradient(spatial_matrix)
-    tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
+    #spatial_matrix = tf.stack(svae.z_list, axis=-1)  # (None, 128, 4)
+    #spatial_matrix = tf.stop_gradient(spatial_matrix)
+    #tvae = Temporal_VAE((128, 4), spatial_matrix, scope='temporal_vae', lr=1e-4)
 
     #feature = tf.concat([svae.z, tvae.z], axis=1) # (None, 192)
-    feature = tf.concat([svae.z], axis=1) # (None, 192)
+    feature = svae.z
 
     #train_ops = [svae.update, tvae.update]
     train_ops = [svae.update]
 
     loss = {
-            'svae': svae.elbo_loss,
-            'tvae': tvae.elbo_loss
+            'svae': svae.total_loss,
+            #'tvae': tvae.elbo_loss
             }
     #encoding_var = svae.trainable_variables + tvae.trainable_variables
     encoding_var = svae.inference_net.trainable_variables 
 
     sampler = {
             'svae': svae.random_sample,
-            'tvae': tvae.random_sample
+            #'tvae': tvae.random_sample
             }
 
     return feature, train_ops, loss, encoding_var, sampler
@@ -344,5 +459,8 @@ if __name__ == '__main__':
 #         sess.run(vae.update, update_feed_dict)
 #         file_writer = tf.summary.FileWriter(logdir='./tmp/logs/test', graph=sess.graph)
 # 
+
+    vq = Spatial_VQVAE((39,39,6), input_hold, scope='vqvae')
+    vq.summary()
 
     print('graph build done') 
