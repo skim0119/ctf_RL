@@ -85,7 +85,7 @@ minimum_batch_size = 3000
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
-selfplay_reload = 10000
+selfplay_reload = 20000
 
 ## Logger Initialization 
 log_episodic_reward = MovingAverage(moving_average_step)
