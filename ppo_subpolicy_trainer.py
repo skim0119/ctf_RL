@@ -44,12 +44,16 @@ MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 
+OVERRIDE = False
+PROGBAR = True
+LOG_DEVICE = False
+
 ## Training Directory Reset
-OVERRIDE = False;
 TRAIN_NAME = 'ppo_7channel_subp'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
+MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count()
 
@@ -220,6 +224,9 @@ def get_action(states):
 
 batch = [[] for _ in range(num_mode)]
 num_batch = [0 for _ in range(num_mode)]
+
+if PROGBAR:
+    progbar = tf.keras.utils.Progbar(None)
 while True:
     MODE = np.argmin(sess.run(subtrain_step))
     mode_episode = sess.run(subtrain_step[MODE])
@@ -291,6 +298,8 @@ while True:
     global_episodes += NENV
     sess.run(global_step_next)
     sess.run(subtrain_step_next[MODE])
+    if PROGBAR:
+        progbar.update(global_episodes)
 
     batch[MODE].extend(trajs)
     num_batch[MODE] += sum([len(traj) for traj in trajs])
