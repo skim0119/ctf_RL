@@ -43,12 +43,10 @@ MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
 setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_ppo_defense.ini']
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
-map_list = ['fair_map/board{}.txt'.format(i) for i in range(1,5)]
-call_map = lambda: random.choice(map_list)
 
 ## Training Directory Reset
 OVERRIDE = False;
-TRAIN_NAME = 'golub_ppo_subp_bootstrap'
+TRAIN_NAME = 'ppo_7channel_subp'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -91,12 +89,12 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
-epoch = 4
-minbatch_size = 6000
+epoch = 2
+minbatch_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 6 * keep_frame
+nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
@@ -104,6 +102,25 @@ global_episode_rewards = [MA(moving_average_step) for _ in range(num_mode)]
 global_length = [MA(moving_average_step) for _ in range(num_mode)]
 global_succeed = [MA(moving_average_step) for _ in range(num_mode)]
 global_episodes = 0
+
+## Map Setting
+map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
+max_epsilon = 0.70; max_at = 150000
+def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
+    x = (x-lowx) / (highx-lowx)
+    if x < 0:
+        val = 0
+    elif x > 1:
+        val = 1
+    else:
+        val = x * x * (3 - 2 * x)
+    return val*(highy-lowy)+lowy
+def use_this_map(x, max_episode, max_prob):
+    prob = smoothstep(x, highx=max_episode, highy=max_prob)
+    if np.random.random() < prob:
+        return random.choice(map_list)
+    else:
+        return None
 
 ## Environment Initialization
 def make_env(map_size):
@@ -166,16 +183,6 @@ writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 global_episodes = sess.run(global_step) # Reset the counter
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
-# Red Policy (selfplay)
-'''
-red_policy = TrainedNetwork(
-            model_path='model/a3c_pretrained',
-            input_tensor='global/state:0',
-            output_tensor='global/actor/Softmax:0'
-        )
-'''
-
-
 def reward_shape(prev_red_alive, red_alive, done, idx=None, additional_reward=None):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
@@ -223,10 +230,11 @@ while True:
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     
     # Bootstrap
-    if np.random.random() < 0.25: # by half chance, play on fair map
-        s1 = envs.reset(custom_board=call_map(), policy_red=red_policies[MODE])
-    else:
-        s1 = envs.reset(config_path=setting_paths[MODE], policy_red=red_policies[MODE])
+    s1 = envs.reset(
+            config_path=setting_paths[MODE],
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=red_policies[MODE]
+        )
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
     
@@ -270,7 +278,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx] + env_reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
