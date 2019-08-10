@@ -195,7 +195,7 @@ class Spatial_VQVAE(tf.keras.Model):
                     keras_layers.UpSampling2D((3,3)),
                     # No activation
                     keras_layers.Conv2DTranspose(
-                        filters=6,
+                        filters=7,
                         kernel_size=5,
                         #padding="SAME",
                         activation='tanh',
@@ -226,9 +226,9 @@ class Spatial_VQVAE(tf.keras.Model):
             with tf.name_scope('loss'):
                 self.recon_loss = tf.losses.mean_squared_error(predictions=self.x_logit, labels=frames[-1])
                 self.vq_loss = tf.reduce_mean(
-                        tf.norm(tf.stop_gradient(self.z_e) - z_q, axis=-1)**2, axis=[0,1,2])
+                        tf.norm(tf.stop_gradient(self.z_e) - z_q, axis=-1)**2, axis=-1)
                 self.commit_loss = tf.reduce_mean(
-                        tf.norm(self.z_e - tf.stop_gradient(z_q), axis=-1)**2, axis=[0,1,2])
+                        tf.norm(self.z_e - tf.stop_gradient(z_q), axis=-1)**2, axis=-1)
                 self.total_loss = self.recon_loss + self.vq_loss + beta * self.commit_loss
 
 
@@ -239,7 +239,7 @@ class Spatial_VQVAE(tf.keras.Model):
             grad_z = tf.gradients(self.recon_loss, z_q)
             encoder_grads = [(tf.gradients(self.z_e, var, grad_z)[0] + beta*tf.gradients(self.commit_loss, var)[0], var)
                     for var in encoder_vars]
-            embed_grads = list(zip(tf.gradients(self.vq_loss, embeds), [embeds]))
+            embed_grads = list(zip(tf.gradients(self.vq_loss, self.embeds), [self.embeds]))
 
             # Optimizer
             with tf.name_scope('trainer'):
@@ -259,7 +259,7 @@ class Spatial_VQVAE(tf.keras.Model):
     def sample(self, eps=None):
         if eps is None:
             eps = tf.random.normal(shape=[4, self.latent_dim])
-        return self.decode(eps, apply_tanh=True)
+        return self.decode(eps)
 
     def decode(self, z):
         logits = self.generative_net(z)
@@ -379,7 +379,7 @@ class Temporal_VAE(tf.keras.Model):
               axis=raxis)
 
 def build_network(input_hold, keep_dim=4):
-    svae = Spatial_VQVAE((39,39,6), input_hold, scope='spatial_vae', lr=1e-4)
+    svae = Spatial_VQVAE((39,39,7), input_hold, scope='spatial_vae', lr=1e-4)
 
     #spatial_matrix = tf.stack(svae.z_list, axis=-1)  # (None, 128, 4)
     #spatial_matrix = tf.stop_gradient(spatial_matrix)

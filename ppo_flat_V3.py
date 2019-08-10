@@ -102,7 +102,7 @@ minimum_batch_size = 7000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 6 * keep_frame
+nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
