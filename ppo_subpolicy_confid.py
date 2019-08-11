@@ -140,15 +140,23 @@ sess = tf.Session(config=config)
 
 global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_meta_step, NENV)
+global_step_next = tf.assign_add(global_step, NENV)
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_meta_step])
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 
 # Resotre / Initialize
-network.initiate(saver, MODEL_LOAD_PATH)
+pretrained_vars = []
+pretrained_vars_name = []
+for varlist in network.a_vars[:-1]+network.c_vars[:-1]:
+    for var in varlist:
+        if var.name in pretrained_vars_name:
+            continue
+        pretrained_vars_name.append(var.name)
+        pretrained_vars.append(var)
+restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
+network.initiate(restoring_saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
-
 
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
@@ -170,37 +178,36 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         traj_buffer['logit'].extend(traj[4])
 
         # Subp Trajectory
-        if TRAIN_SUBP: 
-            sub_traj = Trajectory(depth=5)
-            mode = traj[1][0] # Initial mode
-            for i in range(len(traj)):
-                if traj[1][i] != mode:
-                    sub_bootstrap = traj[9][i] # Next critic
-                    td_target, advantages = gae(sub_traj[2], sub_traj[3], sub_bootstrap,
-                            gamma, lambd, normalize=False)
-                    sub_traj_buffer[mode]['state'].extend(sub_traj[0])
-                    sub_traj_buffer[mode]['action'].extend(sub_traj[1])
-                    sub_traj_buffer[mode]['td_target'].extend(td_target)
-                    sub_traj_buffer[mode]['advantage'].extend(advantages)
-                    sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
+        sub_traj = Trajectory(depth=5)
+        mode = traj[1][0] # Initial mode
+        for i in range(len(traj)):
+            if traj[1][i] != mode:
+                sub_bootstrap = traj[9][i] # Next critic
+                td_target, advantages = gae(sub_traj[2], sub_traj[3], sub_bootstrap,
+                        gamma, lambd, normalize=False)
+                sub_traj_buffer[mode]['state'].extend(sub_traj[0])
+                sub_traj_buffer[mode]['action'].extend(sub_traj[1])
+                sub_traj_buffer[mode]['td_target'].extend(td_target)
+                sub_traj_buffer[mode]['advantage'].extend(advantages)
+                sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
-                    sub_traj.clear()
-                    mode = traj[1][i]
+                sub_traj.clear()
+                mode = traj[1][i]
 
-                sub_traj.append([
-                        traj[0][i], # State
-                        traj[6][i], # Action
-                        traj[10][i]+traj[2][i], # Reward (indiv + shared)
-                        traj[7][i], # Critic
-                        traj[8][i] # Prob
-                    ])
-            td_target, advantages = gae(sub_traj[2], sub_traj[3], 0,
-                    gamma, lambd, normalize=False)
-            sub_traj_buffer[mode]['state'].extend(sub_traj[0])
-            sub_traj_buffer[mode]['action'].extend(sub_traj[1])
-            sub_traj_buffer[mode]['td_target'].extend(td_target)
-            sub_traj_buffer[mode]['advantage'].extend(advantages)
-            sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
+            sub_traj.append([
+                    traj[0][i], # State
+                    traj[6][i], # Action
+                    traj[10][i]+traj[2][i], # Reward (indiv + shared)
+                    traj[7][i], # Critic
+                    traj[8][i] # Prob
+                ])
+        td_target, advantages = gae(sub_traj[2], sub_traj[3], 0,
+                gamma, lambd, normalize=False)
+        sub_traj_buffer[mode]['state'].extend(sub_traj[0])
+        sub_traj_buffer[mode]['action'].extend(sub_traj[1])
+        sub_traj_buffer[mode]['td_target'].extend(td_target)
+        sub_traj_buffer[mode]['advantage'].extend(advantages)
+        sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
     if buffer_size < 10:
         return
@@ -219,48 +226,45 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         network.update_bandit(*mdp_tuple, global_episodes, writer, log)
 
     # Train Sub
-    if TRAIN_SUBP: 
-        for mode in range(num_mode):
-            it = batch_sampler(
-                    batch_size,
-                    epoch,
-                    np.stack(sub_traj_buffer[mode]['state']),
-                    np.stack(sub_traj_buffer[mode]['action']),
-                    np.stack(sub_traj_buffer[mode]['td_target']),
-                    np.stack(sub_traj_buffer[mode]['advantage']),
-                    np.stack(sub_traj_buffer[mode]['logit'])
-                )
-            for mdp_tuple in it:
-                network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
+    for mode in range(num_mode):
+        it = batch_sampler(
+                batch_size,
+                epoch,
+                np.stack(sub_traj_buffer[mode]['state']),
+                np.stack(sub_traj_buffer[mode]['action']),
+                np.stack(sub_traj_buffer[mode]['td_target']),
+                np.stack(sub_traj_buffer[mode]['advantage']),
+                np.stack(sub_traj_buffer[mode]['logit'])
+            )
+        for mdp_tuple in it:
+            network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
 
-def reward_shape(prev_red_alive, red_alive, done, idx=None, additional_reward=None):
+def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
-    reward = []
+    reward_list = []
     red_flags = envs.red_flag_captured()
     blue_flags = envs.blue_flag_captured()
     for i in range(NENV):
-        if idx == 0:
-            # Attack (C/max enemy)
-            num_prev_enemy = sum(prev_red_alive[i])
-            num_enemy = sum(red_alive[i])
-            reward.append((num_prev_enemy - num_enemy)*0.25)
-        if idx == 1:
-            if red_flags[i]:
-                reward.append(1)
-            else:
-                reward.append(0)
-        if idx == 2:
-            if blue_flags[i]:
-                reward.append(-1)
-            elif done[i]:
-                reward.append(1)
-            else:
-                reward.append(0)
-    if additional_reward is not None:
-        return np.array(reward) + additional_reward
-    else:
-        return np.array(reward)
+        reward = np.array([0]*3)
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        reward[0] = (num_prev_enemy - num_enemy)*0.25
+        #Sct
+        if red_flags[i]:
+            reward[1] = 1
+        else:
+            reward[1] = 0
+        #Def
+        if blue_flags[i]:
+            reward[2] = -1
+        elif done[i]:
+            reward[2] = 1
+        else:
+            reward[2] = 0
+        reward_list.append(reward)
+    return np.array(reward_list)
 
 print('Training Initiated:')
 def get_action(states, initial=False):
@@ -287,6 +291,7 @@ while True:
     episode_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
@@ -329,7 +334,6 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                # Reselect meta
                 trajs[idx].append([
                     s0[idx],
                     a0[idx],
@@ -361,13 +365,13 @@ while True:
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= batch_memory_size:
-        meta_train(batch, 0, epoch, minibatch_size, log_writer, log_image_on, global_episodes)
+        meta_train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         batch = []
         num_batch = 0
 
     steps = []
     for env_id in range(NENV):
-        steps.append(max([len(traj) for traj in meta_trajs[env_id*num_blue:(env_id+1)*num_blue]]))
+        steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     log_episodic_reward.append(np.mean(episode_rew))
     log_length.append(np.mean(steps))
     log_winrate.append(np.mean(envs.blue_win()))

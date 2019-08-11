@@ -259,8 +259,8 @@ class PPO_multimodes(a3c):
 
             with tf.variable_scope(scope):
                 self._build_placeholder(in_size)
-                self.bandit_action_ = tf.placeholder(shape=[None], dtype=tf.int32, name='action_hold')
-                self.old_bandit_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_holder')
+                self.bandit_action_ = tf.placeholder(shape=[None], dtype=tf.int32, name='bandit_hold')
+                self.old_bandit_logits_ = tf.placeholder(shape=[None, num_mode], dtype=tf.float32, name='old_bandit_logit_holder')
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_holder')
 
                 self.logits, self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
@@ -307,7 +307,7 @@ class PPO_multimodes(a3c):
                         *train_args,
                         self.critic[-1],
                         entropy_beta=entropy_beta,
-                        name_scope='meta_loss{}'
+                        name_scope='meta_loss'
                     )
                 actor_loss, critic_loss, entropy = loss
 
@@ -342,19 +342,23 @@ class PPO_multimodes(a3c):
         return actions, critics, logits
 
     def initiate_confid(self, n):
-        self.entering_confid = np.ones(n)
+        self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
 
     def run_network_with_bandit(self, states):
         feed_dict = {self.state_input: states}
         ops = self.actor + self.critic + self.logits
-        a_probs, critics, logits = self.sess.run(ops, feed_dict)
+        res = self.sess.run(ops, feed_dict)
+        a_probs, res = res[:len(self.actor)], res[len(self.actor):]
+        critics, res = res[:len(self.critic)], res[len(self.actor):]
+        logits = res
+
         bandit_prob, bandit_critic, bandit_logit = a_probs[-1], critics[-1], logits[-1]
-        bandit_action = np.array([np.random.choice(num_mode, p=prob / sum(prob)) for prob in bandit_prob])
+        bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
 
         # Confidence
         confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
-        for i in range(len(self.entering_confid)):
+        for i in range(len(self.entering_confids)):
             confid = confids[i]
             old_confid = self.entering_confids[i]
             if confid < old_confid: # compare inverse entropy
@@ -362,11 +366,10 @@ class PPO_multimodes(a3c):
                 self.playing_mode[i] = bandit_action[i]
         bandit_action = self.playing_mode
     
-        
-        actions = np.array([np.random.choice(self.action_size, p=prob[i] / sum(prob[i])) for prob, i in zip(a_probs, bandit_action)])
+        actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
-        critics = [critic[i] for critic, i in zip(critics, bandit_action)]
-        logits = [logit[i] for logit, i in zip(logits, bandit_action)]
+        critics = [critics[mod][idx] for idx, mod in enumerate(bandit_action)]
+        logits = [logits[mod][idx] for idx, mod in enumerate(bandit_action)]
         return actions, critics, logits, bandit_action, bandit_critic, bandit_logit
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False, idx=None):
