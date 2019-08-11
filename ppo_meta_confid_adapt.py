@@ -294,6 +294,8 @@ def reward_shape(prev_red_alive, red_alive, done):
         #Def
         if blue_flags[i]:
             reward[2] = -1
+        elif done[i]:
+            reward[2] = 1
         else:
             reward[2] = 0
         reward_list.append(reward)
