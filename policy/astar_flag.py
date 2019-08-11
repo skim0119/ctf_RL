@@ -30,6 +30,7 @@ class AStar(Policy):
         """
 
         super().__init__()
+        self._random_transition_safe = False
 
     def initiate(self, free_map, agent_list):
         super().initiate(free_map, agent_list)

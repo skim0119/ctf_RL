@@ -37,6 +37,8 @@ class Policy:
         """
         self.free_map = None
         self.agent_list = None
+
+        self._random_transition_safe = True 
         
     def gen_action(self, agent_list, observation):
         """Action generation method.
@@ -77,7 +79,9 @@ class Policy:
         next_loc    : Output coordinate after action
         can_move    : Check if the move is possible from the position
         distance    : Calculate distance between two point
+        get_flag_loc: Otuput coordinate of enemy flag
         route_astar : Outputs route(coordinate) from start to end 
+
     """
     def move_toward(self, start, target):
         """
@@ -153,6 +157,30 @@ class Policy:
             return ((start[0]-goal[0])**2 + (start[1]-goal[1])**2) ** 0.5
         return abs(start[0]-goal[0]) + abs(start[1]-goal[1])
 
+    def get_flag_loc(self, team, friendly_flag=False):
+        """
+        Return the location of enemy flag
+        If friendly_flag is given True, it returns aliance flag.
+
+        Args:
+            team (int): team id (0 for blue, 1 for red)
+
+        Return:
+            coord (tuple): Coordinate of the flag
+
+        """
+        if team == const.TEAM1_BACKGROUND:
+            flag_id = const.TEAM2_FLAG
+        elif team == const.TEAM2_BACKGROUND:
+            flag_id = const.TEAM1_FLAG
+        loc = np.argwhere(self.free_map==flag_id)
+        if len(loc == 0):
+            loc = None
+        else:
+            loc = loc[0]
+
+        return loc
+         
     def route_astar(self, start, goal):
         """
         Finds route from start to goal.

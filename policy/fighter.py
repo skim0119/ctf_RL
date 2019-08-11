@@ -44,7 +44,7 @@ class Fighter(Policy):
                 continue
 
             if self.agent_type[agent] == 'aggr':
-                goal = self.search_nearest(agent, observation, TEAM2_UGV)
+                goal = self.search_nearest_enemy(agent, observation)
                 
                 if goal == agent.get_loc():
                     action_out.append(0)
@@ -57,12 +57,12 @@ class Fighter(Policy):
 
         return action_out
     
-    def search_nearest(self, agent, obs, code):
+    def search_nearest_enemy(self, agent, obs):
         """
         function for finding the nearest code
         """
         dist = []        
-        end = np.argwhere(obs[:,:,CHANNEL[code]]==REPRESENT[code])
+        end = np.argwhere(obs[:,:,CHANNEL[TEAM2_UGV]]==REPRESENT[TEAM2_UGV] or obs[:,:,CHANNEL[TEAM2_UGV2]]==REPRESENT[TEAM2_UGV2])
         if len(end) != 0:
             for fx, fy in end:
                 x, y = agent.get_loc()
@@ -92,7 +92,7 @@ class Fighter(Policy):
         guard_radius = 4
         down_radius = 6
         flag_x, flag_y = np.argwhere(obs[:,:,CHANNEL[TEAM1_FLAG]]==REPRESENT[TEAM1_FLAG])[0]
-        enemy_x, enemy_y = self.search_nearest(agent,obs,TEAM2_UGV)
+        enemy_x, enemy_y = self.search_nearest_enemy(agent,obs)
         x, y = agent.get_loc()
 
         if (flag_x-x)**2 + (flag_y-y)**2 <= guard_radius**2 and (enemy_x-x)**2 + (enemy_y-y)**2 <= down_radius**2:

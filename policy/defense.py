@@ -29,12 +29,11 @@ class Defense(Policy):
 
     def initiate(self, free_map, agent_list):
         self.free_map = free_map
-        self.free_map_old = free_map
         self.team = agent_list[0].team
 
-        self.flag_location = None
+        self.flag_location = self.get_flag_loc(self.team, True)
         self.random = np.random
-        self.exploration = 0.5
+        self.exploration = 0.1
 
         self.flag_code = const.TEAM1_FLAG
 
@@ -57,55 +56,23 @@ class Defense(Policy):
         # if map changes then reset the flag location
         # search for a flag until finds it
         if self.flag_location == None:
+            self.flag_location = self.get_flag_loc(self.team, True) # In case it is partial observation
 
-            loc = self.scan_obs(self.free_map, self.flag_code)
-            if len(loc) is not 0:
-                self.flag_location = loc[0]
-
-            for idx,agent in enumerate(agent_list):
-                a = self.random_search(agent, idx, self.free_map)
+        if self.flag_location == None: # Random Search
+            for idx, agent in enumerate(agent_list):
+                action_out.append(self.random.randint(0, 5))
+        else:
+            # go to the flag to defend it
+            for idx, agent in enumerate(agent_list):
+                a = self.flag_approach(agent)
                 action_out.append(a)
-
-            return action_out
-
-        # go to the flag to defend it
-        for idx,agent in enumerate(agent_list):
-            a = self.flag_approach(agent, idx, self.free_map)
-            action_out.append(a)
 
         return action_out
 
-    def random_search(self, agent, index, obs):
+    def flag_approach(self, agent):
         """Generate 1 action for given agent object."""
-        action = self.random.randint(0, 5)
-
-        return action
-
-    def flag_approach(self, agent, index, obs):
-        """Generate 1 action for given agent object."""
-        x,y = agent.get_loc()
-        action = 0
-
-        if self.flag_location[0] > x+1:
-            action = 2
-        elif self.flag_location[0] < x-1:
-            action = 4
-        elif self.flag_location[1] > y+1:
-            action = 3
-        elif self.flag_location[1] < y-1:
-            action = 1
-
+        action = move_toward(agent.get_loc(), self.flag_location)
         if self.random.random() < self.exploration:
             action = self.random.randint(0, 5)
 
         return action
-
-    def scan_obs(self, obs, value):
-        location = []
-
-        for y in range(len(obs)):
-            for x in range(len(obs[0])):
-                if obs[x][y] == const.TEAM1_FLAG:
-                    location.append([x,y])
-
-        return location
