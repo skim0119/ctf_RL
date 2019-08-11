@@ -29,6 +29,7 @@ class Patrol(Policy):
 
     def __init__(self):
         super().__init__()
+        self._random_transition_safe = False  # Experiment variable that indicate random transition is not safe
     
     def initiate(self, free_map, agent_list):
         self.team = agent_list[0].team
