@@ -40,7 +40,7 @@ TRAIN_SUBP = False
 num_mode = 3
 
 ## Training Directory Reset
-TRAIN_NAME = 'confid_baseline'
+TRAIN_NAME = sys.argv[1]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
