@@ -354,7 +354,12 @@ class PPO_multimodes(a3c):
         logits = res
 
         bandit_prob, bandit_critic, bandit_logit = a_probs[-1], critics[-1], logits[-1]
-        bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
+        try:
+            bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
+        except Exception as e:
+            print(e)
+            print(bandit_prob)
+            raise Exception('probability nan')
 
         # Confidence
         confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)

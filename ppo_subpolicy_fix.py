@@ -44,6 +44,7 @@ from method.ppo import PPO_multimodes as Network
 assert len(sys.argv) == 2
 
 PROGBAR = True
+LOGDEVICE = False
 
 num_mode = 3
 
@@ -55,7 +56,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 4
+NENV = 8#multiprocessing.cpu_count() 
 
 MODEL_LOAD_PATH = './model/ppo_7channel_subp/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
@@ -143,20 +144,28 @@ num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
+gpu_options = tf.GPUOptions(allow_growth=True)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
 
 sess = tf.Session(config=config)
 
+global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode)
+network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 
-global_episodes = 0
-saver = tf.train.Saver(max_to_keep=3)
-network.initiate(saver, MODEL_LOAD_PATH)
-sess.run(tf.assign(global_step, 0)) # Reset the counter
-
+# Resotre / Initialize
+pretrained_vars = []
+pretrained_vars_name = []
+for varlist in network.a_vars[:-1]+network.c_vars[:-1]:
+    for var in varlist:
+        if var.name in pretrained_vars_name:
+            continue
+        pretrained_vars_name.append(var.name)
+        pretrained_vars.append(var)
+restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
+network.initiate(restoring_saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
@@ -275,7 +284,7 @@ while True:
             env_reward[:] = -1
             done[:] = True
 
-        reward = reward_shape(was_alive_red, is_alive_red, done, env_reward)
+        reward = reward_shape(was_alive_red, is_alive_red, done)
         episode_rew += env_reward
     
         a1, v1, logits1, actions = get_action(s1)
