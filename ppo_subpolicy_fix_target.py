@@ -57,7 +57,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8#multiprocessing.cpu_count() 
+NENV = 4#multiprocessing.cpu_count() 
 
 MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
