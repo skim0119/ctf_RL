@@ -31,7 +31,8 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 3
+target_setting_path = sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
@@ -40,7 +41,7 @@ TRAIN_SUBP = True
 num_mode = 3
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[1]
+TRAIN_NAME = sys.argv[2]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -48,7 +49,8 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()  
 
-MODEL_LOAD_PATH = './model/ppo_7channel_subp'
+MODEL_LOAD_PATH = './model/confid_baseline'
+SWITCH_EP = 10000
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
@@ -300,6 +302,8 @@ while True:
     trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
     
     # Bootstrap
+    if global_episodes > SWITCH_EP:
+        env_setting_path = target_setting_path
     s1 = envs.reset(
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
@@ -380,7 +384,7 @@ while True:
     log_winrate.append(np.mean(envs.blue_win()))
 
     if log_on:
-        tag = 'adapt_train_log/'
+        tag = 'kerasTest/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
