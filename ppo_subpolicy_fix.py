@@ -41,30 +41,29 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-OVERRIDE = True
+assert len(sys.argv) == 2
+
 PROGBAR = True
 
 num_mode = 3
-env_setting_path = 'setting_full.ini'
 
 ## Training Directory Reset
-TRAIN_NAME = 'adapt_train/fixed_subpolicy_run2'
+TRAIN_NAME = sys.argv[1]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
+MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
 NENV = multiprocessing.cpu_count() // 4
 
-if OVERRIDE:
-    MODEL_LOAD_PATH = './model/ppo_subp_robust/' # initialize values
-else:
-    MODEL_LOAD_PATH = MODEL_PATH
+MODEL_LOAD_PATH = './model/ppo_7channel_subp/' # initialize values
+ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
-path_create(LOG_PATH, override=OVERRIDE)
-path_create(MODEL_PATH, override=OVERRIDE)
-path_create(SAVE_PATH, override=OVERRIDE)
+path_create(LOG_PATH)
+path_create(MODEL_PATH)
+path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -96,11 +95,11 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minbatch_size = 1000
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 6 * keep_frame
+nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
@@ -109,9 +108,8 @@ log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
 
 ## Map Setting
-map_dir = 'fair_map/'
-map_list = [map_dir+'board{}.txt'.format(i) for i in range(1,5)]
-max_epsilon = 0.55; max_at = 1
+map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
+max_epsilon = 0.00; max_at = 1
 def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
     x = (x-lowx) / (highx-lowx)
     if x < 0:
@@ -138,7 +136,7 @@ def use_this_policy():
 ## Environment Initialization
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path=env_setting_path)
+	config_path=ENV_SETTING_PATH)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
@@ -148,24 +146,16 @@ num_red = len(envs.get_team_red()[0])
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
 config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
-if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None)
-
 sess = tf.Session(config=config)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
-subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
 network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode)
 
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3)
 network.initiate(saver, MODEL_LOAD_PATH)
-if OVERRIDE:
-    sess.run(tf.assign(global_step, 0)) # Reset the counter
-else:
-    global_episodes = sess.run(global_step)
+sess.run(tf.assign(global_step, 0)) # Reset the counter
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
@@ -202,7 +192,7 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
     for mdp_tuple in it:
         network.update_global(*mdp_tuple, global_episodes, writer, log, mode)
 
-def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
+def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
     r = []
@@ -213,7 +203,7 @@ def reward_shape(prev_red_alive, red_alive, done, def_reward=0):
         num_prev_enemy = sum(prev_red_alive[i])
         num_enemy = sum(red_alive[i])
         r.append((num_prev_enemy - num_enemy)*0.25)
-        r.append((num_prev_enemy - num_enemy)*0.25)
+        r.append((num_prev_enemy - num_enemy)*0.25) # two attack
         # Scout
         if red_flags[i]:
             r.append(1)
@@ -244,6 +234,8 @@ batch_def = []
 num_batch_att = 0
 num_batch_sct = 0
 num_batch_def = 0
+if PROGBAR:
+    progbar = tf.keras.utils.Progbar(None)
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
@@ -260,10 +252,8 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
-    if global_episodes > 20000:
-        env_setting_path = 'setting_partial.ini'
     s1 = envs.reset(
-            config_path=env_setting_path,
+            config_path=ENV_SETTING_PATH,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
@@ -279,7 +269,7 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        env_reward = (raw_reward-prev_rew-0.01*step)/100.0
+        env_reward = (raw_reward-prev_rew-0.01)/100.0
 
         if step == max_ep:
             env_reward[:] = -1
@@ -311,8 +301,6 @@ while True:
     sess.run(global_step_next)
     if PROGBAR:
         progbar.update(global_episodes)
-    for i in range(num_mode):
-        sess.run(subtrain_step_next[i])
     
     for i in range(NENV):
         batch_att.append(trajs[4*i+0])
