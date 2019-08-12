@@ -230,12 +230,14 @@ def reward_shape(prev_red_alive, red_alive, done):
 print('Training Initiated:')
 def get_action(states):
     a1, v1, logits1 = [], [], []
-    a, v, logits = network.run_network(states, 0)
+    res = network.run_network_all(states)
+    a, v, logits = res[:3]
     a1.extend(a[:2]); v1.extend(v[:2]); logits1.extend(logits[:2])
-    a, v, logits = network.run_network(states, 1)
+    a, v, logits = res[3:6]
     a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
-    a, v, logits = network.run_network(states, 2)
+    a, v, logits = res[6:]
     a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
+
     actions = np.reshape(a1, [NENV, num_blue])
     return np.array(a1), np.array(v1), np.array(logits1), actions
 
