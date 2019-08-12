@@ -56,7 +56,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8#multiprocessing.cpu_count() 
+NENV = 4#multiprocessing.cpu_count() 
 
 MODEL_LOAD_PATH = './model/ppo_7channel_subp/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
@@ -94,9 +94,9 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
-minbatch_size = 2000
+minbatch_size = 100
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -228,12 +228,14 @@ def reward_shape(prev_red_alive, red_alive, done):
 print('Training Initiated:')
 def get_action(states):
     a1, v1, logits1 = [], [], []
-    a, v, logits = network.run_network(states, 0)
+    res = network.run_network_all(states)
+    a, v, logits = res[:3]
     a1.extend(a[:2]); v1.extend(v[:2]); logits1.extend(logits[:2])
-    a, v, logits = network.run_network(states, 1)
+    a, v, logits = res[3:6]
     a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
-    a, v, logits = network.run_network(states, 2)
+    a, v, logits = res[6:]
     a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
+
     actions = np.reshape(a1, [NENV, num_blue])
     return np.array(a1), np.array(v1), np.array(logits1), actions
 

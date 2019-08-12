@@ -341,6 +341,16 @@ class PPO_multimodes(a3c):
         actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
         return actions, critics, logits
 
+    def run_network_all(self, states):
+        feed_dict = {self.state_input: states}
+        ops = [self.actor[0], self.critic[0], self.logits[0], self.actor[1], self.critic[1], self.logits[1], self.actor[2], self.critic[2], self.logits[2]]
+        res = self.sess.run(ops, feed_dict)
+        a_probs1, critics1, logits1, a_probs2, critics2, logits2, a_probs3, critics3, logits3 = res
+        actions1 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs1])
+        actions2 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs2])
+        actions3 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs3])
+        return actions1, critics1, logits1, actions2, critics2, logits2, actions3, critics3, logits3
+
     def initiate_confid(self, n):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
