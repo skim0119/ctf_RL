@@ -223,6 +223,8 @@ def reward_shape(prev_red_alive, red_alive, done):
         # Defense
         if blue_flags[i]:
             r.append(-1)
+        elif done[i]:
+            r.append(1)
         else:
             r.append(0)
     return np.array(r)
@@ -255,6 +257,17 @@ while True:
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
     
+    # Bootstrap
+    if global_episodes > SWITCH_EP:
+        ENV_SETTING_PATH = target_setting_path
+    s1 = envs.reset(
+            config_path=ENV_SETTING_PATH,
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=use_this_policy()
+        )
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
+
     # initialize parameters 
     episode_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
@@ -264,14 +277,6 @@ while True:
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
-    # Bootstrap
-    if global_episodes > SWITCH_EP:
-        ENV_SETTING_PATH = target_setting_path
-    s1 = envs.reset(
-            config_path=ENV_SETTING_PATH,
-            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
-            policy_red=use_this_policy()
-        )
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
