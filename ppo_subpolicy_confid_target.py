@@ -275,7 +275,7 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_confid(NENV*num_blue)
-    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states)
+    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states, use_confid=True)
 
     actions = np.reshape(action, [NENV, num_blue])
 

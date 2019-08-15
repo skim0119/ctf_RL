@@ -355,7 +355,7 @@ class PPO_multimodes(a3c):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
 
-    def run_network_with_bandit(self, states):
+    def run_network_with_bandit(self, states, use_confid=False):
         feed_dict = {self.state_input: states}
         ops = self.actor + self.critic + self.logits
         res = self.sess.run(ops, feed_dict)
@@ -372,14 +372,15 @@ class PPO_multimodes(a3c):
             raise Exception('probability nan')
 
         # Confidence
-        #confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
-        #for i in range(len(self.entering_confids)):
-        #    confid = confids[i]
-        #    old_confid = self.entering_confids[i]
-        #    if confid < old_confid: # compare inverse entropy
-        #        self.entering_confids[i] = confid
-        #        self.playing_mode[i] = bandit_action[i]
-        #bandit_action = self.playing_mode
+        if use_confid:
+            confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
+            for i in range(len(self.entering_confids)):
+                confid = confids[i]
+                old_confid = self.entering_confids[i]
+                if confid < old_confid: # compare inverse entropy
+                    self.entering_confids[i] = confid
+                    self.playing_mode[i] = bandit_action[i]
+            bandit_action = self.playing_mode
     
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
