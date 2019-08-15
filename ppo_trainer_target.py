@@ -53,9 +53,9 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 
 MODEL_LOAD_PATH = './model/ppo_robust_target' # initialize values
-SWITCH_EP = 10000
+SWITCH_EP = 1000
 
-NENV = 8#multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count()  
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
