@@ -372,14 +372,14 @@ class PPO_multimodes(a3c):
             raise Exception('probability nan')
 
         # Confidence
-        confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
-        for i in range(len(self.entering_confids)):
-            confid = confids[i]
-            old_confid = self.entering_confids[i]
-            if confid < old_confid: # compare inverse entropy
-                self.entering_confids[i] = confid
-                self.playing_mode[i] = bandit_action[i]
-        bandit_action = self.playing_mode
+        #confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
+        #for i in range(len(self.entering_confids)):
+        #    confid = confids[i]
+        #    old_confid = self.entering_confids[i]
+        #    if confid < old_confid: # compare inverse entropy
+        #        self.entering_confids[i] = confid
+        #        self.playing_mode[i] = bandit_action[i]
+        #bandit_action = self.playing_mode
     
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
