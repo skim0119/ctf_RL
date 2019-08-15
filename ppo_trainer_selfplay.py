@@ -37,14 +37,14 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_robust_target'
+TRAIN_NAME = 'ppo_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 
-NENV = 8#multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count()  
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full_selfplay.ini'
@@ -152,7 +152,7 @@ forward_network = TrainedNetwork(
         input_tensor='main/state:0',
         output_tensor='main/PPO/activation/Softmax:0',
         import_scope='forward',
-        device='/device:GPU:1'
+        device='/device:GPU:0'
     )
 
 def prob2act(prob):
@@ -299,7 +299,7 @@ while True:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'kerasTest/'
+        tag = 'baseline_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

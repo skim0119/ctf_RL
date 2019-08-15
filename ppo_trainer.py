@@ -40,32 +40,27 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-OVERRIDE = False
 PROGBAR = True
 LOG_DEVICE = False
+OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_robust_target'
+TRAIN_NAME = 'ppo_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
-GPU_CAPACITY = 0.90
+GPU_CAPACITY = 0.95
 
-if OVERRIDE:
-    MODEL_LOAD_PATH = './model/ppo_flat_robust/' # initialize values
-else:
-    MODEL_LOAD_PATH = MODEL_PATH
-
-NENV = 8#multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count()  
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
 
 ## Data Path
-path_create(LOG_PATH, override=OVERRIDE)
-path_create(MODEL_PATH, override=OVERRIDE)
-path_create(SAVE_PATH, override=OVERRIDE)
+path_create(LOG_PATH)
+path_create(MODEL_PATH)
+path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -96,8 +91,8 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
-epoch = 3
-minimum_batch_size = 3000
+epoch = 2
+minimum_batch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -166,7 +161,7 @@ network = Network(input_shape=input_size, action_size=action_space, scope='main'
 # Resotre / Initialize
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3)
-network.initiate(saver, MODEL_LOAD_PATH)
+network.initiate(saver, MODEL_PATH)
 if OVERRIDE:
     sess.run(tf.assign(global_step, 0)) # Reset the counter
 else:
@@ -297,7 +292,7 @@ while global_episodes < total_episodes:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'kerasTest/'
+        tag = 'baseline_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
