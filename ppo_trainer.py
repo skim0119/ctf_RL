@@ -52,7 +52,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count()  
+NENV = 8#multiprocessing.cpu_count()  
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
@@ -67,7 +67,7 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 # Training
-total_episodes = 50000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 150000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -92,7 +92,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 6000
+minimum_batch_size = 3000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1

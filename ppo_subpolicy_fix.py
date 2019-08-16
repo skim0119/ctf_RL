@@ -56,9 +56,9 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 4#multiprocessing.cpu_count() 
+NENV = multiprocessing.cpu_count() 
 
-MODEL_LOAD_PATH = './model/ppo_7channel_subp/' # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline2/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
