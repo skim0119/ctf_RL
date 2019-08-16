@@ -41,7 +41,7 @@ from method.ppo2 import PPO as Network
 assert len(sys.argv) == 3, 'Provide setting initiation file for variation'
 target_setting_path = sys.argv[1]
 
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
@@ -55,7 +55,7 @@ GPU_CAPACITY = 0.90
 MODEL_LOAD_PATH = './model/ppo_robust_target' # initialize values
 SWITCH_EP = 10000
 
-NENV = multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count() //2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'

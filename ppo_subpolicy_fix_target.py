@@ -57,11 +57,11 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() 
+NENV = multiprocessing.cpu_count() // 2
 
 MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
-SWITCH_EP = 3000
+SWITCH_EP = 10000
 
 ## Data Path
 path_create(LOG_PATH)
@@ -96,9 +96,9 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
-minbatch_size = 2000
+minbatch_size = 3000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -147,15 +147,16 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
 global_episodes = 0
-global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
+with tf.device('/gpu:1'):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
+    saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 
 # Resotre / Initialize
 pretrained_vars = []
