@@ -232,6 +232,7 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
     # Train Sub
     if TRAIN_SUBP:
         for mode in range(num_mode):
+            if len(sub_traj_buffer[mode]['state']) == 0: continue
             it = batch_sampler(
                     batch_size,
                     epoch,
