@@ -35,8 +35,8 @@ assert len(sys.argv) == 3
 target_setting_path = sys.argv[1]
 
 LOGDEVICE = False
-PROGBAR = True
-TRAIN_SUBP = True
+PROGBAR = False
+TRAIN_SUBP = False
 
 num_mode = 3
 
@@ -76,7 +76,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
