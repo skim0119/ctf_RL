@@ -35,7 +35,7 @@ assert len(sys.argv) == 2
 
 LOGDEVICE = False
 PROGBAR = True
-TRAIN_SUBP = True
+TRAIN_SUBP = False
 
 num_mode = 3
 
@@ -48,7 +48,7 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()  
 
-MODEL_LOAD_PATH = './model/ppo_7channel_subp'
+MODEL_LOAD_PATH = './model/fix_baseline'
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path

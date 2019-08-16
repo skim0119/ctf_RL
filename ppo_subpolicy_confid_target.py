@@ -232,6 +232,7 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
     # Train Sub
     if TRAIN_SUBP:
         for mode in range(num_mode):
+            if len(sub_traj_buffer[mode]['state']) == 0: continue
             it = batch_sampler(
                     batch_size,
                     epoch,
@@ -275,7 +276,7 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_confid(NENV*num_blue)
-    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states)
+    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states, use_confid=True)
 
     actions = np.reshape(action, [NENV, num_blue])
 
