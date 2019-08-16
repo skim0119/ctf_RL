@@ -61,7 +61,7 @@ NENV = multiprocessing.cpu_count()
 
 MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
-SWITCH_EP = 1000
+SWITCH_EP = 3000
 
 ## Data Path
 path_create(LOG_PATH)
