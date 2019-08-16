@@ -306,6 +306,7 @@ while True:
     if global_episodes > SWITCH_EP:
         env_setting_path = target_setting_path
     s1 = envs.reset(
+            config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )

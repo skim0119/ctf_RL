@@ -34,7 +34,7 @@ from method.ppo import PPO_multimodes as Network
 assert len(sys.argv) == 2
 
 LOGDEVICE = False
-PROGBAR = True
+PROGBAR = False
 TRAIN_SUBP = False
 
 num_mode = 3
@@ -84,7 +84,7 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
 batch_memory_size = 4000
 
@@ -273,7 +273,7 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_confid(NENV*num_blue)
-    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states)
+    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states, True)
 
     actions = np.reshape(action, [NENV, num_blue])
 
