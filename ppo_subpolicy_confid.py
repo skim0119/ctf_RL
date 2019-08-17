@@ -48,7 +48,7 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()  
 
-MODEL_LOAD_PATH = './model/fix_baseline'
+MODEL_LOAD_PATH = './model/fix_baseline2'
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path

@@ -52,10 +52,10 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 
-MODEL_LOAD_PATH = './model/ppo_robust_target' # initialize values
+MODEL_LOAD_PATH = './model/ppo_baseline' # initialize values
 SWITCH_EP = 10000
 
-NENV = multiprocessing.cpu_count() //2
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
