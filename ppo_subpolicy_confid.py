@@ -30,13 +30,13 @@ from utility.logger import record
 from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
-from method.ppo import PPO as MetaNetwork
+from method.ppo2 import PPO as MetaNetwork
 
 assert len(sys.argv) == 2
 
 LOGDEVICE = False
 PROGBAR = True
-TRAIN_SUBP = False
+TRAIN_SUBP = True
 CONTINUE = False
 
 num_mode = 3
@@ -145,7 +145,7 @@ global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-meta_network = MetaNetwork(in_size=input_size, action_size=num_mode, sess=sess, scope='meta')
+meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta')
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
@@ -283,7 +283,7 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_confid(NENV*num_blue)
-    bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states)
+    bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
     action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
 

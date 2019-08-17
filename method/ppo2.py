@@ -52,7 +52,7 @@ class PPO:
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_hold')
 
                 # Build Network
-                model = V2_PPO();  self.model = model
+                model = V2_PPO(action_size);  self.model = model
                 self.actor, self.logits, self.log_logits, self.critic = model(self.state_input)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
                 model.feature_network.summary()
@@ -72,11 +72,14 @@ class PPO:
 
                 self.cnn_summary = self._build_kernel_summary(model.feature_network._layers_snapshot)
 
-    def run_network(self, states):
+    def run_network(self, states, return_action=True):
         feed_dict = {self.state_input: states}
         a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.log_logits], feed_dict)
-        actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
-        return actions, critics, logits
+        if return_action:
+            actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
+            return actions, critics, logits
+        else:
+            return a_probs, critics, logits
 
     def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
         feed_dict = {self.state_input: state_input,

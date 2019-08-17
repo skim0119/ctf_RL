@@ -78,14 +78,14 @@ class V2(tf.keras.Model):
 
 class V2_PPO(tf.keras.Model):
     @store_args
-    def __init__(self, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
         super(V2_PPO, self).__init__(name=name)
 
         # Feature Encoder
         self.feature_network = V2()
 
         # Actor
-        self.actor_dense1 = keras_layers.Dense(5)
+        self.actor_dense1 = keras_layers.Dense(action_size)
         self.sftmx = keras_layers.Activation('softmax')
 
         # Critic
@@ -121,7 +121,7 @@ class V2_PPO(tf.keras.Model):
             critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
 
             # Actor Loss
-            action_OH = tf.one_hot(action, 5, dtype=tf.float32)
+            action_OH = tf.one_hot(action, self.action_size, dtype=tf.float32)
             log_prob = tf.reduce_sum(self.log_logits * action_OH, 1)
             old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
 
