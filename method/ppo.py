@@ -355,15 +355,13 @@ class PPO_multimodes(a3c):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
 
-    def run_network_with_bandit(self, states, use_confid=False):
+    def run_network_with_bandit(self, states, bandit_prob, use_confid=False):
         feed_dict = {self.state_input: states}
-        ops = self.actor + self.critic + self.logits
+        ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
         res = self.sess.run(ops, feed_dict)
-        a_probs, res = res[:len(self.actor)], res[len(self.actor):]
-        critics, res = res[:len(self.critic)], res[len(self.actor):]
-        logits = res
+        a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
+        critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
 
-        bandit_prob, bandit_critic, bandit_logit = a_probs[-1], critics[-1], logits[-1]
         try:
             bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
         except Exception as e:
@@ -386,7 +384,7 @@ class PPO_multimodes(a3c):
 
         critics = [critics[mod][idx] for idx, mod in enumerate(bandit_action)]
         logits = [logits[mod][idx] for idx, mod in enumerate(bandit_action)]
-        return actions, critics, logits, bandit_action, bandit_critic, bandit_logit
+        return actions, critics, logits, bandit_action
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False, idx=None):
         feed_dict = {self.state_input: state_input,
