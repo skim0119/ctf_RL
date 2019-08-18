@@ -30,6 +30,7 @@ from utility.logger import record
 from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
+from method.ppo2 import PPO as MetaNetwork
 
 assert len(sys.argv) == 3
 target_setting_path = sys.argv[1]
@@ -37,6 +38,7 @@ target_setting_path = sys.argv[1]
 LOGDEVICE = False
 PROGBAR = False
 TRAIN_SUBP = False
+CONTINUE = False
 
 num_mode = 3
 
@@ -49,7 +51,7 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()  
 
-MODEL_LOAD_PATH = './model/confid_baseline'
+MODEL_LOAD_PATH = './model/confid2_baseline'
 SWITCH_EP = 10000
 ENV_SETTING_PATH = 'setting_full.ini'
 
@@ -145,19 +147,12 @@ global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
+meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta')
+
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
 # Resotre / Initialize
-pretrained_vars = []
-pretrained_vars_name = []
-for varlist in network.a_vars[:-1]+network.c_vars[:-1]:
-    for var in varlist:
-        if var.name in pretrained_vars_name:
-            continue
-        pretrained_vars_name.append(var.name)
-        pretrained_vars.append(var)
-restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
-network.initiate(restoring_saver, MODEL_LOAD_PATH)
+network.initiate(saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
@@ -227,7 +222,7 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
             np.stack(traj_buffer['logit'])
         )
     for mdp_tuple in it:
-        network.update_bandit(*mdp_tuple, global_episodes, writer, log)
+        meta_network.update_network(*mdp_tuple, global_episodes, writer, log)
 
     # Train Sub
     if TRAIN_SUBP:
@@ -276,7 +271,9 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_confid(NENV*num_blue)
-    action, critic, logits, bandit_action, bandit_critic, bandit_logit = network.run_network_with_bandit(states, use_confid=True)
+    bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
+
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
 
     actions = np.reshape(action, [NENV, num_blue])
 
