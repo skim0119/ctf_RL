@@ -48,7 +48,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = './model/fix_baseline2'
 ENV_SETTING_PATH = 'setting_full.ini'
@@ -234,7 +234,7 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
             np.stack(traj_buffer['logit'])
         )
     for mdp_tuple in it:
-        meta_network.update_global(*mdp_tuple, global_episodes, writer, log)
+        meta_network.update_network(*mdp_tuple, global_episodes, writer, log)
         #network.update_bandit(*mdp_tuple, global_episodes, writer, log)
 
     # Train Sub
