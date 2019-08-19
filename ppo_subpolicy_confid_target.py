@@ -53,7 +53,7 @@ NENV = multiprocessing.cpu_count()
 
 MODEL_LOAD_PATH = './model/confid2_baseline'
 SWITCH_EP = 10000
-ENV_SETTING_PATH = 'setting_full.ini'
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -131,7 +131,7 @@ def use_this_policy():
 ## Environment Initialization
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path=ENV_SETTING_PATH)
+	config_path=env_setting_path)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
