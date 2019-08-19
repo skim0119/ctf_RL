@@ -51,7 +51,7 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()  
 
-MODEL_LOAD_PATH = './model/confid2_baseline'
+MODEL_LOAD_PATH = './model/confid_baseline_namsong'
 SWITCH_EP = 10000
 env_setting_path = 'setting_full.ini'
 
