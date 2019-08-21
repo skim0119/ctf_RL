@@ -1,10 +1,3 @@
-'''
-- Self-play
-- Flat
-- PPO
-- No UAV
-'''
-
 import pickle
 
 import os
@@ -42,32 +35,27 @@ from method.ppo2 import PPO as Network
 
 PROGBAR = True
 LOG_DEVICE = False
-OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline'
+TRAIN_NAME = 'ppo_imitate_linear_1'
+IMITATE_NAME = 'imitate_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
-GPU_CAPACITY = 0.95
+GPU_CAPACITY = 0.90
 
 NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
 
-## Data Path
-path_create(LOG_PATH)
-path_create(MODEL_PATH)
-path_create(SAVE_PATH)
-
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 # Training
-total_episodes = 150000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 300000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -92,12 +80,13 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 5000
+minimum_batch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
+selfplay_reload = 20000
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -109,19 +98,9 @@ log_traintime = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
-max_epsilon = 0.70; max_at = total_episodes
-def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
-    x = (x-lowx) / (highx-lowx)
-    if x < 0:
-        val = 0
-    elif x > 1:
-        val = 1
-    else:
-        val = x * x * (3 - 2 * x)
-    return val*(highy-lowy)+lowy
-def use_this_map(x, max_episode, max_prob):
-    prob = smoothstep(x, highx=max_episode, highy=max_prob)
-    if np.random.random() < prob:
+max_epsilon = 0.70;
+def use_this_map():
+    if np.random.random() < max_epsilon:
         return random.choice(map_list)
     else:
         return None
@@ -147,7 +126,7 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
@@ -156,20 +135,37 @@ sess = tf.Session(config=config)
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+with tf.device('/gpu:0'):
+    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 network.initiate(saver, MODEL_PATH)
-if OVERRIDE:
-    sess.run(tf.assign(global_step, 0)) # Reset the counter
-else:
-    global_episodes = sess.run(global_step)
+global_episodes = sess.run(global_step)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
+## Make Red's Policy
+forward_network_a = TrainedNetwork(
+        model_name=IMITATE_NAME,
+        input_tensor='main/state:0',
+        output_tensor='main/PPO/activation/Softmax:0',
+        import_scope='forward',
+        device='/device:GPU:0'
+    )
+# forward_network_v = TrainedNetwork(
+#         model_name=IMITATE_NAME,
+#         input_tensor='main/state:0',
+#         output_tensor='main/PPO/Reshape:0',
+#         import_scope='forward',
+#         device='/device:GPU:0'
+#     )
+
+def prob2act(prob):
+    action_out = [np.random.choice(5, p=p/sum(p)) for p in prob]
+    return action_out
 
 ### TRAINING ###
 def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -205,16 +201,46 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         network.update_network(*mdp_tuple, global_episodes, writer, log)
 
 def get_action(states):
-    a1, v1, logits1 = network.run_network(states)
-    actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, logits1, actions
+    blue_index = np.arange(len(states)).reshape((NENV,num_blue))[:,:num_blue].reshape([-1])
+    # red_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,-num_red:].reshape([-1])
+    blue_state = states[blue_index]
+    # red_state = states[red_index]
+
+    feed_dict={network.state_input: blue_state}
+    ops = [network.actor, network.critic, network.log_logits]
+    blue_logit, b_v1, logits1 = sess.run(ops, feed_dict)
+    red_logit = forward_network_a.sess.run(forward_network_a.action,
+            feed_dict={forward_network_a.state: blue_state})
+    # imit_v1 = forward_network_v.sess.run(forward_network_a.action,
+    #         feed_dict={forward_network_a.state: blue_state})
+
+    blue_a = prob2act(blue_logit)
+    red_a = prob2act(red_logit)
+
+    a1 = blue_a
+
+    actions = np.reshape(blue_a, [NENV, num_blue])
+
+    #Calculating Reward from different action
+    mse_imit = ((blue_logit - red_logit)**2).mean(axis=1)
+
+    # Calculating Reward from a value metric
+    dv_imit = 0#b_v1 - imit_v1
+    print(mse_imit.shape)
+    print(red_logit.shape)
+    print(blue_logit.shape)
+    print(red_a)
+
+
+    return a1, b_v1, logits1, actions, blue_state, mse_imit, dv_imit
 
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
+while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
+    reload_on = interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
 
     # initialize parameters
@@ -225,13 +251,22 @@ while global_episodes < total_episodes:
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
 
+    #Initializing Variables for imitation learning based on episode number:
+    if global_episodes < 10000:
+        beta = 0.8
+    elif global_episodes < 50000:
+        beta = 1.0 - 0.2*global_episodes/10000
+    else:
+        beta=0
+    k = 0.1
+
     # Bootstrap
     s1 = envs.reset(
             config_path=env_setting_path,
-            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            custom_board=use_this_map(),
             policy_red=use_this_policy()
         )
-    a1, v1, logits1, actions = get_action(s1)
+    a1, v1, logits1, actions, s1, mse_imit, dv_imit = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
@@ -242,7 +277,8 @@ while global_episodes < total_episodes:
 
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (raw_reward - prev_rew - 0.01)/100.0
+
+        reward = (1-beta)*(raw_reward - prev_rew - 0.01)/100.0 - (beta)*(k*mse_imit)
 
         if step == max_ep:
             reward[:] = -1
@@ -250,7 +286,7 @@ while global_episodes < total_episodes:
 
         episode_rew += reward
 
-        a1, v1, logits1, actions = get_action(s1)
+        a1, v1, logits1, actions, s1, mse_imit, dv_imit = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
@@ -304,6 +340,9 @@ while global_episodes < total_episodes:
 
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+
+    if reload_on:
+        forward_network.reset_network_weight()
 
     if play_save_on:
         for i in range(NENV):
