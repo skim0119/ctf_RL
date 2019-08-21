@@ -378,9 +378,9 @@ while True:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    log_episodic_reward.append(np.mean(episode_rew))
-    log_length.append(np.mean(steps))
-    log_winrate.append(np.mean(envs.blue_win()))
+    log_episodic_reward.extend(episode_rew.tolist())
+    log_length.extend(steps)
+    log_winrate.extend(envs.blue_win())
 
     if log_on:
         tag = 'kerasTest/'

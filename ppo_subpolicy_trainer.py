@@ -45,11 +45,12 @@ setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_p
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 
 OVERRIDE = False
-PROGBAR = True
+PROGBAR = False
 LOG_DEVICE = False
+RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline2'
+TRAIN_NAME = 'fix_baseline_80'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -92,9 +93,9 @@ keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
-minbatch_size = 5000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -270,6 +271,7 @@ while True:
         if step == max_ep:
             done[:] = True
         reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+
         if step == max_ep:
             env_reward[:] = -1
         else:
@@ -285,6 +287,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
+                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx] 
                 trajs[idx].append([s0[idx], a[idx], reward[env_idx] + env_reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
@@ -312,9 +315,9 @@ while True:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    global_episode_rewards[MODE].append(np.mean(episode_rew))
-    global_length[MODE].append(np.mean(steps))
-    global_succeed[MODE].append(np.mean(envs.blue_win()))
+    global_episode_rewards[MODE].extend(episode_rew.tolist())
+    global_length[MODE].extend(steps)
+    global_succeed[MODE].extend(envs.blue_win())
 
 
     if log_on:
