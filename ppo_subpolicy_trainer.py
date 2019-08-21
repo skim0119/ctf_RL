@@ -95,7 +95,7 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 4000
+minbatch_size = 8000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -223,13 +223,17 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
-batch = [[] for _ in range(num_mode)]
-num_batch = [0 for _ in range(num_mode)]
+batch = []
+num_batch = 0
+mode_changed = False
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
 while True:
-    MODE = np.argmin(sess.run(subtrain_step))
+    if mode_changed:
+        mode_changed = False
+        MODE = (MODE + 1) % num_mode
+    #MODE = np.argmin(sess.run(subtrain_step))
     mode_episode = sess.run(subtrain_step[MODE])
 
     log_on = interval_flag(mode_episode, save_stat_frequency, 'log{}'.format(MODE))
@@ -304,13 +308,14 @@ while True:
     if PROGBAR:
         progbar.update(global_episodes)
 
-    batch[MODE].extend(trajs)
-    num_batch[MODE] += sum([len(traj) for traj in trajs])
+    batch.extend(trajs)
+    num_batch += sum([len(traj) for traj in trajs])
 
-    if num_batch[MODE] >= minbatch_size:
-        train(batch[MODE], network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
-        batch[MODE] = []
-        num_batch[MODE] = 0
+    if num_batch >= minbatch_size:
+        train(batch, network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        batch = []
+        num_batch = 0
+        mode_changed = True
 
     steps = []
     for env_id in range(NENV):
@@ -321,11 +326,12 @@ while True:
 
 
     if log_on:
+        tag = 'baseline_training/'
         step = sess.run(subtrain_step[MODE])
         record({
-            'Records/mean_length'+MODE_NAME(MODE): global_length[MODE](),
-            'Records/mean_succeed'+MODE_NAME(MODE): global_succeed[MODE](),
-            'Records/mean_episode_reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'length'+MODE_NAME(MODE): global_length[MODE](),
+            tag+'win-rate'+MODE_NAME(MODE): global_succeed[MODE](),
+            tag+'reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
         }, writer, step)
         
     if save_on:
