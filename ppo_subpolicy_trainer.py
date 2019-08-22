@@ -45,12 +45,12 @@ setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_p
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 
 OVERRIDE = False
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
-RBETA = 0.5
+RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline_Rrecord'
+TRAIN_NAME = 'fix_baseline_80'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -254,7 +254,7 @@ while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    episode_env_rew = np.aeros(NENV)
+    episode_env_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
