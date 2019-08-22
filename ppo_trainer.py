@@ -38,7 +38,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline_Rrecord'
+TRAIN_NAME = 'ppo_baseline_Rrecord2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -278,8 +278,10 @@ while global_episodes < total_episodes:
         episode_rew += reward
 
         shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
-        for i in range(3):
-            case_rew += shaped_reward[:,i]
+        for i in range(NENV): 
+            if not was_done[i]:
+                for j in range(3):
+                    case_rew[j][i] += shaped_reward[i,j]
 
         a1, v1, logits1, actions = get_action(s1)
 
