@@ -47,16 +47,16 @@ red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 OVERRIDE = False
 PROGBAR = False
 LOG_DEVICE = False
-RBETA = 0.8
+RBETA = 0.5
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline_80'
+TRAIN_NAME = 'fix_baseline_Rrecord'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-NENV = multiprocessing.cpu_count()
+NENV = multiprocessing.cpu_count() // 2
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)
@@ -104,6 +104,7 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
 global_episode_rewards = [MA(moving_average_step) for _ in range(num_mode)]
+global_environment_rewards = [MA(moving_average_step) for _ in range(num_mode)]
 global_length = [MA(moving_average_step) for _ in range(num_mode)]
 global_succeed = [MA(moving_average_step) for _ in range(num_mode)]
 global_episodes = 0
@@ -252,6 +253,7 @@ while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
+    episode_env_rew = np.aeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -274,13 +276,18 @@ while True:
 
         if step == max_ep:
             done[:] = True
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE)
 
         if step == max_ep:
             env_reward[:] = -1
         else:
-            env_reward = (raw_reward - prev_rew)/100
-        episode_rew += reward
+            env_reward = (raw_reward - prev_rew - 0.01)/100
+
+
+        for i in range(NENV): 
+            if not done[i]:
+                episode_rew[i] += reward[i]
+                episode_env_rew[i] += env_reward[i]
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -292,7 +299,7 @@ while True:
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
                 reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx] 
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx] + env_reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -321,6 +328,7 @@ while True:
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards[MODE].extend(episode_rew.tolist())
+    global_environment_rewards[MODE].extend(episode_env_rew.tolist())
     global_length[MODE].extend(steps)
     global_succeed[MODE].extend(envs.blue_win())
 
@@ -332,6 +340,7 @@ while True:
             tag+'length'+MODE_NAME(MODE): global_length[MODE](),
             tag+'win-rate'+MODE_NAME(MODE): global_succeed[MODE](),
             tag+'reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'env_reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
         }, writer, step)
         
     if save_on:
