@@ -286,7 +286,7 @@ while True:
 
 
         for i in range(NENV): 
-            if not done[i]:
+            if not was_done[i]:
                 episode_rew[i] += reward[i]
                 episode_env_rew[i] += env_reward[i]
     
