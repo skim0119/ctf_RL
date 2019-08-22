@@ -10,96 +10,6 @@ from utility.utils import discount_rewards
 from method.base import initialize_uninitialized_vars as iuv
 
 
-class Subgraph:
-    """Subgraph
-
-    Import pre-trained model for simulation and training.
-    
-    It does not initialize model.
-    """
-    @store_args
-    def __init__(
-        self,
-        in_size,
-        model_name,
-        network_type=None,
-        sess=None,
-        global_network=None,
-        record=False,
-        *args,
-        **kwargs
-    ):
-        if sess is None:
-            self.graph = tf.Graph()
-            self.sess = tf.Session(graph=self.graph)
-        else:
-            self.graph = self.sess.graph
-
-        with self.sess.as_default(), self.graph.as_default():
-            self.network = network_type(
-                in_size=in_size,
-                action_size=5,
-                lr_actor=5e-5,
-                lr_critic=2e-4,
-                scope=model_name,
-                entropy_beta = 0.01,
-                sess=sess,
-                global_network=global_network
-            )
-            self.network.initialize_vars()
-            self.network.pull_global()
-
-
-    def get_action(self, states):
-        actions, values = self.network.run_network(states)
-        return actions, values
-
-    def train(self, trajs, bootstrap=0.0, gamma=0.98):
-        buffer_s, buffer_a, buffer_tdtarget, buffer_adv = [], [], [], []
-        for idx, traj in enumerate(trajs):
-            if len(traj) == 0:
-                continue
-            observations = traj[0]
-            actions = traj[1]
-            rewards = np.array(traj[2])
-            values = np.array(traj[3])
-            
-            value_ext = np.append(values, [bootstrap[idx]])
-            td_target  = rewards + gamma * value_ext[1:]
-            advantages = rewards + gamma * value_ext[1:] - value_ext[:-1]
-            advantages = discount_rewards(advantages,gamma)
-            
-            buffer_s.extend(observations)
-            buffer_a.extend(actions)
-            buffer_tdtarget.extend(td_target.tolist())
-            buffer_adv.extend(advantages.tolist())
-
-        if len(buffer_s) == 0:
-            return
-
-        # Stack buffer
-        feed_dict = {
-            self.network.state_input : np.stack(buffer_s),
-            self.network.action_ : np.array(buffer_a),
-            self.network.td_target_ : np.array(buffer_tdtarget),
-            self.network.advantage_ : np.array(buffer_adv),
-        }
-
-        # Update Buffer
-        self.network.update_global(
-            buffer_s,
-            buffer_a,
-            buffer_tdtarget,
-            buffer_adv
-        )
-
-        # get global parameters to local ActorCritic 
-        self.network.pull_global()
-        
-        return 
-    
-
-
 class TrainedNetwork:
     """TrainedNetwork
 
@@ -117,12 +27,13 @@ class TrainedNetwork:
         action_space=5,
         sess=None,
         device=None,
-        import_scope='',
+        import_scope=None,
         *args,
         **kwargs
     ):
-        self.input_tensor = import_scope + '/' + input_tensor
-        self.output_tensor = import_scope + '/' + output_tensor
+        if import_scope is not None:
+            self.input_tensor = import_scope + '/' + input_tensor
+            self.output_tensor = import_scope + '/' + output_tensor
         if sess is None:
             self.graph = tf.Graph()
             self.graph.device(device)
