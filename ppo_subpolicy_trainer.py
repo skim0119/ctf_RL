@@ -340,7 +340,7 @@ while True:
             tag+'length'+MODE_NAME(MODE): global_length[MODE](),
             tag+'win-rate'+MODE_NAME(MODE): global_succeed[MODE](),
             tag+'reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
-            tag+'env_reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'env_reward'+MODE_NAME(MODE): global_environment_rewards[MODE](),
         }, writer, step)
         
     if save_on:
