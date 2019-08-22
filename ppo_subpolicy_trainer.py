@@ -227,6 +227,7 @@ def get_action(states):
 batch = []
 num_batch = 0
 mode_changed = False
+MODE = 0
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
