@@ -45,7 +45,7 @@ setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_p
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 
 OVERRIDE = False
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
 RBETA = 0.8
 
@@ -56,7 +56,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-NENV = multiprocessing.cpu_count()
+NENV = multiprocessing.cpu_count() // 2
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)
@@ -95,7 +95,7 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 4000
+minbatch_size = 8000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -104,6 +104,7 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
 global_episode_rewards = [MA(moving_average_step) for _ in range(num_mode)]
+global_environment_rewards = [MA(moving_average_step) for _ in range(num_mode)]
 global_length = [MA(moving_average_step) for _ in range(num_mode)]
 global_succeed = [MA(moving_average_step) for _ in range(num_mode)]
 global_episodes = 0
@@ -223,13 +224,18 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
-batch = [[] for _ in range(num_mode)]
-num_batch = [0 for _ in range(num_mode)]
+batch = []
+num_batch = 0
+mode_changed = False
+MODE = 0
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
 while True:
-    MODE = np.argmin(sess.run(subtrain_step))
+    if mode_changed:
+        mode_changed = False
+        MODE = (MODE + 1) % num_mode
+    #MODE = np.argmin(sess.run(subtrain_step))
     mode_episode = sess.run(subtrain_step[MODE])
 
     log_on = interval_flag(mode_episode, save_stat_frequency, 'log{}'.format(MODE))
@@ -248,6 +254,7 @@ while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
+    episode_env_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -270,13 +277,18 @@ while True:
 
         if step == max_ep:
             done[:] = True
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE)
 
         if step == max_ep:
             env_reward[:] = -1
         else:
-            env_reward = (raw_reward - prev_rew)/100
-        episode_rew += reward
+            env_reward = (raw_reward - prev_rew - 0.01)/100
+
+
+        for i in range(NENV): 
+            if not done[i]:
+                episode_rew[i] += reward[i]
+                episode_env_rew[i] += env_reward[i]
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -288,7 +300,7 @@ while True:
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
                 reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx] 
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx] + env_reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -304,28 +316,32 @@ while True:
     if PROGBAR:
         progbar.update(global_episodes)
 
-    batch[MODE].extend(trajs)
-    num_batch[MODE] += sum([len(traj) for traj in trajs])
+    batch.extend(trajs)
+    num_batch += sum([len(traj) for traj in trajs])
 
-    if num_batch[MODE] >= minbatch_size:
-        train(batch[MODE], network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
-        batch[MODE] = []
-        num_batch[MODE] = 0
+    if num_batch >= minbatch_size:
+        train(batch, network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        batch = []
+        num_batch = 0
+        mode_changed = True
 
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards[MODE].extend(episode_rew.tolist())
+    global_environment_rewards[MODE].extend(episode_env_rew.tolist())
     global_length[MODE].extend(steps)
     global_succeed[MODE].extend(envs.blue_win())
 
 
     if log_on:
+        tag = 'baseline_training/'
         step = sess.run(subtrain_step[MODE])
         record({
-            'Records/mean_length'+MODE_NAME(MODE): global_length[MODE](),
-            'Records/mean_succeed'+MODE_NAME(MODE): global_succeed[MODE](),
-            'Records/mean_episode_reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'length'+MODE_NAME(MODE): global_length[MODE](),
+            tag+'win-rate'+MODE_NAME(MODE): global_succeed[MODE](),
+            tag+'reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'env_reward'+MODE_NAME(MODE): global_environment_rewards[MODE](),
         }, writer, step)
         
     if save_on:

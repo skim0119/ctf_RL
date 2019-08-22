@@ -110,6 +110,10 @@ log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
+log_attack_reward = MovingAverage(moving_average_step)
+log_scout_reward = MovingAverage(moving_average_step)
+log_defense_reward = MovingAverage(moving_average_step)
+
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
 max_epsilon = 0.00; max_at = 1
@@ -209,6 +213,35 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
+def reward_shape(prev_red_alive, red_alive, done):
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
+    reward = []
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
+    for i in range(NENV):
+        possible_reward = []
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+        # Defense
+        if blue_flags[i]:
+            possible_reward.append(-1)
+        elif done[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+
+        reward.append(possible_reward)
+
+    return np.array(reward)
+
 batch = []
 num_batch = 0
 while True:
@@ -219,8 +252,10 @@ while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
@@ -244,13 +279,16 @@ while True:
         
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         reward = (raw_reward - prev_rew - 0.01)/100.0
-
         if step == max_ep:
             reward[:] = -1
             done[:] = True
-
         episode_rew += reward
+
+        shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
+        for i in range(3):
+            case_rew += shaped_reward[:,i]
 
         a1, v1, logits1, actions = get_action(s1)
 
@@ -262,6 +300,7 @@ while True:
 
         prev_rew = raw_reward
         was_alive = is_alive
+        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
@@ -288,6 +327,10 @@ while True:
     log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
+    log_attack_reward.extend(case_rew[0].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
+
     global_episodes += NENV
     sess.run(global_step_next)
     if PROGBAR:
@@ -299,9 +342,12 @@ while True:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'redwin-rate': log_redwinrate(),
-            tag+'reward': log_episodic_reward(),
+            tag+'env_reward': log_episodic_reward(),
             tag+'rollout_time': log_looptime(),
             tag+'train_time': log_traintime(),
+            tag+'reward_attack': log_attack_reward(),
+            tag+'reward_scout': log_scout_reward(),
+            tag+'reward_defense': log_defense_reward(),
         }, writer, global_episodes)
         
     if save_on:
