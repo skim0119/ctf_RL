@@ -44,7 +44,7 @@ from method.ppo import PPO_multimodes as Network
 assert len(sys.argv) == 3
 target_setting_path = sys.argv[1]
 
-PROGBAR = True
+PROGBAR = False
 LOGDEVICE = False
 
 num_mode = 3
@@ -57,7 +57,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count()
 
 MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'

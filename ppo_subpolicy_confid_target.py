@@ -37,7 +37,7 @@ target_setting_path = sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = False
-TRAIN_SUBP = False
+TRAIN_SUBP = True
 CONTINUE = False
 
 num_mode = 3
@@ -71,7 +71,6 @@ gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
-entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
 lr_a           = config.getfloat('TRAINING', 'LR_ACTOR')
 lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
@@ -307,6 +306,8 @@ while True:
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
     a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
 
     # Rollout
