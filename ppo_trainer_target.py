@@ -41,7 +41,7 @@ from method.ppo2 import PPO as Network
 assert len(sys.argv) == 3, 'Provide setting initiation file for variation'
 target_setting_path = sys.argv[1]
 
-PROGBAR = True
+PROGBAR = False
 LOG_DEVICE = False
 
 ## Training Directory Reset
@@ -268,6 +268,8 @@ while True:
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
