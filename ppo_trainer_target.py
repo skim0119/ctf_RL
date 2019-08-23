@@ -95,7 +95,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 3000
+minimum_batch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -254,12 +254,7 @@ while True:
     episode_rew = np.zeros(NENV)
     case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
-    was_alive = [True for agent in envs.get_team_blue().flat]
-    was_alive_red = [True for agent in envs.get_team_red().flat]
-    was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
-    
     # Bootstrap
     if global_episodes > SWITCH_EP:
         env_setting_path = target_setting_path
@@ -268,8 +263,15 @@ while True:
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
+
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
+    was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
+    was_done = [False for env in range(NENV)]
+
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
+    
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout

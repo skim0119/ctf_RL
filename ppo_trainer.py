@@ -33,12 +33,12 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-PROGBAR = True
+PROGBAR = False
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline_Rrecord2'
+TRAIN_NAME = 'ppo_baseline_Rrecord'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
