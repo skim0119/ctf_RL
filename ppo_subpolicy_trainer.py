@@ -47,10 +47,10 @@ red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 OVERRIDE = False
 PROGBAR = True
 LOG_DEVICE = False
-RBETA = 0.8
+RBETA = 1.0
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline_80'
+TRAIN_NAME = 'fix_baseline_100'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -143,11 +143,12 @@ config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
-global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, NENV)
-subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
-subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
+with tf.device('/GPU:0'):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
+    subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
+    network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, **kwargv):
     traj_buffer = defaultdict(list)

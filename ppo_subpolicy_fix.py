@@ -45,6 +45,7 @@ assert len(sys.argv) == 2
 
 PROGBAR = True
 LOGDEVICE = False
+RBETA = 0.8
 
 num_mode = 3
 
@@ -58,7 +59,7 @@ GPU_CAPACITY = 0.95
 
 NENV = multiprocessing.cpu_count() 
 
-MODEL_LOAD_PATH = './model/fix_baseline2/' # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
@@ -298,7 +299,8 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[idx]+env_reward[env_idx], v0[idx], logits[idx]])
+                reward_function = (RBETA) * reward[idx] + (1-RBETA) * env_reward[env_idx]
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
