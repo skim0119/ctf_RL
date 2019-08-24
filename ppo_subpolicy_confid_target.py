@@ -289,15 +289,6 @@ while True:
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
     
-    # initialize parameters 
-    episode_rew = np.zeros(NENV)
-    prev_rew = np.zeros(NENV)
-    was_alive = [True for agent in envs.get_team_blue().flat]
-    was_alive_red = [True for agent in envs.get_team_red().flat]
-    was_done = [False for env in range(NENV)]
-
-    trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
-    
     # Bootstrap
     if global_episodes > SWITCH_EP:
         env_setting_path = target_setting_path
@@ -308,6 +299,16 @@ while True:
         )
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
+
+    # initialize parameters 
+    episode_rew = np.zeros(NENV)
+    prev_rew = np.zeros(NENV)
+    was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
+    was_done = [False for env in range(NENV)]
+
+    trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
+    
     a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
 
     # Rollout
