@@ -222,6 +222,8 @@ def reward_shape(prev_red_alive, red_alive, done):
         # Defense
         if blue_flags[i]:
             r.append(-1)
+        elif done[i]:
+            r.append(1)
         else:
             r.append(0)
     return np.array(r)
