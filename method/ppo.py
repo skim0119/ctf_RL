@@ -165,10 +165,10 @@ class PPO(a3c):
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
-                total_counter += np.prod(grad.shape) 
+                total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
-            
+
             writer.add_summary(summary,global_episodes)
 
             writer.flush()
@@ -178,7 +178,7 @@ class PPO(a3c):
         actor_name = self.scope + '/actor'
         critic_name = self.scope + '/critic'
 
-        image_summary = [] 
+        image_summary = []
         def add_image(net, name, Y=-1, X=8):
             grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
@@ -193,7 +193,7 @@ class PPO(a3c):
             add_image(_layers['CNN1'], '5_CNN')
             add_image(_layers['CNN2'], '6_CNN')
 
-        # Actor 
+        # Actor
         with tf.variable_scope('actor'):
             logits = layers.fully_connected(
                 feature, self.action_size,
@@ -218,7 +218,7 @@ class PPO(a3c):
 
         # Collect Summary
         self.cnn_summary = tf.summary.merge(image_summary)
-        
+
         # Visualization
         #self.feature_static = _layers['sepCNN1']
         #self.feature_dynamic = _layers['attention']
@@ -228,7 +228,7 @@ class PPO(a3c):
         #self.conv_layer_grad_dynamic = tf.gradients(yc, self.feature_dynamic)[0]
         #self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
         #self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
-            
+
         return logits, actor, critic, a_vars, c_vars
 
 
@@ -351,11 +351,14 @@ class PPO_multimodes(a3c):
         actions3 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs3])
         return actions1, critics1, logits1, actions2, critics2, logits2, actions3, critics3, logits3
 
-    def initiate_confid(self, n):
+    def initiate_confid(self, n, fixed_length=None):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
+        self.threshhold = np.zeros(n) # Have threshhold increase while training. Make it the average maximum?
+        self.fixed_length = 5
+        self.fixed_length_counter = 0
 
-    def run_network_with_bandit(self, states, bandit_prob, use_confid=False):
+    def run_network_with_bandit(self, states, bandit_prob, use_confid=False, fixed_step=False, use_threshhold=False):
         feed_dict = {self.state_input: states}
         ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
         res = self.sess.run(ops, feed_dict)
@@ -378,8 +381,29 @@ class PPO_multimodes(a3c):
                 if confid < old_confid: # compare inverse entropy
                     self.entering_confids[i] = confid
                     self.playing_mode[i] = bandit_action[i]
+                else:
+                    self.entering_confids[i] = 0.95*old_confid + 0.05*confid
+
             bandit_action = self.playing_mode
-    
+
+        if fixed_step:
+            if fixed_length_counter == 0:
+                self.playing_mode = bandit_action
+                self.fixed_length_counter = self.fixed_length
+            else:
+                bandit_action = self.playing_mode
+                self.fixed_length_counter -= 1
+
+
+        if use_threshhold:
+            for i in range(len(self.entering_confids)):
+                prob = bandit_prob[bandit_action]
+                if threshhold < prob: # compare inverse entropy
+                    self.entering_confids[i] = confid
+                    self.playing_mode[i] = bandit_action[i]
+
+                self.threshhold[i] = 0.95*self.threshhold[i] + 0.05*prob
+
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
         critics = [critics[mod][idx] for idx, mod in enumerate(bandit_action)]
@@ -412,10 +436,10 @@ class PPO_multimodes(a3c):
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
-                total_counter += np.prod(grad.shape) 
+                total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
-            
+
             writer.add_summary(summary,global_episodes)
             writer.flush()
 
@@ -446,17 +470,17 @@ class PPO_multimodes(a3c):
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
-                total_counter += np.prod(grad.shape) 
+                total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/grad_vanish_rate_bandit', simple_value=vanish_counter/total_counter)
-            
+
             writer.add_summary(summary,global_episodes)
             writer.flush()
 
     def _build_network(self, input_hold):
         encoder_name = self.scope + '/encoder'
 
-        image_summary = [] 
+        image_summary = []
         def add_image(net, name, Y=-1, X=8):
             grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
@@ -543,7 +567,7 @@ class PPO_multimodes(a3c):
 
         # Collect Summary
         self.cnn_summary = tf.summary.merge(image_summary)
-        
+
         # Visualization (Gradcam)
         '''
         self.feature_static = _layers['sepCNN1']
@@ -555,6 +579,5 @@ class PPO_multimodes(a3c):
         self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
         self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
         '''
-            
-        return logit_list, actor_list, critic_list, a_vars_list, c_vars_list
 
+        return logit_list, actor_list, critic_list, a_vars_list, c_vars_list

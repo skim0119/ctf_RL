@@ -37,7 +37,7 @@ assert len(sys.argv) == 2
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
-CONTINUE = False
+CONTINUE = True
 
 num_mode = 3
 
@@ -47,10 +47,10 @@ LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
-GPU_CAPACITY = 0.90
+GPU_CAPACITY = 0.70
 NENV = multiprocessing.cpu_count()//2
 
-MODEL_LOAD_PATH = './model/fix_baseline2'
+MODEL_LOAD_PATH = './model/fix_baseline'
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
@@ -88,14 +88,14 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-batch_memory_size = 4000
+batch_memory_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
-## Logger Initialization 
+## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
@@ -145,7 +145,7 @@ global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta')
+meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-3)
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
@@ -180,7 +180,7 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         # Meta Trajectory
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
-        
+
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
         traj_buffer['td_target'].extend(td_target)
@@ -286,7 +286,7 @@ def get_action(states, initial=False):
         network.initiate_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=True)
 
     actions = np.reshape(action, [NENV, num_blue])
 
@@ -302,8 +302,8 @@ while True:
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = False # interval_flag(global_episodes, 50000, 'replay_save')
-    
-    # initialize parameters 
+
+    # initialize parameters
     episode_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
@@ -311,7 +311,7 @@ while True:
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
-    
+
     # Bootstrap
     s1 = envs.reset(
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
@@ -339,7 +339,7 @@ while True:
             done[:] = True
 
         task_reward = reward_shape(was_alive_red, is_alive_red, done)
-    
+
         a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1)
         for idx, d in enumerate(done):
             if d:
@@ -403,7 +403,7 @@ while True:
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
-    if play_save_on:
-        for i in range(NENV):
-            with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
-                pickle.dump(info[i], handle)
+    # if play_save_on:
+    #     for i in range(NENV):
+    #         with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
+    #             pickle.dump(info[i], handle)
