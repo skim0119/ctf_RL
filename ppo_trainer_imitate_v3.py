@@ -37,7 +37,7 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_imitate_linear_1'
+TRAIN_NAME = 'ppo_imitate_linear_v3_k1'
 IMITATE_NAME = 'imitate_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -148,20 +148,20 @@ writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 ## Make Red's Policy
-forward_network_a = TrainedNetwork(
-        model_name=IMITATE_NAME,
-        input_tensor='main/state:0',
-        output_tensor='main/PPO/activation/Softmax:0',
-        import_scope='forward',
-        device='/device:GPU:0'
-    )
-# forward_network_v = TrainedNetwork(
+# forward_network_a = TrainedNetwork(
 #         model_name=IMITATE_NAME,
 #         input_tensor='main/state:0',
-#         output_tensor='main/PPO/Reshape:0',
+#         output_tensor='main/PPO/activation/Softmax:0',
 #         import_scope='forward',
 #         device='/device:GPU:0'
 #     )
+forward_network_v = TrainedNetwork(
+        model_name=IMITATE_NAME,
+        input_tensor='main/state:0',
+        output_tensor='main/PPO/Reshape:0',
+        import_scope='forward',
+        device='/device:GPU:0'
+    )
 
 def prob2act(prob):
     action_out = [np.random.choice(5, p=p/sum(p)) for p in prob]
@@ -209,26 +209,24 @@ def get_action(states):
     feed_dict={network.state_input: blue_state}
     ops = [network.actor, network.critic, network.log_logits]
     blue_logit, b_v1, logits1 = sess.run(ops, feed_dict)
-    red_logit = forward_network_a.sess.run(forward_network_a.action,
-            feed_dict={forward_network_a.state: blue_state})
-    # imit_v1 = forward_network_v.sess.run(forward_network_a.action,
+    # red_logit = forward_network_a.sess.run(forward_network_a.action,
     #         feed_dict={forward_network_a.state: blue_state})
 
     blue_a = prob2act(blue_logit)
-    red_a = prob2act(red_logit)
 
     a1 = blue_a
 
     actions = np.reshape(blue_a, [NENV, num_blue])
     b_logits =np.reshape(blue_logit, [NENV, num_blue,5])
-    r_logits =np.reshape(red_logit, [NENV, num_blue,5])
     #Calculating Reward from different action
-    mse_imit = ((b_logits - r_logits)**2).mean(axis=2).mean(axis=1)
+    mse_imit = 0#((b_logits - r_logits)**2).mean(axis=2)
 
 
+    imit_v1 = forward_network_v.sess.run(forward_network_v.action,
+        feed_dict={forward_network_v.state: blue_state})
     # Calculating Reward from a value metric
-    dv_imit = 0#b_v1 - imit_v1
-
+    dv_imit = np.abs(imit_v1-b_v1) #b_v1 - imit_v1
+    dv_imit = np.reshape(dv_imit, [NENV, num_blue])
 
     return a1, b_v1, logits1, actions, blue_state, mse_imit, dv_imit
 
@@ -276,7 +274,7 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
 
-        reward = (1-beta)*(raw_reward - prev_rew - 0.01)/100.0 - (beta)*(k*mse_imit)
+        reward = (raw_reward - prev_rew - 0.01)/100.0
 
         if step == max_ep:
             reward[:] = -1
@@ -290,6 +288,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
+                rew = (1-beta)*reward[env_idx] - (beta)*(k*dv_imit[env_idx][idx%4])
                 trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
