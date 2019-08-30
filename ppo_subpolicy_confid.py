@@ -37,7 +37,7 @@ assert len(sys.argv) == 2
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
-CONTINUE = True
+CONTINUE = False
 
 num_mode = 3
 
@@ -47,7 +47,7 @@ LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
-GPU_CAPACITY = 0.70
+GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = './model/fix_baseline'
@@ -88,7 +88,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-batch_memory_size = 2000
+batch_memory_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -99,6 +99,10 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
+
+log_attack_reward = MovingAverage(moving_average_step)
+log_scout_reward = MovingAverage(moving_average_step)
+log_defense_reward = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -144,6 +148,7 @@ sess = tf.Session(config=config)
 global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
+# with tf.device('/gpu:1'):
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
 meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-3)
 
@@ -166,7 +171,7 @@ else:
     global_episodes = sess.run(global_step)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 
-network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+# network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
@@ -286,11 +291,39 @@ def get_action(states, initial=False):
         network.initiate_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=True)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=False)
 
     actions = np.reshape(action, [NENV, num_blue])
 
     return bandit_action, bandit_critic, bandit_logit, actions, action, critic, logits
+def reward_shape(prev_red_alive, red_alive, done):
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
+    reward = []
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
+    for i in range(NENV):
+        possible_reward = []
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+        # Defense
+        if blue_flags[i]:
+            possible_reward.append(-1)
+        elif done[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+
+        reward.append(possible_reward)
+
+    return np.array(reward)
 
 batch = []
 num_batch = 0
@@ -305,6 +338,7 @@ while True:
 
     # initialize parameters
     episode_rew = np.zeros(NENV)
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -333,6 +367,12 @@ while True:
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         env_reward = (raw_reward - prev_rew - 0.01)/100
         episode_rew += env_reward
+
+        shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
+        for i in range(NENV):
+            if not was_done[i]:
+                for j in range(3):
+                    case_rew[j][i] += shaped_reward[i,j]
 
         if step == max_ep:
             env_reward[:] = -1
@@ -391,6 +431,9 @@ while True:
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
+    log_attack_reward.extend(case_rew[0].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
 
     if log_on:
         tag = 'adapt_train_log/'
@@ -398,6 +441,9 @@ while True:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
+            tag+'reward_attack': log_attack_reward(),
+            tag+'reward_scout': log_scout_reward(),
+            tag+'reward_defense': log_defense_reward(),
         }, writer, global_episodes)
 
     if save_on:
