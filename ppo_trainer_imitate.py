@@ -37,8 +37,8 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_imitate'
-IMITATE_NAME = 'ppo_baseline'
+TRAIN_NAME = 'ppo_imitate_linear_1'
+IMITATE_NAME = 'imitate_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -48,7 +48,7 @@ GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_full_selfplay.ini'
+env_setting_path = 'setting_full.ini'
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
@@ -80,7 +80,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 3000
+minimum_batch_size = 6000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -155,13 +155,13 @@ forward_network_a = TrainedNetwork(
         import_scope='forward',
         device='/device:GPU:0'
     )
-forward_network_v = TrainedNetwork(
-        model_name=IMITATE_NAME,
-        input_tensor='main/state:0',
-        output_tensor='main/PPO/Reshape:0',
-        import_scope='forward',
-        device='/device:GPU:0'
-    )
+# forward_network_v = TrainedNetwork(
+#         model_name=IMITATE_NAME,
+#         input_tensor='main/state:0',
+#         output_tensor='main/PPO/Reshape:0',
+#         import_scope='forward',
+#         device='/device:GPU:0'
+#     )
 
 def prob2act(prob):
     action_out = [np.random.choice(5, p=p/sum(p)) for p in prob]
@@ -201,16 +201,18 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         network.update_network(*mdp_tuple, global_episodes, writer, log)
 
 def get_action(states):
-    blue_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,:num_blue].reshape([-1])
-    red_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,-num_red:].reshape([-1])
+    blue_index = np.arange(len(states)).reshape((NENV,num_blue))[:,:num_blue].reshape([-1])
+    # red_index = np.arange(len(states)).reshape((NENV,num_blue+num_red))[:,-num_red:].reshape([-1])
     blue_state = states[blue_index]
-    red_state = states[red_index]
+    # red_state = states[red_index]
 
     feed_dict={network.state_input: blue_state}
     ops = [network.actor, network.critic, network.log_logits]
     blue_logit, b_v1, logits1 = sess.run(ops, feed_dict)
     red_logit = forward_network_a.sess.run(forward_network_a.action,
-            feed_dict={forward_network_a.state: red_state})
+            feed_dict={forward_network_a.state: blue_state})
+    # imit_v1 = forward_network_v.sess.run(forward_network_a.action,
+    #         feed_dict={forward_network_a.state: blue_state})
 
     blue_a = prob2act(blue_logit)
     red_a = prob2act(red_logit)
@@ -220,10 +222,15 @@ def get_action(states):
     actions = np.reshape(blue_a, [NENV, num_blue])
 
     #Calculating Reward from different action
-    mse_imit = ((blue_logit - red_logit)**2).mean(axis=0)
+    mse_imit = ((blue_logit - red_logit)**2).mean(axis=1)
 
     # Calculating Reward from a value metric
-    dv_imit = b_v1 - r_v1
+    dv_imit = 0#b_v1 - imit_v1
+    print(mse_imit.shape)
+    print(red_logit.shape)
+    print(blue_logit.shape)
+    print(red_a)
+
 
     return a1, b_v1, logits1, actions, blue_state, mse_imit, dv_imit
 
@@ -244,14 +251,14 @@ while True:
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
 
-    #Initializing Beta based on episode number:
+    #Initializing Variables for imitation learning based on episode number:
     if global_episodes < 10000:
         beta = 0.8
     elif global_episodes < 50000:
         beta = 1.0 - 0.2*global_episodes/10000
     else:
         beta=0
-
+    k = 0.1
 
     # Bootstrap
     s1 = envs.reset(
@@ -270,7 +277,8 @@ while True:
 
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        reward = (1-beta)*(raw_reward - prev_rew - 0.01)/100.0 - (beta)*mse_imit
+
+        reward = (1-beta)*(raw_reward - prev_rew - 0.01)/100.0 - (beta)*(k*mse_imit)
 
         if step == max_ep:
             reward[:] = -1

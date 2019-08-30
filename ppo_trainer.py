@@ -8,7 +8,7 @@
 import pickle
 
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+#os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 import shutil
 import configparser
@@ -52,7 +52,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8#multiprocessing.cpu_count()  
+NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
@@ -92,14 +92,14 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 3000
+minimum_batch_size = 5000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
-## Logger Initialization 
+## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
 log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
@@ -182,7 +182,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
-        
+
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
         traj_buffer['td_target'].extend(td_target)
@@ -216,15 +216,15 @@ while global_episodes < total_episodes:
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
-    
-    # initialize parameters 
+
+    # initialize parameters
     episode_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
-    
+
     # Bootstrap
     s1 = envs.reset(
             config_path=env_setting_path,
@@ -239,7 +239,7 @@ while global_episodes < total_episodes:
         s0 = s1
         a, v0 = a1, v1
         logits = logits1
-        
+
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         reward = (raw_reward - prev_rew - 0.01)/100.0
@@ -265,7 +265,7 @@ while global_episodes < total_episodes:
         if np.all(done):
             break
     etime_roll = time.time()
-            
+
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
@@ -279,7 +279,7 @@ while global_episodes < total_episodes:
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
-    
+
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
@@ -301,7 +301,7 @@ while global_episodes < total_episodes:
             tag+'rollout_time': log_looptime(),
             tag+'train_time': log_traintime(),
         }, writer, global_episodes)
-        
+
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
@@ -309,4 +309,3 @@ while global_episodes < total_episodes:
         for i in range(NENV):
             with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
                 pickle.dump(info[i], handle)
-
