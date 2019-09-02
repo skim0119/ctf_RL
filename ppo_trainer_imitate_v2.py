@@ -37,7 +37,7 @@ PROGBAR = True
 LOG_DEVICE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_imitate_linear_1'
+TRAIN_NAME = 'ppo_imitate_linear_v2_k3_lr5'
 IMITATE_NAME = 'imitate_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -64,7 +64,7 @@ critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
 lr_a           = config.getfloat('TRAINING', 'LR_ACTOR')
 lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
-
+lr = 5e-4#1e-4
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
@@ -136,7 +136,7 @@ sess = tf.Session(config=config)
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 with tf.device('/gpu:0'):
-    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess,lr=lr)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -223,7 +223,7 @@ def get_action(states):
     b_logits =np.reshape(blue_logit, [NENV, num_blue,5])
     r_logits =np.reshape(red_logit, [NENV, num_blue,5])
     #Calculating Reward from different action
-    mse_imit = ((b_logits - r_logits)**2).mean(axis=2).mean(axis=1)
+    mse_imit = ((b_logits - r_logits)**2).mean(axis=2)
 
 
     # Calculating Reward from a value metric
@@ -252,11 +252,11 @@ while True:
     #Initializing Variables for imitation learning based on episode number:
     if global_episodes < 10000:
         beta = 0.8
-    elif global_episodes < 50000:
+    if global_episodes < 50000:
         beta = 1.0 - 0.2*global_episodes/10000
     else:
         beta=0
-    k = 0.1
+    k = 0.3
 
     # Bootstrap
     s1 = envs.reset(
@@ -276,7 +276,7 @@ while True:
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
 
-        reward = (1-beta)*(raw_reward - prev_rew - 0.01)/100.0 - (beta)*(k*mse_imit)
+        reward = (raw_reward - prev_rew - 0.01)/100.0
 
         if step == max_ep:
             reward[:] = -1
@@ -290,6 +290,7 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
+                rew = (1-beta)*reward[env_idx] - (beta)*(k*mse_imit[env_idx][idx%4])
                 trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
         prev_rew = raw_reward
