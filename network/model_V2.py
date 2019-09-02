@@ -69,9 +69,9 @@ class V2(tf.keras.Model):
         _layers['dense1'] = net
 
         self._layers_snapshot = _layers
-        
+
         if self.trainable:
-            return net 
+            return net
         else:
             return tf.stop_gradient(net)
 
@@ -94,7 +94,8 @@ class V2_PPO(tf.keras.Model):
     def call(self, inputs):
         net = self.feature_network(inputs)
 
-        logits = self.actor_dense1(net) 
+        logits = self.actor_dense1(net)
+        logits = tf.math.maximum(logits, 1e-9)
         actor = self.sftmx(logits)
         log_logits = tf.nn.log_softmax(logits)
 

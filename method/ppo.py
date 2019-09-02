@@ -387,7 +387,7 @@ class PPO_multimodes(a3c):
             bandit_action = self.playing_mode
 
         if fixed_step:
-            if fixed_length_counter == 0:
+            if self.fixed_length_counter == 0:
                 self.playing_mode = bandit_action
                 self.fixed_length_counter = self.fixed_length
             else:
@@ -397,9 +397,8 @@ class PPO_multimodes(a3c):
 
         if use_threshhold:
             for i in range(len(self.entering_confids)):
-                prob = bandit_prob[bandit_action]
-                if threshhold < prob: # compare inverse entropy
-                    self.entering_confids[i] = confid
+                prob = bandit_prob[i][bandit_action[i]]
+                if self.threshhold[i] < prob: # compare inverse entropy
                     self.playing_mode[i] = bandit_action[i]
 
                 self.threshhold[i] = 0.95*self.threshhold[i] + 0.05*prob

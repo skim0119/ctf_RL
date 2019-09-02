@@ -104,6 +104,10 @@ log_attack_reward = MovingAverage(moving_average_step)
 log_scout_reward = MovingAverage(moving_average_step)
 log_defense_reward = MovingAverage(moving_average_step)
 
+log_attack_perc = MovingAverage(moving_average_step)
+log_scout_perc = MovingAverage(moving_average_step)
+log_defense_perc = MovingAverage(moving_average_step)
+
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
 max_epsilon = 0.00; max_at = 1
@@ -150,7 +154,7 @@ global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 # with tf.device('/gpu:1'):
 network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-3)
+meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-4)
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
@@ -291,11 +295,12 @@ def get_action(states, initial=False):
         network.initiate_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=False)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=False, fixed_step=False, use_threshhold=True)
 
     actions = np.reshape(action, [NENV, num_blue])
 
     return bandit_action, bandit_critic, bandit_logit, actions, action, critic, logits
+
 def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
     red_alive = np.reshape(red_alive, [NENV, num_red])
@@ -435,6 +440,18 @@ while True:
     log_scout_reward.extend(case_rew[1].tolist())
     log_defense_reward.extend(case_rew[2].tolist())
 
+    attack=[];scout=[];defense=[]
+    for i in a1:
+        if i == 0:
+            attack.append(1);scout.append(0);defense.append(0)
+        elif i == 1:
+            attack.append(0);scout.append(1);defense.append(0)
+        elif i==2:
+            attack.append(0);scout.append(0);defense.append(1)
+        log_attack_perc.extend(attack)
+        log_scout_perc.extend(scout)
+        log_defense_perc.extend(defense)
+
     if log_on:
         tag = 'adapt_train_log/'
         record({
@@ -444,6 +461,9 @@ while True:
             tag+'reward_attack': log_attack_reward(),
             tag+'reward_scout': log_scout_reward(),
             tag+'reward_defense': log_defense_reward(),
+            tag+'perc_attack': log_attack_perc(),
+            tag+'perc_scout': log_scout_perc(),
+            tag+'perc_defense': log_defense_perc(),
         }, writer, global_episodes)
 
     if save_on:

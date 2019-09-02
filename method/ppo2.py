@@ -60,6 +60,7 @@ class PPO:
 
                 # Build Trainer
                 optimizer = tf.keras.optimizers.Adam(lr)
+                self.optimizer = optimizer
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
                 self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
@@ -90,8 +91,8 @@ class PPO:
         self.sess.run(self.update_ops, feed_dict)
 
         if log:
-            ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
-            aloss, closs, entropy = self.sess.run(ops, feed_dict)
+            ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy,self.optimizer.lr]
+            aloss, closs, entropy, lr = self.sess.run(ops, feed_dict)
 
             log_ops = [self.cnn_summary]
                        #self.merged_grad_summary_op,
@@ -100,6 +101,7 @@ class PPO:
             for summary in summaries:
                 writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
+            summary.value.add(tag='summary/learning_rate', simple_value=lr)
             summary.value.add(tag='summary/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/critic_loss', simple_value=closs)
             summary.value.add(tag='summary/entropy', simple_value=entropy)
@@ -109,16 +111,16 @@ class PPO:
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
-                total_counter += np.prod(grad.shape) 
+                total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
-            
+
             writer.add_summary(summary,global_episodes)
 
             writer.flush()
 
     def _build_kernel_summary(self, snapshot):
-        image_summary = [] 
+        image_summary = []
         def add_image(net, name, Y=-1, X=8):
             grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
@@ -134,7 +136,7 @@ class PPO:
 
         # Collect Summary
         cnn_summary = tf.summary.merge(image_summary)
-        
+
         # Visualization
         #self.feature_static = snapshot['sepCNN1']
         #self.feature_dynamic = snapshot['attention']
@@ -169,5 +171,3 @@ class PPO:
     @property
     def get_vars(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
-        
-
