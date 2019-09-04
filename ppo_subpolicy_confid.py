@@ -39,6 +39,10 @@ PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
 
+USE_THRESH = True
+USE_FS = False
+USE_CONFID = False
+
 num_mode = 3
 
 ## Training Directory Reset
@@ -295,7 +299,7 @@ def get_action(states, initial=False):
         network.initiate_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=False, fixed_step=False, use_threshhold=True)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=USE_CONFID, fixed_step=USE_FS, use_threshhold=USE_THRESH)
 
     actions = np.reshape(action, [NENV, num_blue])
 

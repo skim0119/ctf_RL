@@ -40,8 +40,8 @@ PROGBAR = True
 TRAIN_SUBP = False
 CONTINUE = False
 USE_THRESH = False
-USE_FS = True
-USE_CONFID = False
+USE_FS = False
+USE_CONFID = True
 
 num_mode = 3
 
@@ -54,11 +54,11 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()
 
-MODEL_LOAD_PATH = './model/09_01_19_META_FS_LR1E4'
+MODEL_LOAD_PATH = './model/09_01_19_META_CONFID_LR1E4'
 #09_01_18_META_THRESH_LR1E4
 # 09_01_19_META_CONFID_LR1E4
 # 09_01_19_META_FS_LR1E4
-SWITCH_EP = 10000
+SWITCH_EP = 40
 env_setting_path = 'setting_full.ini'
 
 ## Data Path
@@ -96,7 +96,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-batch_memory_size = 4000
+batch_memory_size = 3500
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -332,6 +332,17 @@ while True:
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
 
+    # Bootstrap
+    if global_episodes > SWITCH_EP:
+        env_setting_path = target_setting_path
+    s1 = envs.reset(
+            config_path=env_setting_path,
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=use_this_policy()
+        )
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
+
     # initialize parameters
     episode_rew = np.zeros(NENV)
     case_rew = [np.zeros(NENV) for _ in range(3)]
@@ -342,14 +353,7 @@ while True:
 
     trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
 
-    # Bootstrap
-    if global_episodes > SWITCH_EP:
-        env_setting_path = target_setting_path
-    s1 = envs.reset(
-            config_path=env_setting_path,
-            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
-            policy_red=use_this_policy()
-        )
+
     a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
     # Rollout
     cumul_reward = np.zeros(NENV)
