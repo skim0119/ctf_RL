@@ -2,6 +2,7 @@ import pickle
 
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+import sys
 
 import shutil
 import configparser
@@ -33,22 +34,25 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
+assert len(sys.argv) == 4
+
 PROGBAR = False
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline_Rrecord'
+TRAIN_NAME = sys.argv[2]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = 8# multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_full.ini'
+#env_setting_path = 'setting_full.ini'
+env_setting_path = sys.argv[1]
 
 ## Data Path
 path_create(LOG_PATH)
@@ -85,7 +89,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 5000
+minimum_batch_size = sys.argv[3]
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
