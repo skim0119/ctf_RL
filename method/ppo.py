@@ -401,7 +401,7 @@ class PPO_multimodes(a3c):
                 if self.threshhold[i] < prob: # compare inverse entropy
                     self.playing_mode[i] = bandit_action[i]
 
-                self.threshhold[i] = 0.95*self.threshhold[i] + 0.05*prob
+                self.threshhold[i] = 0.99*self.threshhold[i] + 0.01*prob
 
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 

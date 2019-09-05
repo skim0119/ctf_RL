@@ -37,7 +37,7 @@ assert len(sys.argv) == 2
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
-CONTINUE = False
+CONTINUE = True
 
 USE_THRESH = True
 USE_FS = False
@@ -111,6 +111,7 @@ log_defense_reward = MovingAverage(moving_average_step)
 log_attack_perc = MovingAverage(moving_average_step)
 log_scout_perc = MovingAverage(moving_average_step)
 log_defense_perc = MovingAverage(moving_average_step)
+log_switch_perc = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -444,7 +445,7 @@ while True:
     log_scout_reward.extend(case_rew[1].tolist())
     log_defense_reward.extend(case_rew[2].tolist())
 
-    attack=[];scout=[];defense=[]
+    attack=[];scout=[];defense=[];switch=[]
     for i in a1:
         if i == 0:
             attack.append(1);scout.append(0);defense.append(0)
@@ -455,6 +456,12 @@ while True:
         log_attack_perc.extend(attack)
         log_scout_perc.extend(scout)
         log_defense_perc.extend(defense)
+    for i in range(length(a1))
+        if a1[i] == a0[i]:
+            switch.append(1)
+        else:
+            switch.append(0)
+        log_switch_perc.extend()
 
     if log_on:
         tag = 'adapt_train_log/'
@@ -468,6 +475,7 @@ while True:
             tag+'perc_attack': log_attack_perc(),
             tag+'perc_scout': log_scout_perc(),
             tag+'perc_defense': log_defense_perc(),
+            tag+'perc_switch': log_switch_perc(),
         }, writer, global_episodes)
 
     if save_on:

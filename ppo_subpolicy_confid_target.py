@@ -32,16 +32,30 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 3
+assert len(sys.argv) == 5
 target_setting_path = sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
-TRAIN_SUBP = False
 CONTINUE = False
+
+if int(sys.argv[4]) == 1:
+    TRAIN_SUBP = True
+else:
+    TRAIN_SUBP = False
+
 USE_THRESH = False
+USE_CONFID = False
 USE_FS = False
-USE_CONFID = True
+if int(sys.argv[3]) == 1:
+    USE_THRESH = True
+    MODEL_LOAD_PATH = './model/09_01_18_META_THRESH_LR1E4'
+if int(sys.argv[3]) == 2:
+    USE_CONFID = True
+    MODEL_LOAD_PATH = './model/09_01_19_META_CONFID_LR1E4'
+if int(sys.argv[3]) == 3:
+    USE_FS = True
+    MODEL_LOAD_PATH = './model/09_01_19_META_FS_LR1E4'
 
 num_mode = 3
 
@@ -54,11 +68,11 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = multiprocessing.cpu_count()
 
-MODEL_LOAD_PATH = './model/09_01_19_META_CONFID_LR1E4'
+
 #09_01_18_META_THRESH_LR1E4
 # 09_01_19_META_CONFID_LR1E4
 # 09_01_19_META_FS_LR1E4
-SWITCH_EP = 40
+SWITCH_EP = 10000
 env_setting_path = 'setting_full.ini'
 
 ## Data Path
