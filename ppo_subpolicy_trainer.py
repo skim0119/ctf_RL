@@ -45,18 +45,18 @@ setting_paths = ['setting_ppo_attacker.ini', 'setting_ppo_scout.ini', 'setting_p
 red_policies = [policy.Roomba, policy.Roomba, policy.AStar]
 
 OVERRIDE = False
-PROGBAR = True
+PROGBAR = False
 LOG_DEVICE = False
-RBETA = 1.0
+RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline_100'
+TRAIN_NAME = 'fix_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-NENV = multiprocessing.cpu_count() // 2
+NENV = 8#multiprocessing.cpu_count() // 2
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)
@@ -83,7 +83,7 @@ lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
 moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -95,7 +95,7 @@ map_size = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 8000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1

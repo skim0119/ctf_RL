@@ -41,8 +41,9 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 3
+assert len(sys.argv) == 4
 target_setting_path = sys.argv[1]
+device_t = sys.argv[3]
 
 PROGBAR = False
 LOGDEVICE = False
@@ -59,9 +60,9 @@ GPU_CAPACITY = 0.95
 
 NENV = multiprocessing.cpu_count()
 
-MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
-SWITCH_EP = 10000
+SWITCH_EP = 0
 
 ## Data Path
 path_create(LOG_PATH)
@@ -98,7 +99,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 3000
+minbatch_size = 4000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -152,7 +153,7 @@ config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE,
 sess = tf.Session(config=config)
 
 global_episodes = 0
-with tf.device('/gpu:1'):
+with tf.device(device_t):
     global_step = tf.Variable(0, trainable=False, name='global_step')
     global_step_next = tf.assign_add(global_step, NENV)
     network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
