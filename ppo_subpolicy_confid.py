@@ -32,16 +32,30 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 4
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = True
 
-USE_THRESH = True
-USE_FS = False
+PARAM1 = 0.05
+PARAM2 = 0.10
+
+if int(sys.argv[3]) == 1:
+    TRAIN_SUBP = True
+else:
+    TRAIN_SUBP = False
+
+USE_THRESH = False
 USE_CONFID = False
+USE_FS = False
+if int(sys.argv[2]) == 1:
+    USE_THRESH = True
+if int(sys.argv[2]) == 2:
+    USE_CONFID = True
+if int(sys.argv[2]) == 3:
+    USE_FS = True
 
 num_mode = 3
 
@@ -80,7 +94,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')/10
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -92,7 +106,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-batch_memory_size = 5000
+batch_memory_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -300,7 +314,8 @@ def get_action(states, initial=False):
         network.initiate_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=USE_CONFID, fixed_step=USE_FS, use_threshhold=USE_THRESH)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob,
+        use_confid=USE_CONFID, fixed_step=USE_FS, use_threshhold=USE_THRESH,confidence_parameter1=PARAM1,confidence_parameter2=PARAM2)
 
     actions = np.reshape(action, [NENV, num_blue])
 
@@ -456,12 +471,12 @@ while True:
         log_attack_perc.extend(attack)
         log_scout_perc.extend(scout)
         log_defense_perc.extend(defense)
-    for i in range(length(a1))
+    for i in range(len(a1)):
         if a1[i] == a0[i]:
-            switch.append(1)
-        else:
             switch.append(0)
-        log_switch_perc.extend()
+        else:
+            switch.append(1)
+        log_switch_perc.extend(switch)
 
     if log_on:
         tag = 'adapt_train_log/'

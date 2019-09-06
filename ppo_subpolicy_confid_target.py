@@ -129,6 +129,8 @@ log_defense_reward = MovingAverage(moving_average_step)
 log_attack_perc = MovingAverage(moving_average_step)
 log_scout_perc = MovingAverage(moving_average_step)
 log_defense_perc = MovingAverage(moving_average_step)
+log_switch_perc = MovingAverage(moving_average_step)
+
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -462,6 +464,12 @@ while True:
         log_attack_perc.extend(attack)
         log_scout_perc.extend(scout)
         log_defense_perc.extend(defense)
+    for i in range(length(a1))
+        if a1[i] == a0[i]:
+            switch.append(0)
+        else:
+            switch.append(1)
+        log_switch_perc.extend()
 
     if log_on:
         tag = 'adapt_train_log/'

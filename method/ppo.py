@@ -334,6 +334,8 @@ class PPO_multimodes(a3c):
             self.merged_grad_summary_op = tf.summary.merge(grad_summary)
             self.merged_summary_op = self._build_summary(self.a_vars + self.c_vars)
             '''
+        self.threshold = 1.0 # Have threshhold increase while training. Make it the average maximum?
+
 
     def run_network(self, states, idx=None):
         feed_dict = {self.state_input: states}
@@ -354,16 +356,19 @@ class PPO_multimodes(a3c):
     def initiate_confid(self, n, fixed_length=None):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
-        self.threshhold = np.zeros(n) # Have threshhold increase while training. Make it the average maximum?
-        self.fixed_length = 5
+        self.fixed_length = 4
         self.fixed_length_counter = 0
 
-    def run_network_with_bandit(self, states, bandit_prob, use_confid=False, fixed_step=False, use_threshhold=False):
+    def run_network_with_bandit(self, states, bandit_prob, prev_action=None, use_confid=False, fixed_step=False,
+        use_threshhold=False, confidence_parameter1=0.05, confidence_parameter2=0.10,confidence_parameter3 = 0.01):
         feed_dict = {self.state_input: states}
         ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
         res = self.sess.run(ops, feed_dict)
         a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
         critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
+
+        if prev_action is not None:
+            return actions, critics, logits, prev_action
 
         try:
             bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
@@ -382,7 +387,7 @@ class PPO_multimodes(a3c):
                     self.entering_confids[i] = confid
                     self.playing_mode[i] = bandit_action[i]
                 else:
-                    self.entering_confids[i] = 0.95*old_confid + 0.05*confid
+                    self.entering_confids[i] = np.max(old_confid + confidence_parameter1, confidence_parameter2)
 
             bandit_action = self.playing_mode
 
@@ -394,14 +399,14 @@ class PPO_multimodes(a3c):
                 bandit_action = self.playing_mode
                 self.fixed_length_counter -= 1
 
-
         if use_threshhold:
+            confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
             for i in range(len(self.entering_confids)):
-                prob = bandit_prob[i][bandit_action[i]]
-                if self.threshhold[i] < prob: # compare inverse entropy
+                confid = confids[i]
+                if  confid < self.threshold-confidence_parameter3: # compare inverse entropy
                     self.playing_mode[i] = bandit_action[i]
 
-                self.threshhold[i] = 0.99*self.threshhold[i] + 0.01*prob
+                self.threshold = np.maximum((1-confidence_parameter1)*self.threshold + confidence_parameter1*confid,confidence_parameter2)
 
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
@@ -426,9 +431,10 @@ class PPO_multimodes(a3c):
             for summary in summaries:
                 writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
-            summary.value.add(tag='summary/actor_loss', simple_value=aloss)
-            summary.value.add(tag='summary/critic_loss', simple_value=closs)
-            summary.value.add(tag='summary/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/sub/actor_loss', simple_value=aloss)
+            summary.value.add(tag='summary/sub/critic_loss', simple_value=closs)
+            summary.value.add(tag='summary/sub/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/sub/threshold', simple_value=self.threshold)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients[idx], feed_dict)
@@ -437,7 +443,7 @@ class PPO_multimodes(a3c):
             for grad in grads:
                 total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
-            summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
+            summary.value.add(tag='summary/sub/grad_vanish_rate', simple_value=vanish_counter/total_counter)
 
             writer.add_summary(summary,global_episodes)
             writer.flush()
@@ -463,6 +469,7 @@ class PPO_multimodes(a3c):
             summary.value.add(tag='summary/bandit_actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/bandit_critic_loss', simple_value=closs)
             summary.value.add(tag='summary/bandit_entropy', simple_value=entropy)
+            summary.value.add(tag='summary/threshold', simple_value=self.threshold)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients[idx], feed_dict)
