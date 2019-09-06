@@ -34,7 +34,8 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-assert len(sys.argv) == 4
+assert len(sys.argv) == 5
+device_t = sys.argv[4]
 
 PROGBAR = False
 LOG_DEVICE = False
@@ -48,11 +49,11 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8# multiprocessing.cpu_count() // 2
+NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 #env_setting_path = 'setting_full.ini'
-env_setting_path = sys.argv[1]
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -60,8 +61,9 @@ path_create(MODEL_PATH)
 path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
+config_path = sys.argv[1]
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(config_path)
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
@@ -77,7 +79,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ') * 4
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -89,7 +91,8 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = sys.argv[3]
+minimum_batch_size = int(sys.argv[3])
+print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -148,16 +151,17 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
 
 sess = tf.Session(config=config)
 
-global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, NENV)
-network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+with tf.device(device_t):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
