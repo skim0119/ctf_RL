@@ -387,7 +387,7 @@ class PPO_multimodes(a3c):
                     self.entering_confids[i] = confid
                     self.playing_mode[i] = bandit_action[i]
                 else:
-                    self.entering_confids[i] = np.max(old_confid + confidence_parameter1, confidence_parameter2)
+                    self.entering_confids[i] = np.maximum(old_confid + confidence_parameter1, confidence_parameter2)
 
             bandit_action = self.playing_mode
 
