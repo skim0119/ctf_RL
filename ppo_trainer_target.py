@@ -50,7 +50,7 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
 MODEL_LOAD_PATH = './model/ppo_baseline_Rrecord2' # initialize values
-SWITCH_EP = 10000
+SWITCH_EP = 0
 
 NENV = 8#multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
