@@ -47,6 +47,7 @@ device_t = sys.argv[3]
 
 PROGBAR = False
 LOGDEVICE = False
+RBETA = 0.8
 
 num_mode = 3
 
@@ -110,6 +111,11 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MA(moving_average_step)
 log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
+log_redwinrate = MovingAverage(moving_average_step)
+
+log_attack_reward = MovingAverage(moving_average_step)
+log_scout_reward = MovingAverage(moving_average_step)
+log_defense_reward = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -272,6 +278,7 @@ while True:
 
     # initialize parameters 
     episode_rew = np.zeros(NENV)
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -298,6 +305,10 @@ while True:
             done[:] = True
 
         reward = reward_shape(was_alive_red, is_alive_red, done)
+        for i in range(NENV): 
+            if not was_done[i]:
+                for j in range(3):
+                    case_rew[j][i] += reward[i,j]
         episode_rew += env_reward
     
         a1, v1, logits1, actions = get_action(s1)
@@ -309,7 +320,8 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[idx]+env_reward[env_idx], v0[idx], logits[idx]])
+                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx] 
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -355,6 +367,11 @@ while True:
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
+    log_redwinrate.extend(envs.red_win())
+
+    log_attack_reward.extend(case_rew[0].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
 
     if log_on:
         step = sess.run(global_step)
@@ -362,7 +379,11 @@ while True:
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
-            tag+'reward': log_episodic_reward(),
+            tag+'redwin-rate': log_redwinrate(),
+            tag+'env_reward': log_episodic_reward(),
+            tag+'reward_attack': log_attack_reward(),
+            tag+'reward_scout': log_scout_reward(),
+            tag+'reward_defense': log_defense_reward(),
         }, writer, step)
         
     if save_on:
