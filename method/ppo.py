@@ -367,8 +367,8 @@ class PPO_multimodes(a3c):
         a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
         critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
 
-        if prev_action is not None:
-            return actions, critics, logits, prev_action
+        # if prev_action is not None:
+        #     return actions, critics, logits, prev_action
 
         try:
             bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
@@ -385,6 +385,7 @@ class PPO_multimodes(a3c):
                 old_confid = self.entering_confids[i]
                 if confid < old_confid: # compare inverse entropy
                     self.entering_confids[i] = confid
+                    # print(self.playing_mode[i] , bandit_action[i])
                     self.playing_mode[i] = bandit_action[i]
                 else:
                     self.entering_confids[i] = np.maximum(old_confid + confidence_parameter1, confidence_parameter2)
@@ -407,6 +408,7 @@ class PPO_multimodes(a3c):
                     self.playing_mode[i] = bandit_action[i]
 
                 self.threshold = np.maximum((1-confidence_parameter1)*self.threshold + confidence_parameter1*confid,confidence_parameter2)
+            bandit_action = self.playing_mode
 
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 

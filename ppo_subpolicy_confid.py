@@ -38,7 +38,7 @@ LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = True
-GPU = '/device:GPU:1'
+GPU = '/device:GPU:0'
 
 PARAM1 = float(sys.argv[4])
 PARAM2 = 0.10
@@ -96,7 +96,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')/10
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -124,10 +124,10 @@ log_attack_reward = MovingAverage(moving_average_step)
 log_scout_reward = MovingAverage(moving_average_step)
 log_defense_reward = MovingAverage(moving_average_step)
 
-log_attack_perc = MovingAverage(moving_average_step)
-log_scout_perc = MovingAverage(moving_average_step)
-log_defense_perc = MovingAverage(moving_average_step)
-log_switch_perc = MovingAverage(moving_average_step)
+log_attack_perc = MovingAverage(moving_average_step*20)
+log_scout_perc = MovingAverage(moving_average_step*20)
+log_defense_perc = MovingAverage(moving_average_step*20)
+log_switch_perc = MovingAverage(moving_average_step*20)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -385,7 +385,7 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = a1[:], v1[:]
+        a0, v0 = list(a1), v1
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
@@ -437,6 +437,24 @@ while True:
         was_alive_red = is_alive_red
         was_done = done
 
+        attack=[];scout=[];defense=[];switch=[]
+        for i in a1:
+            if i == 0:
+                attack.append(1);scout.append(0);defense.append(0)
+            elif i == 1:
+                attack.append(0);scout.append(1);defense.append(0)
+            elif i==2:
+                attack.append(0);scout.append(0);defense.append(1)
+            log_attack_perc.extend(attack)
+            log_scout_perc.extend(scout)
+            log_defense_perc.extend(defense)
+        for i in range(len(a1)):
+            if a1[i] == a0[i]:
+                switch.append(0)
+            else:
+                switch.append(1)
+            log_switch_perc.extend(switch)
+
         if np.all(done):
             break
 
@@ -463,23 +481,7 @@ while True:
     log_scout_reward.extend(case_rew[1].tolist())
     log_defense_reward.extend(case_rew[2].tolist())
 
-    attack=[];scout=[];defense=[];switch=[]
-    for i in a1:
-        if i == 0:
-            attack.append(1);scout.append(0);defense.append(0)
-        elif i == 1:
-            attack.append(0);scout.append(1);defense.append(0)
-        elif i==2:
-            attack.append(0);scout.append(0);defense.append(1)
-        log_attack_perc.extend(attack)
-        log_scout_perc.extend(scout)
-        log_defense_perc.extend(defense)
-    for i in range(len(a1)):
-        if a1[i] == a0[i]:
-            switch.append(0)
-        else:
-            switch.append(1)
-        log_switch_perc.extend(switch)
+
 
     if log_on:
         tag = 'adapt_train_log/'
