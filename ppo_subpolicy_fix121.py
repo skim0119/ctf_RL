@@ -213,11 +213,12 @@ def reward_shape(prev_red_alive, red_alive, done):
         num_prev_enemy = sum(prev_red_alive[i])
         num_enemy = sum(red_alive[i])
         r.append((num_prev_enemy - num_enemy)*0.25)
-        r.append((num_prev_enemy - num_enemy)*0.25)
         # Scout
         if red_flags[i]:
             r.append(1)
+            r.append(1)
         else:
+            r.append(0)
             r.append(0)
         # Defense
         if blue_flags[i]:
@@ -233,9 +234,9 @@ def get_action(states):
     a1, v1, logits1 = [], [], []
     res = network.run_network_all(states)
     a, v, logits = res[:3]
-    a1.extend(a[:2]); v1.extend(v[:2]); logits1.extend(logits[:2])
+    a1.extend(a[:1]); v1.extend(v[:1]); logits1.extend(logits[:1])
     a, v, logits = res[3:6]
-    a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
+    a1.extend(a[1:3]); v1.extend(v[1:3]); logits1.extend(logits[1:3])
     a, v, logits = res[6:]
     a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
 
@@ -319,11 +320,11 @@ while True:
     
     for i in range(NENV):
         batch_att.append(trajs[4*i+0])
-        batch_att.append(trajs[4*i+1])
+        batch_sct.append(trajs[4*i+1])
         batch_sct.append(trajs[4*i+2])
         batch_def.append(trajs[4*i+3])
-        num_batch_att += len(trajs[4*i+0]) + len(trajs[4*i+1])
-        num_batch_sct += len(trajs[4*i+2])
+        num_batch_att += len(trajs[4*i+0])
+        num_batch_sct += len(trajs[4*i+1]) + len(trajs[4*i+2])
         num_batch_def += len(trajs[4*i+3])
 
     if num_batch_att >= minbatch_size:
