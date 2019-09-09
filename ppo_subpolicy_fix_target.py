@@ -237,6 +237,35 @@ def reward_shape(prev_red_alive, red_alive, done):
             r.append(0)
     return np.array(r)
 
+def ghost_reward(prev_red_alive, red_alive, done):
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
+    reward = []
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
+    for i in range(NENV):
+        possible_reward = []
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+        # Defense
+        if blue_flags[i]:
+            possible_reward.append(-1)
+        elif done[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+
+        reward.append(possible_reward)
+
+    return np.array(reward)
+
 print('Training Initiated:')
 def get_action(states):
     a1, v1, logits1 = [], [], []
@@ -278,7 +307,7 @@ while True:
 
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    case_rew = [np.zeros(NENV) for _ in range(4)]
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -305,10 +334,11 @@ while True:
             done[:] = True
 
         reward = reward_shape(was_alive_red, is_alive_red, done)
+        ghost_reward = reward_shape(was_alive_red, is_alive_red, done)
         for i in range(NENV): 
             if not was_done[i]:
                 for j in range(3):
-                    case_rew[j][i] += reward[i,j]
+                    case_rew[j][i] += ghost_reward[i,j]
         episode_rew += env_reward
     
         a1, v1, logits1, actions = get_action(s1)
@@ -370,8 +400,8 @@ while True:
     log_redwinrate.extend(envs.red_win())
 
     log_attack_reward.extend(case_rew[0].tolist())
-    log_scout_reward.extend(case_rew[2].tolist())
-    log_defense_reward.extend(case_rew[3].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
 
     if log_on:
         step = sess.run(global_step)
