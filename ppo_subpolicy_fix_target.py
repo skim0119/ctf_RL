@@ -111,11 +111,11 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MA(moving_average_step)
 log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
-log_redwinrate = MovingAverage(moving_average_step)
+log_redwinrate = MA(moving_average_step)
 
-log_attack_reward = MovingAverage(moving_average_step)
-log_scout_reward = MovingAverage(moving_average_step)
-log_defense_reward = MovingAverage(moving_average_step)
+log_attack_reward = MA(moving_average_step)
+log_scout_reward = MA(moving_average_step)
+log_defense_reward = MA(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
