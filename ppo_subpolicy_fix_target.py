@@ -334,11 +334,11 @@ while True:
             done[:] = True
 
         reward = reward_shape(was_alive_red, is_alive_red, done)
-        ghost_reward = reward_shape(was_alive_red, is_alive_red, done)
+        ghost_rew= ghost_reward(was_alive_red, is_alive_red, done)
         for i in range(NENV): 
             if not was_done[i]:
                 for j in range(3):
-                    case_rew[j][i] += ghost_reward[i,j]
+                    case_rew[j][i] += ghost_rew[i,j]
         episode_rew += env_reward
     
         a1, v1, logits1, actions = get_action(s1)
