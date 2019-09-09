@@ -38,7 +38,7 @@ LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = '/device:GPU:0'
+GPU = '/device:GPU:1'
 
 PARAM1 = float(sys.argv[4])
 PARAM2 = 0.10
