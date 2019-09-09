@@ -32,12 +32,19 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 5
+assert len(sys.argv) == 9
 target_setting_path = sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
 CONTINUE = False
+
+PARAM1 = float(sys.argv[5])
+PARAM2 = float(sys.argv[6])
+PARAM3 = float(sys.argv[7])
+
+GPU = float(sys.argv[8]) # '/device:GPU:0'
+
 
 if int(sys.argv[4]) == 1:
     TRAIN_SUBP = True
@@ -52,7 +59,7 @@ if int(sys.argv[3]) == 1:
     MODEL_LOAD_PATH = './model/09_01_18_META_THRESH_LR1E4'
 if int(sys.argv[3]) == 2:
     USE_CONFID = True
-    MODEL_LOAD_PATH = './model/09_01_19_META_CONFID_LR1E4'
+    MODEL_LOAD_PATH = './model/09_06_CONFID_SUB_P1_01_P2_10'
 if int(sys.argv[3]) == 3:
     USE_FS = True
     MODEL_LOAD_PATH = './model/09_01_19_META_FS_LR1E4'
@@ -110,7 +117,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-batch_memory_size = 3500
+batch_memory_size = 2048
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1

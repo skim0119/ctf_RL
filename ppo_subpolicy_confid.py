@@ -37,7 +37,7 @@ assert len(sys.argv) == 6
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
-CONTINUE = True
+CONTINUE = False
 GPU = '/device:GPU:0'
 
 PARAM1 = float(sys.argv[4])
@@ -314,7 +314,7 @@ def reward_shape(prev_red_alive, red_alive, done):
 print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
-        network.initiate_confid(NENV*num_blue)
+        network.initiate_confid(NENV*num_blue,fixed_length=PARAM1)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
     action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob,

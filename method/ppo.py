@@ -353,10 +353,10 @@ class PPO_multimodes(a3c):
         actions3 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs3])
         return actions1, critics1, logits1, actions2, critics2, logits2, actions3, critics3, logits3
 
-    def initiate_confid(self, n, fixed_length=None):
+    def initiate_confid(self, n, fixed_length=1):
         self.entering_confids = np.ones(n)
         self.playing_mode = np.zeros(n, dtype=int)
-        self.fixed_length = 4
+        self.fixed_length = int(fixed_length)
         self.fixed_length_counter = 0
 
     def run_network_with_bandit(self, states, bandit_prob, prev_action=None, use_confid=False, fixed_step=False,
