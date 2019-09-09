@@ -41,9 +41,14 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 6
 
-PROGBAR = True
+device_t = sys.argv[2]
+N_ATT = int(sys.argv[3])
+N_SCT = int(sys.argv[4])
+N_DEF = int(sys.argv[5])
+
+PROGBAR = False
 LOGDEVICE = False
 RBETA = 0.8
 
@@ -146,14 +151,15 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
 global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
+with tf.device(device_t):
+    network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 
 # Resotre / Initialize
@@ -212,33 +218,36 @@ def reward_shape(prev_red_alive, red_alive, done):
         # Attack (C/max enemy)
         num_prev_enemy = sum(prev_red_alive[i])
         num_enemy = sum(red_alive[i])
-        r.append((num_prev_enemy - num_enemy)*0.25)
+        for _ in range(N_ATT):
+            r.append((num_prev_enemy - num_enemy)*0.25)
         # Scout
-        if red_flags[i]:
-            r.append(1)
-            r.append(1)
-        else:
-            r.append(0)
-            r.append(0)
+        for _ in range(N_SCT):
+            if red_flags[i]:
+                r.append(1)
+            else:
+                r.append(0)
         # Defense
-        if blue_flags[i]:
-            r.append(-1)
-        elif done[i]:
-            r.append(1)
-        else:
-            r.append(0)
+        for _ in range(N_DEF):
+            if blue_flags[i]:
+                r.append(-1)
+            elif done[i]:
+                r.append(1)
+            else:
+                r.append(0)
     return np.array(r)
 
 print('Training Initiated:')
 def get_action(states):
+    cnt1 = N_ATT
+    cnt2 = cnt1 + N_SCT
     a1, v1, logits1 = [], [], []
     res = network.run_network_all(states)
     a, v, logits = res[:3]
-    a1.extend(a[:1]); v1.extend(v[:1]); logits1.extend(logits[:1])
+    a1.extend(a[:cnt1]); v1.extend(v[:cnt1]); logits1.extend(logits[:cnt1])
     a, v, logits = res[3:6]
-    a1.extend(a[1:3]); v1.extend(v[1:3]); logits1.extend(logits[1:3])
+    a1.extend(a[cnt1:cnt2]); v1.extend(v[cnt1:cnt2]); logits1.extend(logits[cnt1:cnt2])
     a, v, logits = res[6:]
-    a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
+    a1.extend(a[cnt2:]); v1.extend(v[cnt2:]); logits1.extend(logits[cnt2:])
 
     actions = np.reshape(a1, [NENV, num_blue])
     return np.array(a1), np.array(v1), np.array(logits1), actions
@@ -319,13 +328,19 @@ while True:
         progbar.update(global_episodes)
     
     for i in range(NENV):
-        batch_att.append(trajs[4*i+0])
-        batch_sct.append(trajs[4*i+1])
-        batch_sct.append(trajs[4*i+2])
-        batch_def.append(trajs[4*i+3])
-        num_batch_att += len(trajs[4*i+0])
-        num_batch_sct += len(trajs[4*i+1]) + len(trajs[4*i+2])
-        num_batch_def += len(trajs[4*i+3])
+        j = 0
+        for _ in range(N_ATT):
+            batch_att.append(trajs[4*i+j])
+            num_batch_att += len(trajs[4*i+j])
+            j += 1
+        for _ in range(N_SCT): 
+            batch_sct.append(trajs[4*i+j])
+            num_batch_sct += len(trajs[4*i+j])
+            j += 1
+        for _ in range(N_DEF): 
+            batch_def.append(trajs[4*i+3])
+            num_batch_def += len(trajs[4*i+3])
+            j += 1
 
     if num_batch_att >= minbatch_size:
         stime = time.time()
