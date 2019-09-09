@@ -56,7 +56,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-NENV = 8#multiprocessing.cpu_count() // 2
+NENV = 8 #multiprocessing.cpu_count() // 2
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)

@@ -61,7 +61,7 @@ GPU_CAPACITY = 0.95
 
 NENV =8# multiprocessing.cpu_count()
 
-MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
 SWITCH_EP = 0
 

@@ -57,7 +57,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() 
+NENV = 8 # multiprocessing.cpu_count() 
 
 MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
@@ -97,7 +97,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 100
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -351,7 +351,7 @@ while True:
 
     if log_on:
         step = sess.run(global_step)
-        tag = 'adapt_train_log/'
+        tag = 'fix_baseline/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
