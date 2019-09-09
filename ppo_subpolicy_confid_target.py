@@ -33,7 +33,7 @@ from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
 assert len(sys.argv) == 9
-target_setting_path = sys.argv[1]
+target_setting_path = "env_settings/"+sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
@@ -43,7 +43,7 @@ PARAM1 = float(sys.argv[5])
 PARAM2 = float(sys.argv[6])
 PARAM3 = float(sys.argv[7])
 
-GPU = float(sys.argv[8]) # '/device:GPU:0'
+GPU = sys.argv[8] # '/device:GPU:0'
 
 
 if int(sys.argv[4]) == 1:
@@ -79,7 +79,7 @@ NENV = multiprocessing.cpu_count()
 #09_01_18_META_THRESH_LR1E4
 # 09_01_19_META_CONFID_LR1E4
 # 09_01_19_META_FS_LR1E4
-SWITCH_EP = 10000
+SWITCH_EP = 0
 env_setting_path = 'setting_full.ini'
 
 ## Data Path
@@ -116,7 +116,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
-epoch = 2
+epoch = 1
 batch_memory_size = 2048
 
 ## Setup
@@ -176,15 +176,17 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
 global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta')
+
+with tf.device(GPU):
+    network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
+    meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-4)
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
@@ -382,7 +384,7 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = a1, v1
+        a0, v0 = list(a1), list(v1)
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
@@ -434,6 +436,24 @@ while True:
         was_alive_red = is_alive_red
         was_done = done
 
+        attack=[];scout=[];defense=[];switch=[]
+        for i in a1:
+            if i == 0:
+                attack.append(1);scout.append(0);defense.append(0)
+            elif i == 1:
+                attack.append(0);scout.append(1);defense.append(0)
+            elif i==2:
+                attack.append(0);scout.append(0);defense.append(1)
+            log_attack_perc.extend(attack)
+            log_scout_perc.extend(scout)
+            log_defense_perc.extend(defense)
+        for i in range(len(a1)):
+            if a1[i] == a0[i]:
+                switch.append(0)
+            else:
+                switch.append(1)
+            log_switch_perc.extend(switch)
+
         if np.all(done):
             break
 
@@ -460,23 +480,6 @@ while True:
     log_scout_reward.extend(case_rew[1].tolist())
     log_defense_reward.extend(case_rew[2].tolist())
 
-    attack=[];scout=[];defense=[]
-    for i in a1:
-        if i == 0:
-            attack.append(1);scout.append(0);defense.append(0)
-        elif i == 1:
-            attack.append(0);scout.append(1);defense.append(0)
-        elif i==2:
-            attack.append(0);scout.append(0);defense.append(1)
-        log_attack_perc.extend(attack)
-        log_scout_perc.extend(scout)
-        log_defense_perc.extend(defense)
-    for i in range(length(a1))
-        if a1[i] == a0[i]:
-            switch.append(0)
-        else:
-            switch.append(1)
-        log_switch_perc.extend()
 
     if log_on:
         tag = 'adapt_train_log/'
@@ -490,6 +493,7 @@ while True:
             tag+'perc_attack': log_attack_perc(),
             tag+'perc_scout': log_scout_perc(),
             tag+'perc_defense': log_defense_perc(),
+            tag+'perc_switch': log_switch_perc(),
         }, writer, global_episodes)
 
     if save_on:
