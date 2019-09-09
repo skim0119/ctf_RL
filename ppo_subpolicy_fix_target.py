@@ -278,7 +278,7 @@ while True:
 
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    case_rew = [np.zeros(NENV) for _ in range(3)]
+    case_rew = [np.zeros(NENV) for _ in range(4)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -370,8 +370,8 @@ while True:
     log_redwinrate.extend(envs.red_win())
 
     log_attack_reward.extend(case_rew[0].tolist())
-    log_scout_reward.extend(case_rew[1].tolist())
-    log_defense_reward.extend(case_rew[2].tolist())
+    log_scout_reward.extend(case_rew[2].tolist())
+    log_defense_reward.extend(case_rew[3].tolist())
 
     if log_on:
         step = sess.run(global_step)
