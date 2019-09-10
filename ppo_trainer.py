@@ -245,7 +245,8 @@ def reward_shape(prev_red_alive, red_alive, done):
 
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
+#while global_episodes < total_episodes:
+while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
