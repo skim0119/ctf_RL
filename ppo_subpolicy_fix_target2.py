@@ -179,6 +179,8 @@ network.initiate(restoring_saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
+global_episodes = sess.run(global_step)
+
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     traj_buffer = defaultdict(list)
     buffer_size = 0
