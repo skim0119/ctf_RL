@@ -32,13 +32,13 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 6
+assert len(sys.argv) == 7
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = '/device:GPU:0'
+GPU = sys.argv[6]
 
 PARAM1 = float(sys.argv[4])
 PARAM2 = 0.10
@@ -106,8 +106,8 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
-epoch = 2
+minibatch_size = 128
+epoch = 1
 batch_memory_size = 2000
 
 ## Setup
