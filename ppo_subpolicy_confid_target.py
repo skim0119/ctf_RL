@@ -59,10 +59,13 @@ if int(sys.argv[3]) == 1:
     MODEL_LOAD_PATH = './model/09_01_18_META_THRESH_LR1E4'
 if int(sys.argv[3]) == 2:
     USE_CONFID = True
-    MODEL_LOAD_PATH = './model/09_06_CONFID_SUB_P1_01_P2_10'
+    if TRAIN_SUBP:
+        MODEL_LOAD_PATH = './model/09_06_CONFID_SUB_P1_01_P2_10'
+    else:
+        MODEL_LOAD_PATH = './model/09_08_19_CONFID_P1_02_P2_15_NS'
 if int(sys.argv[3]) == 3:
     USE_FS = True
-    MODEL_LOAD_PATH = './model/09_01_19_META_FS_LR1E4'
+    MODEL_LOAD_PATH = './model/09_07_19_FS_P1_3'
 
 num_mode = 3
 
