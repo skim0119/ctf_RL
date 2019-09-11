@@ -3,12 +3,11 @@ python ppo_subpolicy_confid_target.py f2.ini F2_CONFID_P1_02_P2_15_NS 2 0 0.02 0
 python ppo_subpolicy_confid_target.py s2.ini S2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py d2.ini D2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py w2.ini W2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
-
 python ppo_subpolicy_confid_target.py s2_d2.ini S2_D2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py s2_f2.ini S2_F2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
+
 python ppo_subpolicy_confid_target.py w2_d2.ini W2_D2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py w2_f2.ini W2_F2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:CPU:0 &
-
 python ppo_subpolicy_confid_target.py f2.ini F2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py s2.ini S2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py d2.ini D2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:CPU:0 &
@@ -23,12 +22,11 @@ python ppo_subpolicy_confid_target.py f2.ini F2_FS_P1_2_NS 3 0 3 0 0 /device:CPU
 python ppo_subpolicy_confid_target.py s2.ini S2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py d2.ini D2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py w2.ini W2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
-
 python ppo_subpolicy_confid_target.py s2_d2.ini S2_D2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py s2_f2.ini S2_F2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
+
 python ppo_subpolicy_confid_target.py w2_d2.ini W2_D2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py w2_f2.ini W2_F2_FS_P1_3_NS 3 0 3 0 0 /device:CPU:0 &
-
 python ppo_subpolicy_confid_target.py f2.ini F2_FS_P1_2_S 3 1 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py s2.ini S2_FS_P1_3_S 3 1 3 0 0 /device:CPU:0 &
 python ppo_subpolicy_confid_target.py d2.ini D2_FS_P1_3_S 3 1 3 0 0 /device:CPU:0 &
