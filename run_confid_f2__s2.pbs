@@ -1,0 +1,28 @@
+#!/bin/bash
+#PBS -q eng-research
+#PBS -N confid_f2__s2
+#PBS -l walltime=48:00:00
+#PBS -l nodes=1:ppn=40:V100
+#PBS -j oe
+#PBS -M skim449@illinois.edu
+#PBS -o confid_f2.out
+#PBS -e cluster_error.out
+
+module load anaconda/3
+module load vim/8.1
+module load cuda/10.0
+module load git/2.19.0
+
+module list
+
+conda activate /projects/tran-research-group/skim449/conda/ctf
+
+cd $PBS_O_WORKDIR
+which python
+which pip
+pwd
+
+python ppo_subpolicy_confid_target.py f2.ini F2_CONFID1_NSUB_1 2 0 0.01 0.10 0 /device:GPU:0 &
+python ppo_subpolicy_confid_target.py f2.ini F2_CONFID1_NSUB_2 2 0 0.02 0.10 0 /device:GPU:0 &
+python ppo_subpolicy_confid_target.py f2.ini F2_CONFID1_SUB_1 2 1 0.01 0.10 0 /device:GPU:1 &
+python ppo_subpolicy_confid_target.py f2.ini F2_CONFID1_SUB_2 2 1 0.02 0.10 0 /device:GPU:1 
