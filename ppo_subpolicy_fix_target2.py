@@ -64,8 +64,10 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
 NENV = 8 # multiprocessing.cpu_count() 
+SWITCH_EP = 0
 
-MODEL_LOAD_PATH = './model/fix_baseline_team{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
+
+MODEL_LOAD_PATH = './model/fix_baseline_coord_{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
 print(MODEL_LOAD_PATH)
 assert os.path.exists(MODEL_LOAD_PATH)
 ENV_SETTING_PATH = 'setting_full.ini'
