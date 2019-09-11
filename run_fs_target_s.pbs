@@ -2,7 +2,7 @@
 #PBS -q eng-research
 #PBS -N fs_ns
 #PBS -l walltime=48:00:00
-#PBS -l nodes=1:ppn=28
+#PBS -l nodes=1:ppn=40:V100
 #PBS -j oe
 #PBS -M skim449@illinois.edu
 #PBS -o fs_ns.out
