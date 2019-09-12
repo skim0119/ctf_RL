@@ -51,7 +51,7 @@ N_DEF = int(sys.argv[5])
 
 PROGBAR = False
 LOGDEVICE = False
-RBETA = 0.8
+RBETA = 0.5
 
 num_mode = 3
 
@@ -67,7 +67,7 @@ NENV = 8 # multiprocessing.cpu_count()
 SWITCH_EP = 0
 
 
-MODEL_LOAD_PATH = './model/fix_baseline_coord_{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline_team{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
 print(MODEL_LOAD_PATH)
 assert os.path.exists(MODEL_LOAD_PATH)
 ENV_SETTING_PATH = 'setting_full.ini'
@@ -106,8 +106,8 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
-epoch = 2
-minbatch_size = 1024
+epoch = 3
+minbatch_size = 2048
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -299,7 +299,7 @@ while True:
     stime = time.time()
     for step in range(max_ep+1):
         s0 = s1
-        a, v0 = a1, v1
+        a, v0 = a1[:], v1[:]
         logits = logits1
 
         s1, raw_reward, done, info = envs.step(actions)
