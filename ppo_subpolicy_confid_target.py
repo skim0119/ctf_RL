@@ -194,8 +194,8 @@ with tf.device(GPU):
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
 if CONTINUE:
-    global_episodes = sess.run(global_step)
     network.initiate(saver, MODEL_PATH)
+    global_episodes = sess.run(global_step)
 else:
     # Resotre / Initialize
     network.initiate(saver, MODEL_LOAD_PATH)
@@ -392,7 +392,7 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = list(a1), list(v1)
+        a0, v0 = a1[:], v0[:]
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
