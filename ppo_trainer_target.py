@@ -49,7 +49,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-MODEL_LOAD_PATH = './model/ppo_baseline_Rrecord2' # initialize values
+MODEL_LOAD_PATH = './model/ppo_baseline' # initialize values
 SWITCH_EP = 0
 
 NENV = 8#multiprocessing.cpu_count() // 2
