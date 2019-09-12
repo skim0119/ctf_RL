@@ -70,7 +70,7 @@ SWITCH_EP = 0
 MODEL_LOAD_PATH = './model/fix_baseline_team{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
 print(MODEL_LOAD_PATH)
 assert os.path.exists(MODEL_LOAD_PATH)
-ENV_SETTING_PATH = 'setting_full.ini'
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -152,7 +152,7 @@ def use_this_policy():
 ## Environment Initialization
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-	config_path=ENV_SETTING_PATH)
+	config_path=env_setting_path)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
@@ -311,7 +311,7 @@ while True:
     if global_episodes > SWITCH_EP:
         env_setting_path = target_setting_path
     s1 = envs.reset(
-            config_path=ENV_SETTING_PATH,
+            config_path=env_setting_path,
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
