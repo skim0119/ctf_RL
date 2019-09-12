@@ -36,8 +36,8 @@ assert len(sys.argv) == 9
 target_setting_path = "env_settings/"+sys.argv[1]
 
 LOGDEVICE = False
-PROGBAR = True
-CONTINUE = False
+PROGBAR = False
+CONTINUE = True
 
 PARAM1 = float(sys.argv[5])
 PARAM2 = float(sys.argv[6])
@@ -193,8 +193,13 @@ with tf.device(GPU):
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
-# Resotre / Initialize
-network.initiate(saver, MODEL_LOAD_PATH)
+if CONTINUE:
+    global_episodes = sess.run(global_step)
+    network.initiate(saver, MODEL_PATH)
+else:
+    # Resotre / Initialize
+    network.initiate(saver, MODEL_LOAD_PATH)
+
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
