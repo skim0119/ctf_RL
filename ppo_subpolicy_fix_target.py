@@ -63,7 +63,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 20 # multiprocessing.cpu_count() 
+NENV = 8 # multiprocessing.cpu_count() 
 SWITCH_EP = 0
 
 
@@ -119,9 +119,9 @@ log_episodic_reward = MA(moving_average_step)
 log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
 
-log_attack_reward = MovingAverage(moving_average_step)
-log_scout_reward = MovingAverage(moving_average_step)
-log_defense_reward = MovingAverage(moving_average_step)
+log_attack_reward = MA(moving_average_step)
+log_scout_reward = MA(moving_average_step)
+log_defense_reward = MA(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -395,7 +395,7 @@ while True:
             num_batch_def += len(trajs[4*i+j])
             j += 1
 
-    if num_batch_att >= minbatch_size or num_batch_sct >= minbatch_size or num_batch_def >= minbatch_size::
+    if num_batch_att >= minbatch_size or num_batch_sct >= minbatch_size or num_batch_def >= minbatch_size:
         stime = time.time()
         train(batch_att, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=0)
         batch_att = []
