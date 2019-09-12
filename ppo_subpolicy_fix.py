@@ -175,6 +175,7 @@ restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
 network.initiate(restoring_saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+global_episodes = sess.run(global_step)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     traj_buffer = defaultdict(list)
@@ -338,8 +339,8 @@ while True:
             num_batch_sct += len(trajs[4*i+j])
             j += 1
         for _ in range(N_DEF): 
-            batch_def.append(trajs[4*i+3])
-            num_batch_def += len(trajs[4*i+3])
+            batch_def.append(trajs[4*i+j])
+            num_batch_def += len(trajs[4*i+j])
             j += 1
 
     if num_batch_att >= minbatch_size:

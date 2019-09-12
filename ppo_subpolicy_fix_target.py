@@ -63,7 +63,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8 # multiprocessing.cpu_count() 
+NENV = 20 # multiprocessing.cpu_count() 
 SWITCH_EP = 0
 
 
@@ -118,6 +118,10 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 log_episodic_reward = MA(moving_average_step)
 log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
+
+log_attack_reward = MovingAverage(moving_average_step)
+log_scout_reward = MovingAverage(moving_average_step)
+log_defense_reward = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -243,6 +247,36 @@ def reward_shape(prev_red_alive, red_alive, done):
                 r.append(0)
     return np.array(r)
 
+def ghost_reward(prev_red_alive, red_alive, done):
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
+    reward = []
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
+    for i in range(NENV):
+        possible_reward = []
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+        # Defense
+        if blue_flags[i]:
+            possible_reward.append(-1)
+        elif done[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+
+        reward.append(possible_reward)
+
+    return np.array(reward)
+
+
 print('Training Initiated:')
 def get_action(states):
     cnt1 = N_ATT
@@ -285,6 +319,7 @@ while True:
     num_red = len(envs.get_team_red()[0])
 
     episode_rew = np.zeros(NENV)
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -313,6 +348,12 @@ while True:
 
         reward = reward_shape(was_alive_red, is_alive_red, done)
         episode_rew += env_reward
+
+        shaped_reward = ghost_reward(was_alive_red, is_alive_red, done)
+        for i in range(NENV): 
+            if not was_done[i]:
+                for j in range(3):
+                    case_rew[j][i] += shaped_reward[i,j]
     
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
@@ -350,22 +391,20 @@ while True:
             num_batch_sct += len(trajs[4*i+j])
             j += 1
         for _ in range(N_DEF): 
-            batch_def.append(trajs[4*i+3])
-            num_batch_def += len(trajs[4*i+3])
+            batch_def.append(trajs[4*i+j])
+            num_batch_def += len(trajs[4*i+j])
             j += 1
 
-    if num_batch_att >= minbatch_size:
+    if num_batch_att >= minbatch_size or num_batch_sct >= minbatch_size or num_batch_def >= minbatch_size::
         stime = time.time()
         train(batch_att, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=0)
         batch_att = []
         num_batch_att = 0
-    if num_batch_sct >= minbatch_size:
-        stime = time.time()
+
         train(batch_sct, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=1)
         batch_sct = []
         num_batch_sct = 0
-    if num_batch_def >= minbatch_size:
-        stime = time.time()
+
         train(batch_def, 0, epoch, minibatch_size, writer, log_image_on, global_episodes, mode=2)
         batch_def = []
         num_batch_def = 0
@@ -377,13 +416,20 @@ while True:
     log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
 
+    log_attack_reward.extend(case_rew[0].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
+
     if log_on:
         step = sess.run(global_step)
-        tag = 'fix_baseline/'
+        tag = 'kerasTest/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
+            tag+'reward_attack': log_attack_reward(),
+            tag+'reward_scout': log_scout_reward(),
+            tag+'reward_defense': log_defense_reward(),
         }, writer, step)
         
     if save_on:
