@@ -34,10 +34,11 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-assert len(sys.argv) == 4, 'Provide setting initiation file for variation'
+assert len(sys.argv) == 5, 'Provide setting initiation file for variation'
 target_setting_path = sys.argv[1]
 device_t = sys.argv[3]
 
+OVERRIDE = bool(sys.argv[4])
 PROGBAR = False
 LOG_DEVICE = False
 
@@ -166,8 +167,12 @@ with tf.device(device_t):
 # Resotre / Initialize
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3)
-network.initiate(saver, MODEL_LOAD_PATH)
-sess.run(tf.assign(global_step, 0)) # Reset the counter
+if OVERRIDE:
+    network.initiate(saver, MODEL_PATH)
+    global_episodes = sess.run(global_step)
+else:
+    network.initiate(saver, MODEL_LOAD_PATH)
+    sess.run(tf.assign(global_step, 0)) # Reset the counter
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)

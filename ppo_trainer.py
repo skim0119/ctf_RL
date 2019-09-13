@@ -34,7 +34,7 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-assert len(sys.argv) == 5
+assert len(sys.argv) == 6
 device_t = sys.argv[4]
 
 PROGBAR = False
@@ -53,7 +53,7 @@ NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 #env_setting_path = 'setting_full.ini'
-env_setting_path = 'setting_full.ini'
+env_setting_path = sys.argv[5]
 
 ## Data Path
 path_create(LOG_PATH)

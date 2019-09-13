@@ -67,7 +67,7 @@ NENV = 8 # multiprocessing.cpu_count()
 SWITCH_EP = 0
 
 
-MODEL_LOAD_PATH = './model/fix_baseline_team{}{}{}/'.format(N_ATT, N_SCT, N_DEF) # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline_team{}{}{}_r1/'.format(N_ATT, N_SCT, N_DEF) # initialize values
 print(MODEL_LOAD_PATH)
 assert os.path.exists(MODEL_LOAD_PATH)
 env_setting_path = 'setting_full.ini'
