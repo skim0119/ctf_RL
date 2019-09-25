@@ -385,7 +385,7 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = list(a1), v1
+        a0, v0 = a1[:], v1[:]
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1

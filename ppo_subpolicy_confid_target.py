@@ -37,13 +37,14 @@ target_setting_path = "env_settings/"+sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
-CONTINUE = False
+CONTINUE = True
 
 PARAM1 = float(sys.argv[5])
 PARAM2 = float(sys.argv[6])
 PARAM3 = float(sys.argv[7])
 
 GPU = sys.argv[8] # '/device:GPU:0'
+print(GPU)
 
 
 if int(sys.argv[4]) == 1:
@@ -194,7 +195,20 @@ with tf.device(GPU):
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 
 # Resotre / Initialize
-network.initiate(saver, MODEL_LOAD_PATH)
+if not CONTINUE:
+    pretrained_vars = []
+    pretrained_vars_name = []
+    for varlist in network.a_vars[:-1]+network.c_vars[:-1]:
+        for var in varlist:
+            if var.name in pretrained_vars_name:
+                continue
+            pretrained_vars_name.append(var.name)
+            pretrained_vars.append(var)
+    restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
+    network.initiate(restoring_saver, MODEL_LOAD_PATH)
+else:
+    network.initiate(saver, MODEL_PATH)
+    global_episodes = sess.run(global_step)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
@@ -387,7 +401,7 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = list(a1), list(v1)
+        a0, v0 = a1[:], v1[:]
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
