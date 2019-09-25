@@ -353,22 +353,47 @@ class PPO_multimodes(a3c):
         actions3 = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs3])
         return actions1, critics1, logits1, actions2, critics2, logits2, actions3, critics3, logits3
 
-    def initiate_confid(self, n, fixed_length=1):
-        self.entering_confids = np.ones(n)
-        self.playing_mode = np.zeros(n, dtype=int)
-        self.fixed_length = int(fixed_length)
-        self.fixed_length_counter = 0
 
-    def run_network_with_bandit(self, states, bandit_prob, prev_action=None, use_confid=False, fixed_step=False,
-        use_threshhold=False, confidence_parameter1=0.05, confidence_parameter2=0.10,confidence_parameter3 = 0.01):
+
+    def initiate_confid(self, n, use_confid=0, confid_params=[0.05, 0.10, 0.01]):
+        """
+        Overall initialization of confidence. To be run once when network is started.
+        use_confid      : Decides which confidence metric to be used. (Also capable of toggling if a Fixed Step Scheme is Used.)
+                        0 - None; 1 - Confidence; 2 - Threshold; 5 - Fixed Step;
+        confid_params   : Parameters used in the confidence calculations.
+        """
+        self.use_confid = use_confid
+        self.confid_params = confid_params
+
+        if self.use_confid == 1:
+            self.entering_confids = np.ones(n)
+            self.playing_mode = np.zeros(n, dtype=int)
+
+        if self.use_confid == 2:
+            self.threshold = np.zeroes(n)
+
+
+        if self.use_confid == 5:
+            self.fixed_length = int(confid_params[0])
+            self.fixed_length_counter = 0
+
+    def initiate_episode_confid(self, n):
+        """
+        Confidence initialization steps to be perfromed each episode.
+        """
+        if self.use_confid == 1: #Need to reset the Playing Mode and entering Confidence every step.
+            self.entering_confids = np.ones(n)
+            self.playing_mode = np.zeros(n, dtype=int)
+
+
+    def run_network_with_bandit(self, states, bandit_prob):
+        """ """
+
         feed_dict = {self.state_input: states}
         ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
         res = self.sess.run(ops, feed_dict)
         a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
         critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
-
-        # if prev_action is not None:
-        #     return actions, critics, logits, prev_action
 
         try:
             bandit_action = np.array([np.random.choice(self.num_mode, p=prob / sum(prob)) for prob in bandit_prob])
@@ -378,7 +403,7 @@ class PPO_multimodes(a3c):
             raise Exception('probability nan')
 
         # Confidence
-        if use_confid:
+        if self.use_confid == 1: # Confidence Metric
             confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
             for i in range(len(self.entering_confids)):
                 confid = confids[i]
@@ -388,11 +413,21 @@ class PPO_multimodes(a3c):
                     # print(self.playing_mode[i] , bandit_action[i])
                     self.playing_mode[i] = bandit_action[i]
                 else:
-                    self.entering_confids[i] = np.maximum(old_confid + confidence_parameter1, confidence_parameter2)
+                    self.entering_confids[i] = np.maximum(old_confid + self.confid_params[0], self.confid_params[1])
 
             bandit_action = self.playing_mode
 
-        if fixed_step:
+        elif self.use_confid == 2: #Threshold Metric
+            confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
+            for i in range(len(self.entering_confids)):
+                confid = confids[i]
+                if  confid < self.threshold-self.confid_params[2]: # compare inverse entropy
+                    self.playing_mode[i] = bandit_action[i]
+
+                self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confid,self.confid_params[1])
+                bandit_action = self.playing_mode
+
+        elif self.use_confid == 5: #Fixed Step
             if self.fixed_length_counter == 0:
                 self.playing_mode = bandit_action
                 self.fixed_length_counter = self.fixed_length
@@ -400,15 +435,6 @@ class PPO_multimodes(a3c):
                 bandit_action = self.playing_mode
                 self.fixed_length_counter -= 1
 
-        if use_threshhold:
-            confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
-            for i in range(len(self.entering_confids)):
-                confid = confids[i]
-                if  confid < self.threshold-confidence_parameter3: # compare inverse entropy
-                    self.playing_mode[i] = bandit_action[i]
-
-                self.threshold = np.maximum((1-confidence_parameter1)*self.threshold + confidence_parameter1*confid,confidence_parameter2)
-            bandit_action = self.playing_mode
 
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 

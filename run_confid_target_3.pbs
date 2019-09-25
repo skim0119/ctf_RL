@@ -1,11 +1,11 @@
 #!/bin/bash
 #PBS -q eng-research
-#PBS -N confid_ns
+#PBS -N confid_batch3
 #PBS -l walltime=48:00:00
 #PBS -l nodes=1:ppn=40:V100
 #PBS -j oe
 #PBS -M skim449@illinois.edu
-#PBS -o confid_ns.out
+#PBS -o confid_batch3.out
 #PBS -e cluster_error.out
 
 module load anaconda/3
@@ -22,9 +22,7 @@ which python
 which pip
 pwd
 
-python ppo_subpolicy_confid_target.py w2_d2.ini W2_D2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:GPU:0 &
-python ppo_subpolicy_confid_target.py w2_f2.ini W2_F2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:GPU:0 &
-python ppo_subpolicy_confid_target.py f2.ini F2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:GPU:0 &
-python ppo_subpolicy_confid_target.py s2.ini S2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:GPU:1 &
+python ppo_subpolicy_confid_target.py s2_d2.ini S2_D2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:GPU:0 &
+python ppo_subpolicy_confid_target.py s2_f2.ini S2_F2_CONFID_P1_02_P2_15_NS 2 0 0.02 0.15 0 /device:GPU:0 &
 python ppo_subpolicy_confid_target.py d2.ini D2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:GPU:1 &
 python ppo_subpolicy_confid_target.py w2.ini W2_CONFID_P1_02_P2_15_S 2 1 0.02 0.15 0 /device:GPU:1
