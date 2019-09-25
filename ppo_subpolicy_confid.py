@@ -32,32 +32,23 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 7
+assert len(sys.argv) == 8
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = sys.argv[6]
+GPU = sys.argv[7]
 
-PARAM1 = float(sys.argv[4])
-PARAM2 = 0.10
-PARAM3 = float(sys.argv[5])
 
-if int(sys.argv[3]) == 1:
+if int(sys.argv[2]) == 1:
     TRAIN_SUBP = True
 else:
     TRAIN_SUBP = False
 
-USE_THRESH = False
-USE_CONFID = False
-USE_FS = False
-if int(sys.argv[2]) == 1:
-    USE_THRESH = True
-if int(sys.argv[2]) == 2:
-    USE_CONFID = True
-if int(sys.argv[2]) == 3:
-    USE_FS = True
+USE_CONFID= int(sys.argv[3])
+
+paramList = [float(sys.argv[4]),float(sys.argv[5]),float(sys.argv[6])]
 
 num_mode = 3
 
@@ -198,6 +189,7 @@ else:
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 
 # network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+network.initiate_confid(NENV*num_blue,use_confid=USE_CONFID,confid_params=paramList)
 
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
@@ -314,11 +306,10 @@ def reward_shape(prev_red_alive, red_alive, done):
 print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
-        network.initiate_confid(NENV*num_blue,fixed_length=PARAM1)
+        network.initiate_episode_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob,
-        use_confid=USE_CONFID, fixed_step=USE_FS, use_threshhold=USE_THRESH,confidence_parameter1=PARAM1,confidence_parameter2=PARAM2,confidence_parameter3=PARAM3)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
 
     actions = np.reshape(action, [NENV, num_blue])
 
