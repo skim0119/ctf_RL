@@ -365,12 +365,12 @@ class PPO_multimodes(a3c):
         self.use_confid = use_confid
         self.confid_params = confid_params
 
+        self.playing_mode = np.zeros(n, dtype=int)
         if self.use_confid == 1:
             self.entering_confids = np.ones(n)
-            self.playing_mode = np.zeros(n, dtype=int)
 
         if self.use_confid == 2:
-            self.threshold = np.zeroes(n)
+            self.threshold = np.full(n,0.5)
 
 
         if self.use_confid == 5:
@@ -419,9 +419,10 @@ class PPO_multimodes(a3c):
 
         elif self.use_confid == 2: #Threshold Metric
             confids = -np.mean(bandit_prob * np.log(bandit_prob), axis=1)
-            for i in range(len(self.entering_confids)):
+            for i in range(len(self.threshold)):
                 confid = confids[i]
-                if  confid < self.threshold-self.confid_params[2]: # compare inverse entropy
+
+                if  confid < self.threshold[i]-self.confid_params[2]: # compare inverse entropy
                     self.playing_mode[i] = bandit_action[i]
 
                 self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confid,self.confid_params[1])
