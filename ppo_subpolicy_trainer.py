@@ -53,7 +53,7 @@ LOG_DEVICE = False
 RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2] #'fix_baseline'
+TRAIN_NAME = sys.argv[2]+str(time.time()) #'fix_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -186,7 +186,7 @@ def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *
         updater(*mdp_tuple, **kwargv, idx=MODE)
 
 # Resotre / Initialize
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=3)
 network.initiate(saver, MODEL_PATH)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)

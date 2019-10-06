@@ -51,6 +51,7 @@ N_DEF = int(sys.argv[5])
 
 PROGBAR = False
 LOGDEVICE = False
+CONTINUE = True
 RBETA = 0.5
 
 num_mode = 3
@@ -181,11 +182,15 @@ for varlist in network.a_vars[:-1]+network.c_vars[:-1]:
         pretrained_vars_name.append(var.name)
         pretrained_vars.append(var)
 restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
-network.initiate(restoring_saver, MODEL_LOAD_PATH)
+if CONTINUE:
+    network.initiate(restoring_saver, MODEL_PATH)
+    global_episodes = sess.run(global_step)
+else:
+    network.initiate(restoring_saver, MODEL_LOAD_PATH)
+    global_episodes = sess.run(global_step)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
-global_episodes = sess.run(global_step)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     traj_buffer = defaultdict(list)
