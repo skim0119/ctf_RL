@@ -38,6 +38,9 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
+assert len(sys.argv) == 4
+device_t = sys.argv[3]
+
 num_mode = 3
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
@@ -50,7 +53,7 @@ LOG_DEVICE = False
 RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline'
+TRAIN_NAME = sys.argv[2] #'fix_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -93,9 +96,9 @@ keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 2
-minbatch_size = 4000
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -143,7 +146,7 @@ config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
-with tf.device('/GPU:0'):
+with tf.device(device_t):
     global_step = tf.Variable(0, trainable=False, name='global_step')
     global_step_next = tf.assign_add(global_step, NENV)
     subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
