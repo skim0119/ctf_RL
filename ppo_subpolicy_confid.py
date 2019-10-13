@@ -460,7 +460,7 @@ while True:
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= batch_memory_size:
-        meta_train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        meta_train(batch, 0, epoch, minibatch_size, writer, False, global_episodes)
         batch = []
         num_batch = 0
 
