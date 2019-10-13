@@ -422,11 +422,12 @@ class PPO_multimodes(a3c):
             for i in range(len(self.threshold)):
                 confid = confids[i]
 
-                if  confid < self.threshold[i]-self.confid_params[2]: # compare inverse entropy
+                if  confid < self.threshold[i]+self.confid_params[2]: # compare inverse entropy
                     self.playing_mode[i] = bandit_action[i]
 
-                self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confid,self.confid_params[1])
-                bandit_action = self.playing_mode
+            bandit_action = self.playing_mode
+            self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confids , self.confid_params[1])
+                # print(self.threshold)
 
         elif self.use_confid == 5: #Fixed Step
             if self.fixed_length_counter == 0:
@@ -463,7 +464,7 @@ class PPO_multimodes(a3c):
             summary.value.add(tag='summary/sub/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/sub/critic_loss', simple_value=closs)
             summary.value.add(tag='summary/sub/entropy', simple_value=entropy)
-            summary.value.add(tag='summary/sub/threshold', simple_value=self.threshold)
+            summary.value.add(tag='summary/sub/threshold', simple_value=np.mean(self.threshold))
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients[idx], feed_dict)
@@ -498,7 +499,7 @@ class PPO_multimodes(a3c):
             summary.value.add(tag='summary/bandit_actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/bandit_critic_loss', simple_value=closs)
             summary.value.add(tag='summary/bandit_entropy', simple_value=entropy)
-            summary.value.add(tag='summary/threshold', simple_value=self.threshold)
+            # summary.value.add(tag='summary/threshold', simple_value=self.threshold)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients[idx], feed_dict)
