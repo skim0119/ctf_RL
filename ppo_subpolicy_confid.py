@@ -59,6 +59,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
+# NENV = 1
 NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = sys.argv[8]
@@ -87,7 +88,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 100#config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -376,7 +377,8 @@ while True:
     cumul_reward = np.zeros(NENV)
     for step in range(max_ep+1):
         s0 = s1
-        a0, v0 = a1[:], v1[:]
+        a0, v0 = list(a1), v1[:]
+        # a0, v0 = a1[:], v1[:]
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
