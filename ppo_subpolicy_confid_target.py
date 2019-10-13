@@ -32,7 +32,7 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 9
+assert len(sys.argv) == 10
 target_setting_path = "env_settings/"+sys.argv[1]
 
 LOGDEVICE = False
@@ -61,9 +61,9 @@ if int(sys.argv[3]) == 1:
 if int(sys.argv[3]) == 2:
     USE_CONFID = True
     if TRAIN_SUBP:
-        MODEL_LOAD_PATH = './model/09_06_CONFID_SUB_P1_01_P2_10'
+        MODEL_LOAD_PATH = sys.argv[9]
     else:
-        MODEL_LOAD_PATH = './model/09_08_19_CONFID_P1_02_P2_15_NS'
+        MODEL_LOAD_PATH = sys.argv[9]
 if int(sys.argv[3]) == 3:
     USE_FS = True
     MODEL_LOAD_PATH = './model/09_07_19_FS_P1_3'
