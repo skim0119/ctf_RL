@@ -1,29 +1,29 @@
-#python ppo_sobpolicy_confid.py NAME TRAIN_SUB CONFIDENCE_VERS [PARAM1 PARAM2 PARAM3] GPU MODEL_LOAD_PATH
+#python ppo_subpolicy_confid.py NAME TRAIN_SUB CONFIDENCE_VERS [PARAM1 PARAM2 PARAM3] GPU MODEL_LOAD_PATH
 
-python ppo_sobpolicy_confid.py TRIAL1_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_1/
-python ppo_sobpolicy_confid.py TRIAL2_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_2/
-python ppo_sobpolicy_confid.py TRIAL3_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_3/
-python ppo_sobpolicy_confid.py TRIAL4_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_4/
-python ppo_sobpolicy_confid.py TRIAL5_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_5/
-python ppo_sobpolicy_confid.py TRIAL6_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_6/
+python ppo_subpolicy_confid.py TRIAL1_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_1/
+python ppo_subpolicy_confid.py TRIAL2_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_2/
+python ppo_subpolicy_confid.py TRIAL3_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_3/
+python ppo_subpolicy_confid.py TRIAL4_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_4/
+python ppo_subpolicy_confid.py TRIAL5_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_5/
+python ppo_subpolicy_confid.py TRIAL6_CONFID_BASELINE_S 1 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_6/
 
-python ppo_sobpolicy_confid.py TRIAL1_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_1/
-python ppo_sobpolicy_confid.py TRIAL2_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_2/
-python ppo_sobpolicy_confid.py TRIAL3_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_3/
-python ppo_sobpolicy_confid.py TRIAL4_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_4/
-python ppo_sobpolicy_confid.py TRIAL5_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_5/
-python ppo_sobpolicy_confid.py TRIAL6_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_6/
+python ppo_subpolicy_confid.py TRIAL1_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_1/
+python ppo_subpolicy_confid.py TRIAL2_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_2/
+python ppo_subpolicy_confid.py TRIAL3_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_3/
+python ppo_subpolicy_confid.py TRIAL4_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_4/
+python ppo_subpolicy_confid.py TRIAL5_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_5/
+python ppo_subpolicy_confid.py TRIAL6_CONFID_BASELINE_N 0 1 0.01 0.10 0 /device:GPU:0 ./model_baseline/coord_sample_6/
 
-python ppo_sobpolicy_confid.py TRIAL1_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_1/
-python ppo_sobpolicy_confid.py TRIAL2_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_2/
-python ppo_sobpolicy_confid.py TRIAL3_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_3/
-python ppo_sobpolicy_confid.py TRIAL4_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_4/
-python ppo_sobpolicy_confid.py TRIAL5_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_5/
-python ppo_sobpolicy_confid.py TRIAL6_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_6/
+python ppo_subpolicy_confid.py TRIAL1_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_1/
+python ppo_subpolicy_confid.py TRIAL2_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_2/
+python ppo_subpolicy_confid.py TRIAL3_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_3/
+python ppo_subpolicy_confid.py TRIAL4_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_4/
+python ppo_subpolicy_confid.py TRIAL5_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_5/
+python ppo_subpolicy_confid.py TRIAL6_FIXED_BASELINE_S 1 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_6/
 
-python ppo_sobpolicy_confid.py TRIAL1_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_1/
-python ppo_sobpolicy_confid.py TRIAL2_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_2/
-python ppo_sobpolicy_confid.py TRIAL3_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_3/
-python ppo_sobpolicy_confid.py TRIAL4_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_4/
-python ppo_sobpolicy_confid.py TRIAL5_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_5/
-python ppo_sobpolicy_confid.py TRIAL6_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_6/
+python ppo_subpolicy_confid.py TRIAL1_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_1/
+python ppo_subpolicy_confid.py TRIAL2_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_2/
+python ppo_subpolicy_confid.py TRIAL3_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_3/
+python ppo_subpolicy_confid.py TRIAL4_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_4/
+python ppo_subpolicy_confid.py TRIAL5_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_5/
+python ppo_subpolicy_confid.py TRIAL6_FIXED_BASELINE_N 0 5 3 0 0 /device:GPU:0 ./model_baseline/coord_sample_6/
