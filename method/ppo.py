@@ -107,7 +107,7 @@ class PPO(a3c):
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_holder')
 
                 # get the parameters of actor and critic networks
-                self.logits, self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
+                self.logits, self.actor, self.critic, self.a_vars, self.c_vars, self.feature = self._build_network(self.state_input)
                 self.logits = tf.nn.log_softmax(self.logits) # Use log probability for PPO
 
                 # Local Network
@@ -229,7 +229,7 @@ class PPO(a3c):
         #self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
         #self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
 
-        return logits, actor, critic, a_vars, c_vars
+        return logits, actor, critic, a_vars, c_vars, feature
 
 
 class PPO_multimodes(a3c):
@@ -263,7 +263,7 @@ class PPO_multimodes(a3c):
                 self.old_bandit_logits_ = tf.placeholder(shape=[None, num_mode], dtype=tf.float32, name='old_bandit_logit_holder')
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_holder')
 
-                self.logits, self.actor, self.critic, self.a_vars, self.c_vars = self._build_network(self.state_input)
+                self.logits, self.actor, self.critic, self.a_vars, self.c_vars,self.feature = self._build_network(self.state_input)
 
                 train_args = (self.action_, self.advantage_, self.td_target_)
                 self.actor_loss = []
@@ -372,6 +372,9 @@ class PPO_multimodes(a3c):
         if self.use_confid == 2:
             self.threshold = np.full(n,0.5)
 
+        if self.use_confid == 3:
+            self.entering_confids = np.ones(n)
+
 
         if self.use_confid == 5:
             self.fixed_length = int(confid_params[0])
@@ -384,6 +387,11 @@ class PPO_multimodes(a3c):
         if self.use_confid == 1: #Need to reset the Playing Mode and entering Confidence every step.
             self.entering_confids = np.ones(n)
             self.playing_mode = np.zeros(n, dtype=int)
+
+        if self.use_confid == 3:
+            self.entering_confids = np.ones(n)
+            self.confid_hist = np.ndarray([n,1])
+            self.confid_hist_uncertainty = np.ndarray([n,1])
 
 
     def run_network_with_bandit(self, states, bandit_prob):
@@ -428,6 +436,33 @@ class PPO_multimodes(a3c):
             bandit_action = self.playing_mode
             self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confids , self.confid_params[1])
                 # print(self.threshold)
+        elif self.use_confid == 3: #Probabalistic method
+            feed_dict = {self.state_input: states}
+            ops = self.feature
+            res = self.sess.run(ops, feed_dict)
+
+            #Injecting Noise into
+            samples = []
+            print(len(res))
+            print(self.confid_params[1])
+            c=0
+            for i in range(len(res)):
+                for j in range(self.confid_params[1]):
+                    noise = np.random.normal(0,np.std(res[i])*self.confid_params[0],res[0].shape)
+                    samples.append(res[i]+noise)
+                    print(len(samples))
+                    print(samples[0].shape)
+                    c+=1
+            print("c",c)
+            print("feed Dict Shape",np.vstack(samples).shape)
+            feed_dict = {self.feature : np.vstack(samples)}
+            ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
+            res = self.sess.run(ops, feed_dict)
+            a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
+            critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
+            print(len(a_probs[0]))
+            exit()
+
 
         elif self.use_confid == 5: #Fixed Step
             if self.fixed_length_counter == 0:
@@ -616,4 +651,4 @@ class PPO_multimodes(a3c):
         self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
         '''
 
-        return logit_list, actor_list, critic_list, a_vars_list, c_vars_list
+        return logit_list, actor_list, critic_list, a_vars_list, c_vars_list, feature

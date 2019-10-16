@@ -32,23 +32,22 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 9
+assert len(sys.argv) == 2
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = sys.argv[7]
+GPU = "/device:GPU:0"
 
-
-if int(sys.argv[2]) == 1:
+if 0 == 1:
     TRAIN_SUBP = True
 else:
     TRAIN_SUBP = False
 
-USE_CONFID= int(sys.argv[3])
+USE_CONFID= 3
 
-paramList = [float(sys.argv[4]),float(sys.argv[5]),float(sys.argv[6])]
+paramList = [0.5,10,0]
 
 num_mode = 3
 
@@ -59,10 +58,10 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = 1
+NENV = 2
 # NENV = multiprocessing.cpu_count()//2
 
-MODEL_LOAD_PATH = sys.argv[8]
+MODEL_LOAD_PATH = "./model_baseline/coord_sample_1/"
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
