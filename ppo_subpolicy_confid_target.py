@@ -32,46 +32,27 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 10
+assert len(sys.argv) == 11
 target_setting_path = "env_settings/"+sys.argv[1]
 
 LOGDEVICE = False
 PROGBAR = True
-CONTINUE = True
 
-PARAM1 = float(sys.argv[5])
-PARAM2 = float(sys.argv[6])
-PARAM3 = float(sys.argv[7])
+
+USE_CONFID= int(sys.argv[4])
+TRAIN_SUBP = bool(sys.argv[3])
+
+paramList = [float(sys.argv[5]),float(sys.argv[6]),float(sys.argv[7])]
+
 
 GPU = sys.argv[8] # '/device:GPU:0'
-print(GPU)
-
-
-if int(sys.argv[4]) == 1:
-    TRAIN_SUBP = True
-else:
-    TRAIN_SUBP = False
-
-USE_THRESH = False
-USE_CONFID = False
-USE_FS = False
-if int(sys.argv[3]) == 1:
-    USE_THRESH = True
-    MODEL_LOAD_PATH = './model/09_01_18_META_THRESH_LR1E4'
-if int(sys.argv[3]) == 2:
-    USE_CONFID = True
-    if TRAIN_SUBP:
-        MODEL_LOAD_PATH = sys.argv[9]
-    else:
-        MODEL_LOAD_PATH = sys.argv[9]
-if int(sys.argv[3]) == 3:
-    USE_FS = True
-    MODEL_LOAD_PATH = './model/09_07_19_FS_P1_3'
+MODEL_LOAD_PATH = sys.argv[9]
+CONTINUE = bool(sys.argv[10])
 
 num_mode = 3
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2]
+TRAIN_NAME = sys.argv[2] +"_"+str(time.time())
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -211,6 +192,7 @@ else:
     global_episodes = sess.run(global_step)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+network.initiate_confid(NENV*num_blue,use_confid=USE_CONFID,confid_params=paramList)
 
 def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
@@ -326,10 +308,10 @@ def reward_shape(prev_red_alive, red_alive, done):
 print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
-        network.initiate_confid(NENV*num_blue)
+        network.initiate_episode_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=USE_CONFID, fixed_step=USE_FS, use_threshhold=USE_THRESH)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=USE_CONFID)
 
     actions = np.reshape(action, [NENV, num_blue])
 

@@ -32,19 +32,16 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2 import PPO as MetaNetwork
 
-assert len(sys.argv) == 9
+assert len(sys.argv) == 10
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
-CONTINUE = False
+CONTINUE = bool(sys.argv[9])
 GPU = sys.argv[7]
 
 
-if int(sys.argv[2]) == 1:
-    TRAIN_SUBP = True
-else:
-    TRAIN_SUBP = False
+TRAIN_SUBP = bool(sys.argv[2])
 
 USE_CONFID= int(sys.argv[3])
 

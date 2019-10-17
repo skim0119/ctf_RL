@@ -26,7 +26,7 @@ import random
 import math
 from collections import defaultdict
 
-# the modules that you can use to generate the policy. 
+# the modules that you can use to generate the policy.
 import policy
 
 # Data Processing Module
@@ -105,7 +105,7 @@ vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
-## Logger Initialization 
+## Logger Initialization
 log_episodic_reward = MA(moving_average_step)
 log_length = MA(moving_average_step)
 log_winrate = MA(moving_average_step)
@@ -182,7 +182,7 @@ def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=Non
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
-        
+
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
         traj_buffer['td_target'].extend(td_target)
@@ -257,7 +257,7 @@ while True:
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
-    
+
     # Bootstrap
     if global_episodes > SWITCH_EP:
         ENV_SETTING_PATH = target_setting_path
@@ -269,7 +269,7 @@ while True:
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
 
-    # initialize parameters 
+    # initialize parameters
     episode_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
@@ -277,7 +277,7 @@ while True:
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
-    
+
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -298,7 +298,7 @@ while True:
 
         reward = reward_shape(was_alive_red, is_alive_red, done)
         episode_rew += env_reward
-    
+
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
             if d:
@@ -322,7 +322,7 @@ while True:
     sess.run(global_step_next)
     if PROGBAR:
         progbar.update(global_episodes)
-    
+
     for i in range(NENV):
         batch_att.append(trajs[4*i+0])
         batch_att.append(trajs[4*i+1])
@@ -363,7 +363,7 @@ while True:
             tag+'win-rate': log_winrate(),
             tag+'reward': log_episodic_reward(),
         }, writer, step)
-        
+
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
 
