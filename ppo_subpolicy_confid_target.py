@@ -311,7 +311,7 @@ def get_action(states, initial=False):
         network.initiate_episode_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, use_confid=USE_CONFID)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
 
     actions = np.reshape(action, [NENV, num_blue])
 
