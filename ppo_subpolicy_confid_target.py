@@ -58,7 +58,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = multiprocessing.cpu_count()
+NENV = 8
 
 
 #09_01_18_META_THRESH_LR1E4
