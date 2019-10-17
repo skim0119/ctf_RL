@@ -40,14 +40,14 @@ PROGBAR = True
 
 
 USE_CONFID= int(sys.argv[4])
-TRAIN_SUBP = bool(sys.argv[3])
+TRAIN_SUBP = bool((sys.argv[3]))
 
 paramList = [float(sys.argv[5]),float(sys.argv[6]),float(sys.argv[7])]
 
 
 GPU = sys.argv[8] # '/device:GPU:0'
 MODEL_LOAD_PATH = sys.argv[9]
-CONTINUE = bool(sys.argv[10])
+CONTINUE = bool(int(sys.argv[10]))
 
 num_mode = 3
 
