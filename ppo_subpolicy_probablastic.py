@@ -30,7 +30,7 @@ from utility.logger import record
 from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
-from method.ppo2 import PPO as MetaNetwork
+from method.ppo2_probabilistic import PPO as MetaNetwork
 
 assert len(sys.argv) == 2
 
@@ -47,7 +47,7 @@ else:
 
 USE_CONFID= 3
 
-paramList = [0.5,10,0]
+paramList = [0.01,0.1,3]
 
 num_mode = 3
 
@@ -307,9 +307,9 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_episode_confid(NENV*num_blue)
-    bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
+    bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
+    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, uncertainty=uncertainty)
 
     actions = np.reshape(action, [NENV, num_blue])
 

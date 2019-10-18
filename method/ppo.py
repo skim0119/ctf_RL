@@ -374,6 +374,8 @@ class PPO_multimodes(a3c):
 
         if self.use_confid == 3:
             self.entering_confids = np.ones(n)
+        if self.use_confid == 6:
+            self.entering_confids = np.ones(n)
 
 
         if self.use_confid == 5:
@@ -391,10 +393,13 @@ class PPO_multimodes(a3c):
         if self.use_confid == 3:
             self.entering_confids = np.ones(n)
             self.confid_hist = np.ndarray([n,1])
+        if self.use_confid == 6:
+            self.entering_confids = np.ones(n)
+            self.confid_hist = np.ndarray([n,1])
             self.confid_hist_uncertainty = np.ndarray([n,1])
 
 
-    def run_network_with_bandit(self, states, bandit_prob,term_logits):
+    def run_network_with_bandit(self, states, bandit_prob,term_logits=None,uncertainty=None):
         """ """
         terminations = None
 
@@ -439,36 +444,24 @@ class PPO_multimodes(a3c):
                 # print(self.threshold)
 
         elif self.use_confid == 3: #Probabalistic method
-            feed_dict = {self.state_input: states}
-            ops = self.feature
-            res = self.sess.run(ops, feed_dict)
+            for i in range(len(self.entering_confids)):
+                confid = uncertainty[i]
+                old_confid = self.entering_confids[i]
+                if confid < old_confid: # compare inverse entropy
+                    self.entering_confids[i] = confid
+                    # print(self.playing_mode[i] , bandit_action[i])
+                    self.playing_mode[i] = bandit_action[i]
+                else:
+                    self.entering_confids[i] = np.maximum(old_confid + self.confid_params[0], self.confid_params[1])
 
-            #Injecting Noise into
-            samples = []
-            print(len(res))
-            print(self.confid_params[1])
-            c=0
-            for i in range(len(res)):
-                for j in range(self.confid_params[1]):
-                    noise = np.random.normal(0,np.std(res[i])*self.confid_params[0],res[0].shape)
-                    samples.append(res[i]+noise)
+            bandit_action = self.playing_mode
 
-                    c+=1
-            print("c",c)
-            print("feed Dict Shape",np.vstack(samples).shape)
-            feed_dict = {self.feature : np.vstack(samples)}
-            ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
-            res = self.sess.run(ops, feed_dict)
-            a_probs, res = res[:len(self.actor)-1], res[len(self.actor)-1:]
-            critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
-            print(len(a_probs[0]))
-            exit()
         elif self.use_confid == 4: #Termination
             terminations = np.array([np.random.choice(2, p=probs) for probs in term_logits ])
             for i in range(len(terminations)):
                 if terminations[i]:
                     self.playing_mode[i] = bandit_action[i]
-            
+
 
         elif self.use_confid == 5: #Fixed Step
             if self.fixed_length_counter == 0:
@@ -478,12 +471,29 @@ class PPO_multimodes(a3c):
                 bandit_action = self.playing_mode
                 self.fixed_length_counter -= 1
 
+        elif self.use_confid == 6: #Probabalistic time variance method
+            self.confid_hist_uncertainty = np.append(self.confid_hist_uncertainty, uncertainty, axis=1)
+            for i in range(len(self.entering_confids)):
+                confid = uncertainty[i]
+                old_confid = np.maximum(self.confid_hist_uncertainty[i][-self.confid_params[2]:])
+                if confid < old_confid: # compare inverse entropy
+                    self.entering_confids[i] = confid
+                    # print(self.playing_mode[i] , bandit_action[i])
+                    self.playing_mode[i] = bandit_action[i]
+                else:
+                    self.entering_confids[i] = np.maximum(old_confid + self.confid_params[0], self.confid_params[1])
+
+            bandit_action = self.playing_mode
+
 
         actions = np.array([np.random.choice(self.action_size, p=a_probs[mod][idx] / sum(a_probs[mod][idx])) for idx, mod in enumerate(bandit_action)])
 
         critics = [critics[mod][idx] for idx, mod in enumerate(bandit_action)]
         logits = [logits[mod][idx] for idx, mod in enumerate(bandit_action)]
-        return actions, critics, logits, bandit_action, terminations
+        if self.use_confid == 4:
+            return actions, critics, logits, bandit_action, terminations
+        else:
+            return actions, critics, logits, bandit_action
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False, idx=None):
         feed_dict = {self.state_input: state_input,
