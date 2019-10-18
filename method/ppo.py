@@ -394,8 +394,9 @@ class PPO_multimodes(a3c):
             self.confid_hist_uncertainty = np.ndarray([n,1])
 
 
-    def run_network_with_bandit(self, states, bandit_prob):
+    def run_network_with_bandit(self, states, bandit_prob,term_logits):
         """ """
+        terminations = None
 
         feed_dict = {self.state_input: states}
         ops = self.actor[:-1] + self.critic[:-1] + self.logits[:-1]
@@ -436,6 +437,7 @@ class PPO_multimodes(a3c):
             bandit_action = self.playing_mode
             self.threshold = np.maximum((1-self.confid_params[0])*self.threshold + self.confid_params[0]*confids , self.confid_params[1])
                 # print(self.threshold)
+
         elif self.use_confid == 3: #Probabalistic method
             feed_dict = {self.state_input: states}
             ops = self.feature
@@ -450,8 +452,7 @@ class PPO_multimodes(a3c):
                 for j in range(self.confid_params[1]):
                     noise = np.random.normal(0,np.std(res[i])*self.confid_params[0],res[0].shape)
                     samples.append(res[i]+noise)
-                    print(len(samples))
-                    print(samples[0].shape)
+
                     c+=1
             print("c",c)
             print("feed Dict Shape",np.vstack(samples).shape)
@@ -462,7 +463,12 @@ class PPO_multimodes(a3c):
             critics, logits = res[:len(self.critic)-1], res[len(self.critic)-1:]
             print(len(a_probs[0]))
             exit()
-
+        elif self.use_confid == 4: #Termination
+            terminations = np.array([np.random.choice(2, p=probs) for probs in term_logits ])
+            for i in range(len(terminations)):
+                if terminations[i]:
+                    self.playing_mode[i] = bandit_action[i]
+            
 
         elif self.use_confid == 5: #Fixed Step
             if self.fixed_length_counter == 0:
@@ -477,7 +483,7 @@ class PPO_multimodes(a3c):
 
         critics = [critics[mod][idx] for idx, mod in enumerate(bandit_action)]
         logits = [logits[mod][idx] for idx, mod in enumerate(bandit_action)]
-        return actions, critics, logits, bandit_action
+        return actions, critics, logits, bandit_action, terminations
 
     def update_global(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False, idx=None):
         feed_dict = {self.state_input: state_input,

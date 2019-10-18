@@ -30,7 +30,7 @@ from utility.logger import record
 from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
-from method.ppo2 import PPO as MetaNetwork
+from method.ppo_term import PPO as MetaNetwork
 
 assert len(sys.argv) == 2
 
@@ -45,7 +45,7 @@ if 0 == 1:
 else:
     TRAIN_SUBP = False
 
-USE_CONFID= 3
+USE_CONFID= 4
 
 paramList = [0.5,10,0]
 
@@ -209,6 +209,8 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         traj_buffer['td_target'].extend(td_target)
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['logit'].extend(traj[4])
+        traj_buffer['termination'].extend(traj[11])
+        traj_buffer['term_logits'].extend(traj[12])
 
         # Subp Trajectory
         if TRAIN_SUBP:
@@ -254,7 +256,9 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
             np.stack(traj_buffer['action']),
             np.stack(traj_buffer['td_target']),
             np.stack(traj_buffer['advantage']),
-            np.stack(traj_buffer['logit'])
+            np.stack(traj_buffer['logit']),
+            np.stack(traj_buffer['termination']),
+            np.stack(traj_buffer['term_logits']),
         )
     for mdp_tuple in it:
         meta_network.update_network(*mdp_tuple, global_episodes, writer, log)
@@ -307,13 +311,13 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_episode_confid(NENV*num_blue)
-    bandit_prob, bandit_critic, bandit_logit = meta_network.run_network(states, return_action=False)
+    bandit_prob, bandit_critic, bandit_logit, term_logits = meta_network.run_network(states, return_action=False)
 
-    action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob)
+    action, critic, logits, bandit_action, terminations = network.run_network_with_bandit(states, bandit_prob,term_logits)
 
     actions = np.reshape(action, [NENV, num_blue])
 
-    return bandit_action, bandit_critic, bandit_logit, actions, action, critic, logits
+    return bandit_action, bandit_critic, bandit_logit, actions, action, critic, logits, terminations, term_logits
 
 def reward_shape(prev_red_alive, red_alive, done):
     prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
@@ -363,14 +367,14 @@ while True:
     was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=11) for _ in range(num_blue*NENV)]
+    trajs = [Trajectory(depth=13) for _ in range(num_blue*NENV)]
 
     # Bootstrap
     s1 = envs.reset(
             custom_board=use_this_map(global_episodes, max_at, max_epsilon),
             policy_red=use_this_policy()
         )
-    a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1, initial=True)
+    a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1, terminations, term_logits = get_action(s1, initial=True)
 
     # Rollout
     cumul_reward = np.zeros(NENV)
@@ -400,7 +404,7 @@ while True:
 
         task_reward = reward_shape(was_alive_red, is_alive_red, done)
 
-        a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1)
+        a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1,terminations, term_logits = get_action(s1)
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
@@ -422,6 +426,8 @@ while True:
                     sub_logits0[idx],
                     sub_v1[idx],
                     task_reward[env_idx][a0[idx]]+env_reward[env_idx],
+                    terminations[idx],
+                    term_logits[idx],
                     ])
 
         prev_rew = raw_reward
