@@ -13,6 +13,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 import numpy as np
+from scipy.special import softmax
 
 from utility.utils import store_args
 
@@ -457,6 +458,8 @@ class PPO_multimodes(a3c):
             bandit_action = self.playing_mode
 
         elif self.use_confid == 4: #Termination
+            term_logits[:,0] = term_logits[:,0] +self.confid_params[0]
+            term_logits = (term_logits.T/np.sum(term_logits, axis=1)).T
             terminations = np.array([np.random.choice(2, p=probs) for probs in term_logits ])
             for i in range(len(terminations)):
                 if terminations[i]:
