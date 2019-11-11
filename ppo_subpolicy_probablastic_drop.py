@@ -58,7 +58,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = 1
+NENV = 8
 # NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = "./model_baseline/coord_sample_1/"
@@ -199,6 +199,8 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         if len(traj) == 0:
             continue
         buffer_size += len(traj)
+        if buffer_size < 10:
+            return
 
         # Meta Trajectory
         td_target, advantages = gae(traj[2], traj[3], 0,
@@ -243,8 +245,6 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
             sub_traj_buffer[mode]['advantage'].extend(advantages)
             sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
-    if buffer_size < 10:
-        return
 
     # Train Meta
     it = batch_sampler(
@@ -381,8 +381,9 @@ while True:
         logits0 = logits1
         sub_a0, sub_v0 = sub_a1, sub_v1
         sub_logits0 = sub_logits1
-
+        # print("Start Step",time.time())
         s1, raw_reward, done, info = envs.step(actions)
+        # print("End Step",time.time())
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         env_reward = (raw_reward - prev_rew - 0.01)/100
@@ -399,8 +400,9 @@ while True:
             done[:] = True
 
         task_reward = reward_shape(was_alive_red, is_alive_red, done)
-
+        # print("Start Action",time.time())
         a1, v1, logits1, actions, sub_a1, sub_v1, sub_logits1 = get_action(s1)
+        # print("End Action",time.time())
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
@@ -459,7 +461,9 @@ while True:
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= batch_memory_size:
+        # print("Start Train",time.time())
         meta_train(batch, 0, epoch, minibatch_size, writer, False, global_episodes)
+        # print("End Train",time.time())
         batch = []
         num_batch = 0
 

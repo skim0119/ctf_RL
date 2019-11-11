@@ -448,10 +448,10 @@ class V2_dropout(tf.keras.Model):
         self.flat  = keras_layers.Flatten()
         self.dense1 = keras_layers.Dense(units=128)
 
-        self.drop1 = keras_layers.Dropout(0.2)
-        self.drop2 = keras_layers.Dropout(0.2)
-        self.drop3 = keras_layers.Dropout(0.2)
-        self.drop4 = keras_layers.Dropout(0.2)
+        # self.drop1 = keras_layers.Dropout(0.2)
+        # self.drop2 = keras_layers.Dropout(0.2)
+        self.drop3 = keras_layers.Dropout(0.1)
+        self.drop4 = keras_layers.Dropout(0.1)
 
     def call(self, inputs):
         net = inputs
@@ -467,10 +467,10 @@ class V2_dropout(tf.keras.Model):
         _layers['NLNN'] = net
 
         # Block 3 : Convolution
-        net = self.drop1(net)
+        # net = self.drop1(net)
         net = self.conv1(net)
         _layers['CNN1'] = net
-        net = self.drop2(net)
+        # net = self.drop2(net)
         net = self.conv2(net)
         _layers['CNN2'] = net
 

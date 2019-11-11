@@ -199,6 +199,8 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
         if len(traj) == 0:
             continue
         buffer_size += len(traj)
+        if buffer_size < 10:
+            return
 
         # Meta Trajectory
         td_target, advantages = gae(traj[2], traj[3], 0,
@@ -243,8 +245,6 @@ def meta_train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, write
             sub_traj_buffer[mode]['advantage'].extend(advantages)
             sub_traj_buffer[mode]['logit'].extend(sub_traj[4])
 
-    if buffer_size < 10:
-        return
 
     # Train Meta
     it = batch_sampler(
