@@ -73,25 +73,25 @@ class PPO:
 
                 self.cnn_summary = self._build_kernel_summary(model.feature_network._layers_snapshot)
 
-    def run_network(self, states, return_action=True):
+    def run_network(self, states, return_action=True,batchSize=10,noiseMagnitude=0.05):
         feed_dict = {self.state_input: states}
         feature = self.sess.run(self.feature, feed_dict)
 
         samples = []
 
         for i in range(len(feature)):
-            for j in range(10):
-                noise = np.random.normal(0,np.std(feature[i])*0.1,feature[0].shape)
+            for j in range(batchSize):
+                noise = np.random.normal(0,np.std(feature[i])*noiseMagnitude,feature[0].shape)
                 samples.append(feature[i]+noise)
 
         feed_dict = {self.feature : np.vstack(samples)}
         a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.log_logits], feed_dict)
-        a_probs = a_probs.reshape([4,10,3])
+        a_probs = a_probs.reshape([-1,batchSize,3])
         confid = -np.mean(a_probs * np.log(a_probs), axis=2)
         uncertainty = confid.max(axis=1)
         a_probs = np.mean(a_probs, axis=1)
-        critics = np.mean(critics.reshape([4,10]), axis = 1)
-        logits = np.mean(logits.reshape([4,10,3]), axis = 1)
+        critics = np.mean(critics.reshape([-1,batchSize]), axis = 1)
+        logits = np.mean(logits.reshape([-1,batchSize,3]), axis = 1)
 
         if return_action:
             actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])

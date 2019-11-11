@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -q eng-research
+#PBS -N Target_P3
+#PBS -l walltime=48:00:00
+#PBS -l nodes=1:ppn=24
+#PBS -j oe
+#PBS -M skim449@illinois.edu
+#PBS -o Target_P3.out
+#PBS -e cluster_error.out
+
+module load anaconda/3
+module load vim/8.1
+module load cuda/10.0
+module load git/2.19.0
+
+module list
+
+conda activate /projects/tran-research-group/skim449/conda/ctf
+
+cd $PBS_O_WORKDIR
+which python
+which pip
+pwd
+
+python ppo_subpolicy_confid_target.py w2_d2.ini TRIAL1_FIXED_BASELINE_S_TARGET_WD 1 5 3 0 0 /device:CPU:0 ./model/TRIAL1_FIXED_BASELINE_S1571033695.3074708/ 0 &
+python ppo_subpolicy_confid_target.py w2_d2.ini TRIAL2_FIXED_BASELINE_S_TARGET_WD 1 5 3 0 0 /device:CPU:0 ./model/TRIAL2_FIXED_BASELINE_S1571006784.9151592/ 0 &
+python ppo_subpolicy_confid_target.py w2_d2.ini TRIAL3_FIXED_BASELINE_S_TARGET_WD 1 5 3 0 0 /device:CPU:0 ./model/TRIAL3_FIXED_BASELINE_S1571006784.9148514/ 0

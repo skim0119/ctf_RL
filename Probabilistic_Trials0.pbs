@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -q eng-research
+#PBS -N PROB_TRIALS2
+#PBS -l walltime=48:00:00
+#PBS -l nodes=1:ppn=24
+#PBS -j oe
+#PBS -M nealeav2@illinois.edu
+#PBS -o PROB_TRIALS2.out
+#PBS -e cluster_error.out
+
+module load anaconda/3
+module load vim/8.1
+module load cuda/10.0
+module load git/2.19.0
+
+module list
+
+conda activate /projects/tran-research-group/skim449/conda/ctf
+
+cd $PBS_O_WORKDIR
+which python
+which pip
+pwd
+
+python ppo_subpolicy_probablastic.py PROB_TRIAL_BS10_NM1 50 0.01 &
+python ppo_subpolicy_probablastic.py PROB_TRIAL_BS10_NM5 50 0.05 &
+python ppo_subpolicy_probablastic.py PROB_TRIAL_BS10_NM10 50 0.10

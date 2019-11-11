@@ -32,13 +32,13 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2_probabilistic import PPO as MetaNetwork
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 4
 
 LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = "/device:GPU:0"
+GPU = "/device:CPU:0"
 
 if 0 == 1:
     TRAIN_SUBP = True
@@ -50,6 +50,8 @@ USE_CONFID= 3
 paramList = [0.01,0.1,3]
 
 num_mode = 3
+batchSize = int(sys.argv[2])
+noiseMagnitude = float(sys.argv[3])
 
 ## Training Directory Reset
 TRAIN_NAME = sys.argv[1]
@@ -58,7 +60,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = 1
+NENV = 8
 # NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = "./model_baseline/coord_sample_1/"
@@ -307,7 +309,7 @@ print('Training Initiated:')
 def get_action(states, initial=False):
     if initial:
         network.initiate_episode_confid(NENV*num_blue)
-    bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
+    bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False,batchSize=batchSize,noiseMagnitude=noiseMagnitude)
 
     action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, uncertainty=uncertainty)
 
