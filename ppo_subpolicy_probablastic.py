@@ -38,7 +38,7 @@ LOGDEVICE = False
 PROGBAR = True
 TRAIN_SUBP = True
 CONTINUE = False
-GPU = "/device:CPU:0"
+GPU = "/device:GPU:1"
 
 if 0 == 1:
     TRAIN_SUBP = True

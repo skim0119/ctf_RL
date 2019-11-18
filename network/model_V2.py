@@ -323,6 +323,7 @@ class V2_PPO_Probabilistic(tf.keras.Model):
 
     def call(self, inputs):
         net = self.feature_network(inputs)
+        self.feature = net
 
         logits = self.actor_dense1(net)
         logits = tf.math.maximum(logits, 1e-9)
@@ -336,7 +337,6 @@ class V2_PPO_Probabilistic(tf.keras.Model):
         self.logits = logits
         self.log_logits = log_logits
         self.critic = critic
-        self.feature = net
 
         return actor, logits, log_logits, critic, net
 
@@ -448,10 +448,10 @@ class V2_dropout(tf.keras.Model):
         self.flat  = keras_layers.Flatten()
         self.dense1 = keras_layers.Dense(units=128)
 
-        self.drop1 = keras_layers.Dropout(0.2)
-        self.drop2 = keras_layers.Dropout(0.2)
-        self.drop3 = keras_layers.Dropout(0.2)
-        self.drop4 = keras_layers.Dropout(0.2)
+        # self.drop1 = keras_layers.Dropout(0.2)
+        # self.drop2 = keras_layers.Dropout(0.2)
+        # self.drop3 = keras_layers.Dropout(0.2)
+        # self.drop4 = keras_layers.Dropout(0.2)
 
     def call(self, inputs):
         net = inputs
@@ -467,18 +467,18 @@ class V2_dropout(tf.keras.Model):
         _layers['NLNN'] = net
 
         # Block 3 : Convolution
-        net = self.drop1(net)
+        # net = self.drop1(net)
         net = self.conv1(net)
         _layers['CNN1'] = net
-        net = self.drop2(net)
+        # net = self.drop2(net)
         net = self.conv2(net)
         _layers['CNN2'] = net
 
         # Block 4 : Feature Vector
-        net = self.drop3(net)
+        # net = self.drop3(net)
         net = self.flat(net)
         _layers['flat'] = net
-        net = self.drop4(net)
+        # net = self.drop4(net)
         net = self.dense1(net)
         _layers['dense1'] = net
 
@@ -490,9 +490,8 @@ class V2_dropout(tf.keras.Model):
             return tf.stop_gradient(net)
 class V2_PPO_dropout(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO',trials=10):
         super(V2_PPO_dropout, self).__init__(name=name)
-
         # Feature Encoder
         self.feature_network = V2_dropout()
 
@@ -503,16 +502,29 @@ class V2_PPO_dropout(tf.keras.Model):
         # Critic
         self.critic_dense1 = keras_layers.Dense(1)
 
+        self.drop5 = keras_layers.Dropout(0.2)
+        self.drop6 = keras_layers.Dropout(0.2)
+        self.repeater = keras_layers.RepeatVector(trials)
+        self.reshaper = keras_layers.Reshape((3,))
+        self.average = keras_layers.AveragePooling1D(pool_size=trials,data_format='channels_last')
+
     def call(self, inputs):
         net = self.feature_network(inputs)
+        net = self.repeater(net)
 
+        net = self.drop5(net)
         logits = self.actor_dense1(net)
         logits = tf.math.maximum(logits, 1e-9)
         actor = self.sftmx(logits)
         log_logits = tf.nn.log_softmax(logits)
 
+        net = self.drop6(net)
         critic = self.critic_dense1(net)
         critic = tf.reshape(critic, [-1])
+        actor = self.average(actor)
+        actor= self.reshaper(actor)
+
+        #Calculating Uncertainty in the net.
 
         self.actor = actor
         self.logits = logits
@@ -520,6 +532,8 @@ class V2_PPO_dropout(tf.keras.Model):
         self.critic = critic
         self.feature = net
 
+        print(actor.shape)
+        exit()
         return actor, logits, log_logits, critic, net
 
     def build_loss(self, old_log_logit, action, advantage, td_target):

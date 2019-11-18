@@ -80,11 +80,12 @@ class PPO:
         logits_l = []
 
         for j in range(10): #10 samples
-            a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.log_logits], feed_dict)
+            a_probs, critics, logits,feature = self.sess.run([self.actor, self.critic, self.log_logits, self.feature], feed_dict)
+            print(feature)
             a_probs_l.append(a_probs)
             critics_l.append(critics)
             logits_l.append(logits)
-
+        # exit()
         a_probs = np.stack(a_probs_l)
 
         confid = -np.mean(a_probs * np.log(a_probs), axis=2)

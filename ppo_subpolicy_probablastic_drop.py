@@ -58,7 +58,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
-NENV = 1
+NENV = 2
 # NENV = multiprocessing.cpu_count()//2
 
 MODEL_LOAD_PATH = "./model_baseline/coord_sample_1/"
@@ -308,6 +308,10 @@ def get_action(states, initial=False):
     if initial:
         network.initiate_episode_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
+    print(bandit_logit,uncertainty)
+    bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
+    print(bandit_logit,uncertainty)
+    exit()
 
     action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, uncertainty=uncertainty)
 
