@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -q test
 #PBS -N PROB_TRIALS10
-#PBS -l walltime=00:05:00
+#PBS -l walltime=48:00:00
 #PBS -l nodes=1:ppn=4
 #PBS -j oe
 #PBS -M nealeav2@illinois.edu
@@ -23,4 +23,6 @@ which pip
 conda env list
 pwd
 
-ctf-python ppo_subpolicy_probablastic.py PROB_TRIAL_BS10_NM10 50 0.10
+ctf-python ppo_subpolicy_probablastic_drop.py DROP_10_1 10 0.1 &
+ctf-python ppo_subpolicy_probablastic_drop.py DROP_10_1 50 0.1 &
+ctf-python ppo_subpolicy_probablastic_drop.py DROP_10_1 100 0.1
