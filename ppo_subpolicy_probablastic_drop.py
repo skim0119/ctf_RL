@@ -308,10 +308,6 @@ def get_action(states, initial=False):
     if initial:
         network.initiate_episode_confid(NENV*num_blue)
     bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
-    print(bandit_logit,uncertainty)
-    bandit_prob, bandit_critic, bandit_logit, uncertainty = meta_network.run_network(states, return_action=False)
-    print(bandit_logit,uncertainty)
-    exit()
 
     action, critic, logits, bandit_action = network.run_network_with_bandit(states, bandit_prob, uncertainty=uncertainty)
 

@@ -53,7 +53,7 @@ class PPO:
 
                 # Build Network
                 model = V2_PPO_dropout(action_size);  self.model = model
-                self.actor, self.logits, self.log_logits, self.critic, self.feature = model(self.state_input)
+                self.actor, self.logits, self.log_logits, self.critic, self.feature, self.uncertainty = model(self.state_input)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
                 model.feature_network.summary()
                 model.summary()
@@ -75,24 +75,9 @@ class PPO:
 
     def run_network(self, states, return_action=True):
         feed_dict = {self.state_input: states}
-        a_probs_l = []
-        critics_l = []
-        logits_l = []
 
-        for j in range(10): #10 samples
-            a_probs, critics, logits,feature = self.sess.run([self.actor, self.critic, self.log_logits, self.feature], feed_dict)
-            print(feature)
-            a_probs_l.append(a_probs)
-            critics_l.append(critics)
-            logits_l.append(logits)
-        # exit()
-        a_probs = np.stack(a_probs_l)
 
-        confid = -np.mean(a_probs * np.log(a_probs), axis=2)
-        uncertainty = confid.max(axis=0)
-        a_probs = np.mean(a_probs, axis=0)
-        critics = np.mean(np.stack(critics_l), axis = 0)
-        logits = np.mean(np.stack(logits_l), axis = 0)
+        a_probs, critics, logits,feature,uncertainty = self.sess.run([self.actor, self.critic, self.log_logits, self.feature, self.uncertainty], feed_dict)
 
         if return_action:
             actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])

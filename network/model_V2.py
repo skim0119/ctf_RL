@@ -503,28 +503,40 @@ class V2_PPO_dropout(tf.keras.Model):
         self.critic_dense1 = keras_layers.Dense(1)
 
         self.drop5 = keras_layers.Dropout(0.2)
-        self.drop6 = keras_layers.Dropout(0.2)
         self.repeater = keras_layers.RepeatVector(trials)
         self.reshaper = keras_layers.Reshape((3,))
+        self.reshaper1 = keras_layers.Reshape((3,))
         self.average = keras_layers.AveragePooling1D(pool_size=trials,data_format='channels_last')
+        self.average1 = keras_layers.AveragePooling1D(pool_size=trials,data_format='channels_last')
+
+        #Layers to Get Uncertainty
+        self.average2 = keras_layers.AveragePooling1D(pool_size=trials,data_format='channels_last')
+        self.average3 = keras_layers.AveragePooling1D(pool_size=action_size,data_format='channels_first')
 
     def call(self, inputs):
         net = self.feature_network(inputs)
         net = self.repeater(net)
 
-        net = self.drop5(net)
+        net = self.drop5(net,training=True)
         logits = self.actor_dense1(net)
         logits = tf.math.maximum(logits, 1e-9)
         actor = self.sftmx(logits)
         log_logits = tf.nn.log_softmax(logits)
 
-        net = self.drop6(net)
-        critic = self.critic_dense1(net)
-        critic = tf.reshape(critic, [-1])
+        uncertainty = actor*log_logits
+        uncertainty = self.average2(uncertainty)
+        uncertainty = self.average3(uncertainty)
+        uncertainty = tf.reshape(uncertainty, [-1])
+
+        log_logits = self.average1(log_logits)
+        log_logits= self.reshaper1(log_logits)
+        print("actor",dir(actor))
         actor = self.average(actor)
         actor= self.reshaper(actor)
 
-        #Calculating Uncertainty in the net.
+        critic = self.critic_dense1(net)
+        critic = self.average2(critic)
+        critic = tf.reshape(critic, [-1])
 
         self.actor = actor
         self.logits = logits
@@ -532,9 +544,7 @@ class V2_PPO_dropout(tf.keras.Model):
         self.critic = critic
         self.feature = net
 
-        print(actor.shape)
-        exit()
-        return actor, logits, log_logits, critic, net
+        return actor, logits, log_logits, critic, net, uncertainty
 
     def build_loss(self, old_log_logit, action, advantage, td_target):
         def _log(val):
