@@ -32,7 +32,7 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2_probabilistic_drop import PPO as MetaNetwork
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 4
 
 LOGDEVICE = False
 PROGBAR = True
@@ -48,6 +48,8 @@ else:
 USE_CONFID= 3
 
 paramList = [0.01,0.1,3]
+TRIALS = int(sys.argv[2])
+PDROP = float(sys.argv[3])
 
 num_mode = 3
 
@@ -167,7 +169,7 @@ global_step_next = tf.assign_add(global_step, NENV)
 # with tf.device('/gpu:1'):
 with tf.device(GPU):
     network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
-    meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-4)
+    meta_network = MetaNetwork(input_shape=input_size, action_size=num_mode, sess=sess, scope='meta',lr=1e-4, trials=TRIALS, pDrop=PDROP)
 
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+meta_network.get_vars+[global_step])
 

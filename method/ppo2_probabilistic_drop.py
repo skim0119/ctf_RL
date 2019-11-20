@@ -39,6 +39,8 @@ class PPO:
         lr=1e-4,
         sess=None,
         target_network=None,
+        trials=10,
+        pDrop = 0.2,
         **kwargs
     ):
         assert sess is not None, "TF Session is not given."
@@ -52,7 +54,7 @@ class PPO:
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_hold')
 
                 # Build Network
-                model = V2_PPO_dropout(action_size);  self.model = model
+                model = V2_PPO_dropout(action_size,trials=trials,pDrop=pDrop);  self.model = model
                 self.actor, self.logits, self.log_logits, self.critic, self.feature, self.uncertainty = model(self.state_input)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
                 model.feature_network.summary()

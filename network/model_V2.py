@@ -490,7 +490,7 @@ class V2_dropout(tf.keras.Model):
             return tf.stop_gradient(net)
 class V2_PPO_dropout(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO',trials=10):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO',trials=10,pDrop=0.2):
         super(V2_PPO_dropout, self).__init__(name=name)
         # Feature Encoder
         self.feature_network = V2_dropout()
@@ -502,7 +502,7 @@ class V2_PPO_dropout(tf.keras.Model):
         # Critic
         self.critic_dense1 = keras_layers.Dense(1)
 
-        self.drop5 = keras_layers.Dropout(0.2)
+        self.drop5 = keras_layers.Dropout(pDrop)
         self.repeater = keras_layers.RepeatVector(trials)
         self.reshaper = keras_layers.Reshape((3,))
         self.reshaper1 = keras_layers.Reshape((3,))
