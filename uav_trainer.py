@@ -35,7 +35,7 @@ from utility.gae import gae
 from method.ppo2 import PPO as Network
 
 device_ground = '/gpu:0'
-device_air = '/gpu:0'
+device_air = '/gpu:1'
 
 PROGBAR = True
 LOG_DEVICE = False
@@ -49,7 +49,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 12 # multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'uav_settings.ini'
@@ -234,6 +234,7 @@ while global_episodes < total_episodes:
         
         actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
         s1, reward, done, info = envs.step(actions)
+
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         episode_rew += reward * (1-done)
@@ -244,7 +245,7 @@ while global_episodes < total_episodes:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], reward[env_idx]-(int(a[idx]==0)*0.2), v0[idx], logits[idx]])
 
         was_alive = is_alive
         was_done = done
