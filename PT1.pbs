@@ -1,0 +1,28 @@
+sys.argv[2]#!/bin/bash
+#PBS -q eng-research
+#PBS -N DROP1
+#PBS -l walltime=48:00:00
+#PBS -l nodes=1:ppn=24
+#PBS -j oe
+#PBS -M nealeav2@illinois.edu
+#PBS -o PROB_TRIALS10.out
+#PBS -e cluster_error.out
+
+module load anaconda/3
+module load vim/8.1
+module load cuda/10.0
+module load git/2.19.0
+
+module list
+alias ctf-python /projects/tran-research-group/skim449/conda/ctf/bin/python
+conda activate /projects/tran-research-group/skim449/conda/ctf
+
+cd $PBS_O_WORKDIR
+which python
+which pip
+conda env list
+pwd
+
+/projects/tran-research-group/skim449/conda/ctf/bin/python ppo_subpolicy_trainer.py 2 SUBPOLICY_2FRAME1 /device:CPU:0 &
+/projects/tran-research-group/skim449/conda/ctf/bin/python ppo_subpolicy_trainer.py 2 SUBPOLICY_2FRAME2 /device:CPU:0 &
+/projects/tran-research-group/skim449/conda/ctf/bin/python ppo_subpolicy_trainer.py 2 SUBPOLICY_2FRAME3 /device:CPU:0

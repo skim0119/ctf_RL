@@ -38,6 +38,9 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
+assert len(sys.argv) == 4
+device_t = sys.argv[3]
+
 num_mode = 3
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
 
@@ -50,13 +53,14 @@ LOG_DEVICE = False
 RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = 'fix_baseline_80'
+TRAIN_NAME = sys.argv[2]+str(time.time()) #'fix_baseline'
+print(TRAIN_NAME)
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-NENV = multiprocessing.cpu_count()
+NENV = 8 #multiprocessing.cpu_count() // 2
 
 ## Data Path
 path_create(LOG_PATH, override=OVERRIDE)
@@ -65,7 +69,8 @@ path_create(SAVE_PATH, override=OVERRIDE)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
-config.read('config.ini')
+frames = sys.argv[1]
+config.read('config_'+frames+'f.ini')
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
@@ -83,7 +88,7 @@ lr_c = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*16
+save_image_frequency = config.getint('LOG', 'SAVE_STATISTICS_FREQ')*4
 moving_average_step = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -93,17 +98,18 @@ keep_frame = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 2
-minbatch_size = 8000
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 7 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
-## Logger Initialization 
+## Logger Initialization
 global_episode_rewards = [MA(moving_average_step) for _ in range(num_mode)]
+global_environment_rewards = [MA(moving_average_step) for _ in range(num_mode)]
 global_length = [MA(moving_average_step) for _ in range(num_mode)]
 global_succeed = [MA(moving_average_step) for _ in range(num_mode)]
 global_episodes = 0
@@ -142,11 +148,12 @@ config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
-global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, NENV)
-subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
-subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
-network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
+with tf.device(device_t):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
+    subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
+    network = Network(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, **kwargv):
     traj_buffer = defaultdict(list)
@@ -158,7 +165,7 @@ def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *
 
         td_target, advantages = gae(traj[2], traj[3], 0,
                 gamma, lambd, normalize=False)
-        
+
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
         traj_buffer['td_target'].extend(td_target)
@@ -181,7 +188,7 @@ def train(trajs, updater, bootstrap=0, epoch=epoch, batch_size=minibatch_size, *
         updater(*mdp_tuple, **kwargv, idx=MODE)
 
 # Resotre / Initialize
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=3)
 network.initiate(saver, MODEL_PATH)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
@@ -226,6 +233,7 @@ def get_action(states):
 batch = []
 num_batch = 0
 mode_changed = False
+MODE = 0
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
@@ -240,7 +248,7 @@ while True:
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
-    
+
     # Bootstrap
     s1 = envs.reset(
             config_path=setting_paths[MODE],
@@ -249,16 +257,17 @@ while True:
         )
     num_blue = len(envs.get_team_blue()[0])
     num_red = len(envs.get_team_red()[0])
-    
-    # initialize parameters 
+
+    # initialize parameters
     episode_rew = np.zeros(NENV)
+    episode_env_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
-    
+
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -274,14 +283,19 @@ while True:
 
         if step == max_ep:
             done[:] = True
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE) - 0.01
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE)
 
         if step == max_ep:
             env_reward[:] = -1
         else:
-            env_reward = (raw_reward - prev_rew)/100
-        episode_rew += reward
-    
+            env_reward = (raw_reward - prev_rew - 0.01)/100
+
+
+        for i in range(NENV):
+            if not was_done[i]:
+                episode_rew[i] += reward[i]
+                episode_env_rew[i] += env_reward[i]
+
         a1, v1, logits1, actions = get_action(s1)
         for idx, d in enumerate(done):
             if d:
@@ -291,8 +305,8 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx] 
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx] + env_reward[env_idx], v0[idx], logits[idx]])
+                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx]
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -321,6 +335,7 @@ while True:
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
     global_episode_rewards[MODE].extend(episode_rew.tolist())
+    global_environment_rewards[MODE].extend(episode_env_rew.tolist())
     global_length[MODE].extend(steps)
     global_succeed[MODE].extend(envs.blue_win())
 
@@ -332,9 +347,8 @@ while True:
             tag+'length'+MODE_NAME(MODE): global_length[MODE](),
             tag+'win-rate'+MODE_NAME(MODE): global_succeed[MODE](),
             tag+'reward'+MODE_NAME(MODE): global_episode_rewards[MODE](),
+            tag+'env_reward'+MODE_NAME(MODE): global_environment_rewards[MODE](),
         }, writer, step)
-        
+
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
-
-
