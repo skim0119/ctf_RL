@@ -236,7 +236,7 @@ while global_episodes < total_episodes:
         s1, reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        episode_rew += reward
+        episode_rew += reward * (1-done)
 
         a1, v1, logits1, actions = get_action(s1)
 
