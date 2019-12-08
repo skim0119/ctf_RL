@@ -69,6 +69,8 @@ class V2(tf.keras.Model):
         _layers['dense1'] = net
 
         self._layers_snapshot = _layers
+
+        #IMPALA
         
         if self.trainable:
             return net 
@@ -126,7 +128,7 @@ class V2_PPO(tf.keras.Model):
             old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
 
             # Clipped surrogate function
-            ratio = tf.exp(log_prob - old_log_prob)
+            ratio = tf.exp(log_prob - old_log_prob) # precision
             #ratio = log_prob / old_log_prob
             surrogate = ratio * advantage
             clipped_surrogate = tf.clip_by_value(ratio, 1-self.eps, 1+self.eps) * advantage

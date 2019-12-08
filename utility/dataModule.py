@@ -4,7 +4,8 @@ from gym_cap.envs.const import *
 
 def centering(obs, agents, H, W, padder=[0,0,0,1,0,0,0]):
     olx, oly, ch = obs.shape
-    assert ch == len(padder)
+    padder = [0] * ch; padder[3] = 1
+    if len(padder) >= 10: padder[7] = 1
 
     partial = np.any(obs[:,:,CHANNEL[UNKNOWN]])
     if partial: padder[0] = 1

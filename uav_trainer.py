@@ -1,11 +1,3 @@
-"
-TODO:
-- Implememnt SF
-- Look over TF2.0
-- Try to build environment similar to the paper
-- Try to build game for task-specific and heterogeneity environment
-"
-
 import pickle
 
 import os
@@ -42,26 +34,25 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-assert len(sys.argv) == 6
-device_t = sys.argv[4]
+device_ground = '/gpu:0'
+device_air = '/gpu:0'
 
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2]
+TRAIN_NAME = 'UAV_TRAIN'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8 # multiprocessing.cpu_count() // 2
+NENV = 12 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-#env_setting_path = 'setting_full.ini'
-env_setting_path = sys.argv[5]
+env_setting_path = 'uav_settings.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -69,12 +60,12 @@ path_create(MODEL_PATH)
 path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
-config_path = sys.argv[1]
+config_path = 'config.ini'
 config = configparser.ConfigParser()
 config.read(config_path)
 
 # Training
-total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 50000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -87,24 +78,24 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ') * 4
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ') // 2
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
+keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = int(sys.argv[3])
+minimum_batch_size = 2048
 print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 7 * keep_frame
+nchannel = 10 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
@@ -115,35 +106,10 @@ log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
-log_attack_reward = MovingAverage(moving_average_step)
-log_scout_reward = MovingAverage(moving_average_step)
-log_defense_reward = MovingAverage(moving_average_step)
-
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
-max_epsilon = 0.70; max_at = total_episodes
-def smoothstep(x, lowx=0.0, highx=1.0, lowy=0, highy=1):
-    x = (x-lowx) / (highx-lowx)
-    if x < 0:
-        val = 0
-    elif x > 1:
-        val = 1
-    else:
-        val = x * x * (3 - 2 * x)
-    return val*(highy-lowy)+lowy
-def use_this_map(x, max_episode, max_prob):
-    prob = smoothstep(x, highx=max_episode, highy=max_prob)
-    if np.random.random() < prob:
-        return random.choice(map_list)
-    else:
-        return None
-
-## Policy Setting
-heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.Random, policy.AStar]
-heur_weight = [1,1,1,1,1]
-heur_weight = np.array(heur_weight) / sum(heur_weight)
-def use_this_policy():
-    return np.random.choice(heur_policy_list, p=heur_weight)
+def use_fair_map():
+    return random.choice(map_list)
 
 ## Environment Initialization
 def make_env(map_size):
@@ -166,10 +132,12 @@ if PROGBAR:
 
 sess = tf.Session(config=config)
 
-with tf.device(device_t):
+with tf.device(device_ground):
     global_step = tf.Variable(0, trainable=False, name='global_step')
     global_step_next = tf.assign_add(global_step, NENV)
-    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+    network = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess)
+with tf.device(device_air):
+    network_air = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -181,11 +149,11 @@ else:
     global_episodes = sess.run(global_step)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes) # It save both network
 
 
 ### TRAINING ###
-def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
+def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
     traj_buffer = defaultdict(list)
     buffer_size = 0
     for idx, traj in enumerate(trajs):
@@ -214,68 +182,47 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['advantage']),
             np.stack(traj_buffer['logit'])
         )
+    i = 0
     for mdp_tuple in it:
-        network.update_network(*mdp_tuple, global_episodes, writer, log)
+        nn.update_network(*mdp_tuple, global_episodes, writer, log and (i==0))
+        i+=1
 
 def get_action(states):
-    a1, v1, logits1 = network.run_network(states)
-    actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, logits1, actions
+    states = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
+    blue_air, blue_ground, red_air, red_ground = np.split(states, [2,6,8], axis=1)
 
-def reward_shape(prev_red_alive, red_alive, done):
-    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
-    red_alive = np.reshape(red_alive, [NENV, num_red])
-    reward = []
-    red_flags = envs.red_flag_captured()
-    blue_flags = envs.blue_flag_captured()
-    for i in range(NENV):
-        possible_reward = []
-        # Attack (C/max enemy)
-        num_prev_enemy = sum(prev_red_alive[i])
-        num_enemy = sum(red_alive[i])
-        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
-        # Scout
-        if red_flags[i]:
-            possible_reward.append(1)
-        else:
-            possible_reward.append(0)
-        # Defense
-        if blue_flags[i]:
-            possible_reward.append(-1)
-        elif done[i]:
-            possible_reward.append(1)
-        else:
-            possible_reward.append(0)
+    blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
+    blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
 
-        reward.append(possible_reward)
+    action_ground, value_ground, logits_ground = network.run_network(blue_ground)
+    action_air, value_air, logits_air = network_air.run_network(blue_air)
+    action_ground_rsh = np.reshape(action_ground, [NENV, 4])
+    action_air_rsh = np.reshape(action_air, [NENV, 2])
 
-    return np.array(reward)
+    action = np.concatenate([action_air, action_ground])
+    value = np.concatenate([value_air, value_ground])
+    logit = np.concatenate([logits_air, logits_ground])
+    action_rsh = np.concatenate([action_air_rsh, action_ground_rsh], axis=1)
+    return action, value, logit, action_rsh
 
-batch = []
+
+batch_ground, batch_air = [], []
 num_batch = 0
-#while global_episodes < total_episodes:
-while True:
+while global_episodes < total_episodes:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
-    play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
+    play_save_on = interval_flag(global_episodes, 5000, 'replay_save')
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    case_rew = [np.zeros(NENV) for _ in range(3)]
-    prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
-    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)] # Trajectory per agent
     
     # Bootstrap
-    s1 = envs.reset(
-            config_path=env_setting_path,
-            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
-            policy_red=use_this_policy()
-        )
+    s1 = envs.reset(config_path=env_setting_path)
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -285,20 +232,11 @@ while True:
         a, v0 = a1, v1
         logits = logits1
         
-        s1, raw_reward, done, info = envs.step(actions)
+        actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
+        s1, reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        reward = (raw_reward - prev_rew - 0.01)/100.0
-        if step == max_ep:
-            reward[:] = -1
-            done[:] = True
         episode_rew += reward
-
-        shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
-        for i in range(NENV): 
-            if not was_done[i]:
-                for j in range(3):
-                    case_rew[j][i] += shaped_reward[i,j]
 
         a1, v1, logits1, actions = get_action(s1)
 
@@ -308,22 +246,28 @@ while True:
             if was_alive[idx] and not was_done[env_idx]:
                 trajs[idx].append([s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx]])
 
-        prev_rew = raw_reward
         was_alive = is_alive
-        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
             break
     etime_roll = time.time()
             
-    batch.extend(trajs)
+    # Split air trajectory and ground trajectory
+    for i in range(NENV):
+        for j in range(num_blue):
+            ids = i * num_blue + j
+            if j < 2:
+                batch_air.append(trajs[ids])
+            else:
+                batch_ground.append(trajs[ids])
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
-        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        train(network, batch_ground, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        train(network_air, batch_air, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
-        batch = []
+        batch_ground, batch_air = [], []
         num_batch = 0
         log_traintime.append(etime_train - stime_train)
 
@@ -337,17 +281,13 @@ while True:
     log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
-    log_attack_reward.extend(case_rew[0].tolist())
-    log_scout_reward.extend(case_rew[1].tolist())
-    log_defense_reward.extend(case_rew[2].tolist())
-
     global_episodes += NENV
     sess.run(global_step_next)
     if PROGBAR:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'baseline_training/'
+        tag = 'uav_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
@@ -355,9 +295,6 @@ while True:
             tag+'env_reward': log_episodic_reward(),
             tag+'rollout_time': log_looptime(),
             tag+'train_time': log_traintime(),
-            tag+'reward_attack': log_attack_reward(),
-            tag+'reward_scout': log_scout_reward(),
-            tag+'reward_defense': log_defense_reward(),
         }, writer, global_episodes)
         
     if save_on:
