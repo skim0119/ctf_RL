@@ -32,7 +32,7 @@ from utility.gae import gae
 from method.ppo import PPO_multimodes as Network
 from method.ppo2_probabilistic_drop import PPO as MetaNetwork
 
-assert len(sys.argv) == 4
+assert len(sys.argv) == 5
 
 LOGDEVICE = False
 PROGBAR = True
@@ -62,8 +62,9 @@ MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.90
 NENV = 8
 # NENV = multiprocessing.cpu_count()//2
+BASELINE_NAME = sys.argv[4]
 
-MODEL_LOAD_PATH = "./model_baseline/coord_sample_1/"
+MODEL_LOAD_PATH = "./model_baseline/"+BASELINE_NAME+"/"
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
