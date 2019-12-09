@@ -2,7 +2,7 @@
 #PBS -q eng-research
 #PBS -N DROP5
 #PBS -l walltime=48:00:00
-#PBS -l nodes=1:ppn=28
+#PBS -l nodes=1:ppn=24
 #PBS -j oe
 #PBS -M nealeav2@illinois.edu
 #PBS -o DROP5.out
