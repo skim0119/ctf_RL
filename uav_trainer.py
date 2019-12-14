@@ -223,6 +223,12 @@ while global_episodes < total_episodes:
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path)
+    np.set_printoptions(threshold=sys.maxsize)
+    print((s1[0][:,:,0]==-1).astype(int))
+    print((s1[0][:,:,0]==-1).sum())
+    print((s1[1][:,:,0]==-1).astype(int))
+    print((s1[1][:,:,0]==-1).sum())
+    input('')
     a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
@@ -246,9 +252,14 @@ while global_episodes < total_episodes:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if agent.is_air:
-                agent_reward = (s0[idx]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
+                print((s0[idx][:,:,0]==-1).astype(int))
+                print(s0[idx][:,:,0].shape)
+                agent_reward = (s0[idx][:,:,0]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
+                print('air : ', agent_reward)
+                input('')
             else:
                 agent_reward = reward[env_idx]-(int(a[idx]==0)*0.002)
+                print('ugv : ', agent_reward)
             if was_alive[idx] and not was_done[env_idx]:
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 
@@ -260,13 +271,11 @@ while global_episodes < total_episodes:
     etime_roll = time.time()
             
     # Split air trajectory and ground trajectory
-    for i in range(NENV):
-        for j in range(num_blue):
-            ids = i * num_blue + j
-            if j < 2:
-                batch_air.append(trajs[ids])
-            else:
-                batch_ground.append(trajs[ids])
+    for idx, agent in enumerate(envs.get_team_blue().flat):
+        if agent.is_air:
+            batch_air.append(trajs[idx])
+        else:
+            batch_ground.append(trajs[idx])
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
         stime_train = time.time()

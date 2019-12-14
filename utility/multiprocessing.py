@@ -20,8 +20,7 @@ class CloudpickleWrapper(object):
         import pickle
         self.x = pickle.loads(ob)
 
-def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_frame=1):
-    # If continous == True, automatically reset once the game is over.
+def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1):
     parent_remote.close()
     env = env_fn_wrapper.x()
 
@@ -38,10 +37,6 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, continuous=False, keep_fr
                 ob, reward, done, info = env.step(data)
                 if done:
                     pause = True
-                    if continuous:
-                        ## TODO
-                        ob = env.reset()
-                        pause = False
                 ob = centering(ob, env.get_team_blue, 39, 39)
                 if ctrl_red:
                     rob = centering(env.get_obs_red, env.get_team_red, 39, 39)
@@ -94,7 +89,7 @@ class SubprocVecEnv:
         idx = 0
         for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
             self.ps.append(Process(target=worker,
-                args=(idx, work_remote, remote, CloudpickleWrapper(env_fn), False, keep_frame) ) )
+                args=(idx, work_remote, remote, CloudpickleWrapper(env_fn), keep_frame) ) )
             idx += 1
 
         for p in self.ps:
