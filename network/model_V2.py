@@ -80,7 +80,7 @@ class V2(tf.keras.Model):
 
 class V2_PPO(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.05, critic_beta=0.5, name='PPO'):
         super(V2_PPO, self).__init__(name=name)
 
         # Feature Encoder

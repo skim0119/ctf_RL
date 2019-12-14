@@ -49,7 +49,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'uav_settings.ini'
@@ -65,7 +65,7 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 # Training
-total_episodes = 50000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -84,18 +84,18 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
+keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 2048
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 10 * keep_frame
+nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
@@ -232,20 +232,25 @@ while global_episodes < total_episodes:
         a, v0 = a1, v1
         logits = logits1
         
-        actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
+        #actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
+        actions = np.concatenate([actions, np.random.randint(5, size=actions.shape)], axis=1)
         s1, reward, done, info = envs.step(actions)
 
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        episode_rew += reward * (1-done)
+        episode_rew += reward * (1-np.array(was_done, dtype=int))
 
         a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
+            if agent.is_air:
+                agent_reward = (s0[idx]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
+            else:
+                agent_reward = reward[env_idx]-(int(a[idx]==0)*0.002)
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[env_idx]-(int(a[idx]==0)*0.2), v0[idx], logits[idx]])
+                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 
         was_alive = is_alive
         was_done = done
