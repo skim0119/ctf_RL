@@ -118,8 +118,8 @@ def make_env(map_size):
             map_size=map_size,
             config_path=env_setting_path
             )
-envs = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs, keep_frame)
+envs_list = [make_env(map_size) for i in range(NENV)]
+envs = SubprocVecEnv(envs_list, keep_frame)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
@@ -132,9 +132,9 @@ if PROGBAR:
 
 sess = tf.Session(config=config)
 
+global_step = tf.Variable(0, trainable=False, name='global_step')
+global_step_next = tf.assign_add(global_step, NENV)
 with tf.device(device_ground):
-    global_step = tf.Variable(0, trainable=False, name='global_step')
-    global_step_next = tf.assign_add(global_step, NENV)
     network = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess)
 with tf.device(device_air):
     network_air = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess)
@@ -190,6 +190,8 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
 def get_action(states):
     states = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
     blue_air, blue_ground, red_air, red_ground = np.split(states, [2,6,8], axis=1)
+    blue_state, red_state = np.split(states, [6], axis=1)
+    blue_state = blue_state.reshape([NENV*num_blue]+input_size[1:])
 
     blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
     blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
@@ -203,7 +205,8 @@ def get_action(states):
     value = np.concatenate([value_air, value_ground])
     logit = np.concatenate([logits_air, logits_ground])
     action_rsh = np.concatenate([action_air_rsh, action_ground_rsh], axis=1)
-    return action, value, logit, action_rsh
+
+    return blue_state, action, value, logit, action_rsh
 
 
 batch_ground, batch_air = [], []
@@ -223,13 +226,7 @@ while global_episodes < total_episodes:
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path)
-    np.set_printoptions(threshold=sys.maxsize)
-    print((s1[0][:,:,0]==-1).astype(int))
-    print((s1[0][:,:,0]==-1).sum())
-    print((s1[1][:,:,0]==-1).astype(int))
-    print((s1[1][:,:,0]==-1).sum())
-    input('')
-    a1, v1, logits1, actions = get_action(s1)
+    s1, a1, v1, logits1, actions = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
@@ -238,28 +235,23 @@ while global_episodes < total_episodes:
         a, v0 = a1, v1
         logits = logits1
         
-        #actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
-        actions = np.concatenate([actions, np.random.randint(5, size=actions.shape)], axis=1)
+        actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
+        #actions = np.concatenate([actions, np.random.randint(5, size=actions.shape)], axis=1)
         s1, reward, done, info = envs.step(actions)
 
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         episode_rew += reward * (1-np.array(was_done, dtype=int))
 
-        a1, v1, logits1, actions = get_action(s1)
+        s1, a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if agent.is_air:
-                print((s0[idx][:,:,0]==-1).astype(int))
-                print(s0[idx][:,:,0].shape)
-                agent_reward = (s0[idx][:,:,0]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
-                print('air : ', agent_reward)
-                input('')
+                agent_reward = (s0[idx][:,:,-6]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
             else:
                 agent_reward = reward[env_idx]-(int(a[idx]==0)*0.002)
-                print('ugv : ', agent_reward)
             if was_alive[idx] and not was_done[env_idx]:
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 

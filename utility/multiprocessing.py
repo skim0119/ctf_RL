@@ -49,6 +49,7 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1):
                 data['policy_red'] = data['policy_red']()
             if 'policy_blue' in data.keys():
                 data['policy_blue'] = data['policy_blue']()
+
             ob = env.reset(**data)
             ob = centering(ob, env.get_team_blue, 39, 39)
             if ctrl_red:
@@ -112,7 +113,10 @@ class SubprocVecEnv:
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
-        return np.concatenate(obs, axis=0), np.stack(rews), np.stack(dones), infos
+        obs = np.concatenate(obs, axis=0)
+        rews = np.stack(rews)
+        dones = np.stack(dones)
+        return obs, rews, dones, infos
 
     def reset(self, **kwargs):
         for remote in self.remotes:
