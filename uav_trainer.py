@@ -34,15 +34,15 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-device_ground = '/gpu:0'
-device_air = '/gpu:1'
+device_ground = '/gpu:1'
+device_air = '/gpu:0'
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'UAV_TRAIN'
+TRAIN_NAME = 'UAV_TRAIN_SF'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -65,7 +65,7 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 # Training
-total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 1000000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -88,7 +88,7 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 512
 epoch = 2
 minimum_batch_size = 4096
 print(minimum_batch_size)
@@ -141,7 +141,7 @@ with tf.device(device_air):
 
 # Resotre / Initialize
 global_episodes = 0
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=4)
 network.initiate(saver, MODEL_PATH)
 if OVERRIDE:
     sess.run(tf.assign(global_step, 0)) # Reset the counter
@@ -188,25 +188,38 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         i+=1
 
 def get_action(states):
-    states = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
-    blue_air, blue_ground, red_air, red_ground = np.split(states, [2,6,8], axis=1)
-    blue_state, red_state = np.split(states, [6], axis=1)
-    blue_state = blue_state.reshape([NENV*num_blue]+input_size[1:])
+    states_rsh = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
+    blue_air, blue_ground, red_air, red_ground = np.split(states_rsh, [2,6,8], axis=1)
+    blue_states, red_states = np.split(states_rsh, [6], axis=1)
 
+    # BLUE GET ACTION
     blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
     blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
 
-    action_ground, value_ground, logits_ground = network.run_network(blue_ground)
-    action_air, value_air, logits_air = network_air.run_network(blue_air)
-    action_ground_rsh = np.reshape(action_ground, [NENV, 4])
-    action_air_rsh = np.reshape(action_air, [NENV, 2])
+    action_ground, value_ground, logit_ground = network.run_network(blue_ground)
+    action_air, value_air, logit_air = network_air.run_network(blue_air)
 
-    action = np.concatenate([action_air, action_ground])
-    value = np.concatenate([value_air, value_ground])
-    logit = np.concatenate([logits_air, logits_ground])
-    action_rsh = np.concatenate([action_air_rsh, action_ground_rsh], axis=1)
+    action_rsh = np.concatenate([action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
+    value = np.concatenate([value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
+    logit = np.concatenate([logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
 
-    return blue_state, action, value, logit, action_rsh
+    # RED GET ACTION (Comment this section to make it single-side control and return blue_states)
+    red_air = np.reshape(red_air, [NENV*2]+input_size[1:])
+    red_ground = np.reshape(red_ground, [NENV*4]+input_size[1:])
+
+    action_ground, value_ground, logit_ground = network.run_network(red_ground)
+    action_air, value_air, logit_air = network_air.run_network(blue_air)
+
+    action_rsh = np.concatenate([action_rsh, action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
+    value = np.concatenate([value, value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
+    logit = np.concatenate([logit, logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
+
+    # RESHAPE
+    action = action_rsh.reshape([-1])
+    value = value.reshape([-1])
+    logit = logit.reshape([NENV*12, 5])
+
+    return states, action, value, logit, action_rsh
 
 
 batch_ground, batch_air = [], []
@@ -219,10 +232,13 @@ while global_episodes < total_episodes:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive = [True for agent in range(NENV*(num_blue*num_red))]
     was_done = [False for env in range(NENV)]
+    is_air = np.array([agent.is_air for agent in envs.get_team_blue().flat]).reshape([NENV, num_blue])
+    is_air_red = np.array([agent.is_air for agent in envs.get_team_red().flat]).reshape([NENV, num_red])
+    is_air = np.concatenate([is_air, is_air_red], axis=1).reshape([-1])
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)] # Trajectory per agent
+    trajs = [Trajectory(depth=5) for _ in range((num_blue+num_red)*NENV)] # Trajectory per agent
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path)
@@ -235,24 +251,32 @@ while global_episodes < total_episodes:
         a, v0 = a1, v1
         logits = logits1
         
-        actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
+        #actions = np.concatenate([actions, np.zeros_like(actions)], axis=1)
         #actions = np.concatenate([actions, np.random.randint(5, size=actions.shape)], axis=1)
         s1, reward, done, info = envs.step(actions)
+        reward_red = np.array([i['red_reward'] for i in info])
+        env_reward = np.vstack((reward, reward_red)).T.reshape([-1])
 
-        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
+        is_alive = np.array([agent.isAlive for agent in envs.get_team_blue().flat]).reshape([NENV, num_blue])
+        is_alive_red = np.array([agent.isAlive for agent in envs.get_team_red().flat]).reshape([NENV, num_red])
+        is_alive = np.concatenate([is_alive, is_alive_red], axis=1).reshape([-1])
+
+
         episode_rew += reward * (1-np.array(was_done, dtype=int))
 
         s1, a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // num_blue
-            if agent.is_air:
-                agent_reward = (s0[idx][:,:,-6]==-1).sum() * (-1) + reward[env_idx] - (int(a[idx]==0)*0.002)
-            else:
-                agent_reward = reward[env_idx]-(int(a[idx]==0)*0.002)
+        air_reward = s0[::6,:,:,-6].sum(axis=2).sum(axis=1) * (-0.1) * np.repeat(np.array(done,dtype=int), 2)
+        for idx in range(NENV*(num_blue+num_red)):
+        #for idx, agent in enumerate(envs.get_team_blue().flat):
+            env_idx = idx // (num_blue+num_red)
+            env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
+                if is_air[idx]:
+                    agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx] - (int(a[idx]==0)*0.002)
+                else:
+                    agent_reward = env_reward[env_team_idx]-(int(a[idx]==0)*0.002)
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 
         was_alive = is_alive
@@ -263,8 +287,8 @@ while global_episodes < total_episodes:
     etime_roll = time.time()
             
     # Split air trajectory and ground trajectory
-    for idx, agent in enumerate(envs.get_team_blue().flat):
-        if agent.is_air:
+    for idx in range(NENV*(num_blue+num_red)):
+        if is_air[idx]:
             batch_air.append(trajs[idx])
         else:
             batch_ground.append(trajs[idx])
