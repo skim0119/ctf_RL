@@ -1,0 +1,1 @@
+model/UAV_TRAIN, 0, groupA_0

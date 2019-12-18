@@ -1,14 +1,9 @@
-""" NN Model Wrapper """
-
 import numpy as np
 
 import tensorflow as tf
 
 from utility.utils import store_args
 from utility.utils import discount_rewards
-
-from method.base import initialize_uninitialized_vars as iuv
-
 
 class TrainedNetwork:
     """TrainedNetwork
@@ -39,7 +34,7 @@ class TrainedNetwork:
             self.graph.device(device)
             self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True), graph=self.graph)
 
-        self.model_path = 'model/' + model_name
+        self.model_path = model_name
 
         # Initialize Session and TF graph
         self._initialize_network()
@@ -53,12 +48,23 @@ class TrainedNetwork:
 
         return action_out
 
-    def reset_network_weight(self):
-        ckpt = tf.train.get_checkpoint_state(self.model_path)
-        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+    def reset_network_weight(self, path=None, step=None):
+        if path is not None:
+            self.model_path = path
+
+        if step is None:
+            ckpt = tf.train.get_checkpoint_state(self.model_path)
+            if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+            else:
+                raise AssertionError
         else:
-            raise AssertionError
+            full_path = self.model_path + '/ctf_policy.ckpt-' + str(step) + '.meta'
+            self.saver = tf.train.import_meta_graph(
+                    full_path,
+                    clear_device=True,
+                )
+            self.saver.restore(self.sess, full_path)
 
     def _initialize_network(self, verbose=False):
         """reset_network
