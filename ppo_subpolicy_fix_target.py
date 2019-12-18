@@ -70,7 +70,7 @@ path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read('config_1f.ini')
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
