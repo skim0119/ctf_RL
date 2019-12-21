@@ -6,7 +6,6 @@ import time
 import gym
 import gym_cap
 import numpy as np
-from tqdm import tqdm
 
 # the modules that you can use to generate the policy.
 import policy
@@ -16,7 +15,7 @@ from utility.elopy import Elo
 env = gym.make("cap-v0")
 
 # Fair map list
-map_path = 'test_maps/fair_uav'
+map_path = 'fair_uav'
 map_paths = [join(map_path,f) for f in os.listdir(map_path) if isfile(join(map_path, f))]
 
 # Read Possible Player
@@ -24,7 +23,7 @@ def read_player(fpath):
     players = []
     with open(fpath, 'r') as f:
         for line in f:
-            model_path, step, group_name = line.split(',')
+            model_path, step, group_name = line.strip().split(',')
             step = int(step)
             players.append((model_path, step, group_name))
     return players
@@ -33,12 +32,11 @@ players = read_player('competition_player.txt')
 # Scoreboard
 elo = Elo()
 for _,_,name in players:
-    if not elo.contain(name):
+    if not elo.contains(name):
         elo.addPlayer(name)
 elo.addPlayer('Roomba')
 elo.addPlayer('Zeros')
 elo.addPlayer('Random')
-
 
 try:
     nn_policy_1 = policy.UAV()
@@ -50,8 +48,8 @@ try:
     policy1, policy2 = [], []
     while True:
         # Player Selection
-        if episode % 10 == 0:
-            p1, p2 = random.sample(players + basic_policies_name)
+        if episode % 5 == 0:
+            p1, p2 = random.sample(players + basic_policies_name, 2)
             if p1 in basic_policies_name:
                 player1 = p1
                 policy1 = basic_policies[player1]
@@ -73,6 +71,7 @@ try:
                 policy_blue=policy1,
                 policy_red=policy2,
             )
+        env.CONTROL_ALL = False
         t = 0
         done = False
         while not done:
@@ -80,6 +79,7 @@ try:
             t += 1
             if t == 150:
                 break
+
         if env.red_win and env.blue_win:
             elo.recordMatch(player1, player2, draw=True)
         elif env.blue_win:
@@ -93,11 +93,18 @@ try:
 
         # Draw Table
         if episode % 100 == 0:
-            print('played_episode = ', episode)
-            tb = elo.getRatingList()
-            tb = sorted(tb, key=lambda x: x[1])
-            for name, rate in tb:
-                print('{:>7} : {:>5}'.format(name, rate))
+            with open('competition_result.txt', 'w') as f:
+                print('played_episode = ', episode)
+                tb = elo.getRatingList()
+                tb = sorted(tb, key=lambda x: x[1])[::-1]
+                format_string = '|{:>15}|{:>5}|'
+                print(format_string.format('Name', 'Rate'))
+                print('-'*15)
+                for name, rate in tb:
+                    rate = int(rate)
+                    print(format_string.format(name, rate))
+                    f.write(format_string.format(name, rate))
+
 except KeyboardInterrupt:
     env.close()
     del gym.envs.registry.env_specs['cap-v0']

@@ -43,9 +43,10 @@ class UAV(Policy):
         self.keep_frame = 4
         self.vision_range = 19
         self.network = TrainedNetwork(
-                model_name='model/UAV_TRAIN',
+                model_name='model/UAV_TRAIN_SF',
                 input_tensor='ground/state:0',
-                output_tensor='ground/PPO/activation/Softmax:0'
+                output_tensor='ground/PPO/activation/Softmax:0',
+                device='/gpu:0'
             )
 
         self.sess = self.network.sess

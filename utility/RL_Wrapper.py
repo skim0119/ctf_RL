@@ -32,7 +32,9 @@ class TrainedNetwork:
         if sess is None:
             self.graph = tf.Graph()
             self.graph.device(device)
-            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True), graph=self.graph)
+            config = tf.ConfigProto(allow_soft_placement=True)
+            config.gpu_options.allow_growth = True
+            self.sess = tf.Session(config=config, graph=self.graph)
 
         self.model_path = model_name
 
@@ -54,17 +56,20 @@ class TrainedNetwork:
 
         if step is None:
             ckpt = tf.train.get_checkpoint_state(self.model_path)
-            if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-                self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-            else:
-                raise AssertionError
+            with self.sess.graph.as_default():
+                if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+                    self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+                else:
+                    raise AssertionError
         else:
-            full_path = self.model_path + '/ctf_policy.ckpt-' + str(step) + '.meta'
-            self.saver = tf.train.import_meta_graph(
-                    full_path,
-                    clear_device=True,
-                )
-            self.saver.restore(self.sess, full_path)
+            full_path = self.model_path + '/ctf_policy.ckpt-' + str(step)
+            with self.sess.graph.as_default():
+                self.saver = tf.train.import_meta_graph(
+                        full_path+'.meta',
+                        clear_devices=True,
+                        import_scope=self.import_scope
+                    )
+                self.saver.restore(self.sess, full_path)
 
     def _initialize_network(self, verbose=False):
         """reset_network
