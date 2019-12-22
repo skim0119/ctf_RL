@@ -124,7 +124,7 @@ except KeyboardInterrupt:
     elo_string = str(slo)
     with open('competition_result.txt', 'w') as f:
         print(elo_string)
-                f.write(elo_string)
+        f.write(elo_string)
     print("CtF environment Closed")
 
 
