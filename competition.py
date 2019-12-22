@@ -108,17 +108,17 @@ try:
         # Record Set Match
         result = sum(match_results)
         if result > 0:
-            elo.recordMatch(player1, player2, winner=player1)
+            elo.recordMatch(player1, player2, winner=player1, verbose=1)
         elif result < 0:
-            elo.recordMatch(player1, player2, winner=player2)
+            elo.recordMatch(player1, player2, winner=player2, verbose=1)
         else:
-            elo.recordMatch(player1, player2, draw=True)
+            elo.recordMatch(player1, player2, draw=True, verbose=1)
 
         episode += 1
 
         # Draw Table
         if episode % 100 == 0:
-            elo_string = str(slo)
+            elo_string = str(elo)
             with open('competition_result.txt', 'w') as f:
                 print(elo_string)
                 f.write(elo_string)
@@ -128,7 +128,7 @@ except KeyboardInterrupt:
     env.close()
     del gym.envs.registry.env_specs['cap-v0']
 
-    elo_string = str(slo)
+    elo_string = str(elo)
     with open('competition_result.txt', 'w') as f:
         print(elo_string)
         f.write(elo_string)

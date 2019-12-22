@@ -49,7 +49,7 @@ class Elo:
         self.getPlayerList.remove(self.getPlayer(name))
 
 
-    def recordMatch(self, name1, name2, winner=None, draw=False):
+    def recordMatch(self, name1, name2, winner=None, draw=False, verbose=False):
         player1 = self.getPlayer(name1)
         player2 = self.getPlayer(name2)
 
@@ -84,6 +84,9 @@ class Elo:
             newRating2 = 0
             newRating1 = rating1 - rating2
 
+        if verbose:
+            print(f'player1 : {player1.rating} -> {newRating1}')
+            print(f'player2 : {player2.rating} -> {newRating2}')
         player1.rating = newRating1
         player2.rating = newRating2
 
