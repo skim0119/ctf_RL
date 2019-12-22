@@ -1,14 +1,3 @@
-"""
-a3c.py module includes basic modules and implementation of A3C for CtF environment.
-
-Some of the methods are left unimplemented which makes the a3c module to be parent abstraction.
-
-Script contains example A3C
-
-TODO:
-    - Include gradient and weight histograph for nan debug
-"""
-
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
@@ -56,10 +45,8 @@ class PPO:
 
                 # Build Network
                 model = PPO_LSTM_V1(action_size);  self.model = model
-                self.actor, self.logits, self.log_logits, self.critic = model(self.state_input)
-                self.hidden = model
+                self.actor, self.logits, self.log_logits, self.critic, self.hidden = model(self.state_input)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
-                model.feature_network.summary()
                 model.summary()
 
                 # Build Trainer
@@ -67,33 +54,42 @@ class PPO:
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
                 self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
+    def hidden_init(self, batch_size):
+        return [np.zeros([batch_size, 256]), np.zeros([batch_size, 256])]
+
     def run_network(self, states, return_action=True):
-        feed_dict = {self.state_input: states}
-        a_probs, critics, logits = self.sess.run([self.actor, self.critic, self.log_logits], feed_dict)
+        feed_dict = {
+                self.state_input: states[0],
+                self.prev_action_: states[1],
+                self.prev_reward_: states[2],
+                self.hidden_[0] : states[3][0],
+                self.hidden_[1] : states[3][1],
+            }
+        a_probs, critics, logits, hidden_h, hidden_c = self.sess.run([self.actor, self.critic, self.log_logits, self.hidden[0], self.hidden[1]], feed_dict)
         if return_action:
             actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
-            return actions, critics, logits
+            return actions, critics, logits, hidden_h, hidden_c
         else:
-            return a_probs, critics, logits
+            return a_probs, critics, logits, hidden_h, hidden_c
 
-    def update_network(self, state_input, action, td_target, advantage, old_logit, global_episodes, writer=None, log=False):
-        feed_dict = {self.state_input: state_input,
-                     self.action_: action,
-                     self.td_target_: td_target,
-                     self.advantage_: advantage,
-                     self.old_logits_: old_logit}
+    def update_network(self, states, action, td_target, advantage, old_logit, prev_actions, prev_rewards, hhs, hcs, global_episodes, writer=None, log=False):
+        feed_dict = {
+                self.state_input: states,
+                self.prev_action_: prev_actions,
+                self.prev_reward_: prev_rewards,
+                self.hidden_[0] : hhs,
+                self.hidden_[1] : hcs,
+                self.action_: action,
+                self.td_target_: td_target,
+                self.advantage_: advantage,
+                self.old_logits_: old_logit
+            }
         self.sess.run(self.update_ops, feed_dict)
 
         if log:
             ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
             aloss, closs, entropy = self.sess.run(ops, feed_dict)
 
-            log_ops = [self.cnn_summary]
-                       #self.merged_grad_summary_op,
-                       #self.merged_summary_op]
-            summaries = self.sess.run(log_ops, feed_dict)
-            for summary in summaries:
-                writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
             summary.value.add(tag='summary/'+self.scope+'_actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/'+self.scope+'_critic_loss', simple_value=closs)

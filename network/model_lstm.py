@@ -17,7 +17,7 @@ from method.base import put_channels_on_grid
 
 class PPO_LSTM_V1(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.10, critic_beta=0.5, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
         super(PPO_LSTM_V1, self).__init__(name=name)
 
         # Feature Encoder
@@ -64,6 +64,7 @@ class PPO_LSTM_V1(tf.keras.Model):
         net = self.td_dense1(net)
         net = tf.concat([net, prev_action, prev_reward], axis=1)
         net, state_h, state_c = self.lstm1(net, initial_state=hidden)
+        hidden = [state_h, state_c]
 
         logits = self.actor_dense1(net) 
         actor = self.softmax(logits)
@@ -77,9 +78,9 @@ class PPO_LSTM_V1(tf.keras.Model):
         self.logits = logits
         self.log_logits = log_logits
         self.critic = critic
-        self.hidden_state = [state_h, state_c]
+        self.hidden_state = hidden
 
-        return actor, logits, log_logits, critic
+        return actor, logits, log_logits, critic, hidden
 
     def build_loss(self, old_log_logit, action, advantage, td_target):
         def _log(val):

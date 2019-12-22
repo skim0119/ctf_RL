@@ -35,6 +35,15 @@ class Stacked_state:
         return np.concatenate(self.stack, axis=self.axis)
 
 
+class VStacked_state(Stacked_state):
+    def __call__(self, obj=None):
+        if obj is None:
+            return np.stack(self.stack, axis=self.axis)
+        self.stack.append(obj)
+        self.stack.pop(0)
+        return np.stack(self.stack, axis=self.axis)
+
+
 def oh_to_rgb(state):
     # input: [num_agent, width, height, channel]
     n, w, h, ch = state.shape
