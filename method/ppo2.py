@@ -24,7 +24,6 @@ from method.base import put_flat_on_grid
 from method.base import put_ctf_state_on_grid
 from method.base import initialize_uninitialized_vars as iuv
 
-
 from network.attention import self_attention
 from network.model_V2 import V2_PPO
 

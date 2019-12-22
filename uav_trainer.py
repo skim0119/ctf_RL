@@ -34,7 +34,7 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-device_ground = '/gpu:1'
+device_ground = '/gpu:0'
 device_air = '/gpu:0'
 
 PROGBAR = True
@@ -42,14 +42,14 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'UAV_TRAIN_SF'
+TRAIN_NAME = 'UAV_TRAIN_SF_2'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count()
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'uav_settings.ini'
@@ -88,9 +88,9 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 512
+minibatch_size = 256
 epoch = 2
-minimum_batch_size = 4096
+minimum_batch_size = 2048
 print(minimum_batch_size)
 
 ## Setup
@@ -267,16 +267,16 @@ while global_episodes < total_episodes:
         s1, a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
-        air_reward = s0[::6,:,:,-6].sum(axis=2).sum(axis=1) * (-0.1) * np.repeat(np.array(done,dtype=int), 2)
+        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(done,dtype=int), 2)
         for idx in range(NENV*(num_blue+num_red)):
         #for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue+num_red)
             env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
                 if is_air[idx]:
-                    agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx] - (int(a[idx]==0)*0.002)
+                    agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
                 else:
-                    agent_reward = env_reward[env_team_idx]-(int(a[idx]==0)*0.002)
+                    agent_reward = env_reward[env_team_idx]
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 
         was_alive = is_alive

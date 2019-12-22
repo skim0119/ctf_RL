@@ -137,7 +137,7 @@ class V2_PPO(tf.keras.Model):
 
             total_loss = actor_loss
             if self.entropy_beta != 0:
-                total_loss = actor_loss - entropy * self.entropy_beta
+                total_loss = actor_loss + entropy * self.entropy_beta
             if self.critic_beta != 0:
                 total_loss = actor_loss + critic_loss * self.critic_beta
 
