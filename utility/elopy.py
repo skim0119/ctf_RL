@@ -1,3 +1,6 @@
+import pickle
+import os.path
+
 class Elo:
     def __init__(self, base_rating=1500):
         self.base_rating = base_rating
@@ -14,6 +17,15 @@ class Elo:
             string += format_string.format(name, rate)
         string += '-'*(20+3)
         return string
+
+    def save(self, filename='elo.pkl'):
+        with open(filename, 'wb') as file:
+            pickle.dump(self.players, file)
+
+    def load(self, filename='elo.pkl'):
+        if os.path.isfile(filename):
+            with open(filename, 'rb') as file:
+                self.players = pickle.load(file)
 
     def getPlayer(self, name):
         for player in self.players:

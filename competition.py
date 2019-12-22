@@ -36,6 +36,7 @@ for _,_,name in players:
 elo.addPlayer('Roomba')
 elo.addPlayer('Zeros')
 elo.addPlayer('Random')
+elo.load()
 
 # Set Config
 N = 5 # Length of set
@@ -116,6 +117,7 @@ try:
             with open('competition_result.txt', 'w') as f:
                 print(elo_string)
                 f.write(elo_string)
+            elo.save()
 
 except KeyboardInterrupt:
     env.close()
@@ -125,6 +127,7 @@ except KeyboardInterrupt:
     with open('competition_result.txt', 'w') as f:
         print(elo_string)
         f.write(elo_string)
+    elo.save()
     print("CtF environment Closed")
 
 
