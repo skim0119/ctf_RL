@@ -19,6 +19,7 @@ map_path = 'fair_uav'
 map_paths = [join(map_path,f) for f in os.listdir(map_path) if isfile(join(map_path, f))]
 
 # Read Possible Player
+players = []
 def read_player(fpath):
     players = []
     with open(fpath, 'r') as f:
@@ -27,6 +28,7 @@ def read_player(fpath):
             step = int(step)
             players.append((model_path, step, group_name))
     return players
+players = read_player('competition_player.txt')
 
 # Scoreboard
 elo = Elo()
@@ -54,6 +56,9 @@ try:
         # Reread Players
         if episode % 100 == 0:
             players = read_player('competition_player.txt')
+            for _,_,name in players:
+                if not elo.contains(name):
+                    elo.addPlayer(name)
 
         # Player Selection
         p1, p2 = random.sample(players + basic_policies_name, 2)
