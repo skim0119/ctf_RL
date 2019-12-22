@@ -267,7 +267,7 @@ while global_episodes < total_episodes:
         s1, a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
-        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(done,dtype=int), 2)
+        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~done,dtype=int), 2)
         for idx in range(NENV*(num_blue+num_red)):
         #for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue+num_red)
