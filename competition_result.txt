@@ -1,1 +1,20 @@
-|      groupA_10| 2729||      groupA_12| 1841||      groupA_05| 1840||      groupB_11| 1839||      groupB_21| 1839||      groupB_06| 1839||      groupB_05| 1839||          Zeros| 1820||      groupB_08| 1680||      groupA_01| 1152||      groupA_04| 1061||      groupB_09| 1020||      groupB_07| 1003||         Roomba| 1000||         Random| 1000||      groupB_13| 1000||      groupB_03|  964||      groupA_08|  944||      groupB_12|  891||      groupB_20|  736||      groupB_16|  196||      groupA_09|  159||      groupA_06|  159||      groupB_14|    0||      groupB_10|    0||      groupB_04|    0||      groupB_02|    0||      groupB_01|    0||      groupA_11|    0||      groupA_07|    0||      groupA_03|    0||      groupA_02|    0||      groupB_19| -160||      groupB_22| -160||      groupA_13| -165||      groupB_15| -582||      groupB_23| -669||      groupB_18| -759||      groupA_14| -791||      groupB_17| -818|
+-----------------------
+|      groupA_05| 1540|
+|      groupA_03| 1529|
+|      groupB_04| 1528|
+|         Roomba| 1528|
+|      groupA_06| 1521|
+|      groupA_08| 1516|
+|      groupB_07| 1516|
+|      groupB_05| 1514|
+|      groupA_04| 1512|
+|      groupA_07| 1501|
+|      groupA_01| 1499|
+|          Zeros| 1491|
+|      groupB_03| 1489|
+|         Random| 1483|
+|      groupA_02| 1476|
+|      groupB_06| 1460|
+|      groupB_02| 1444|
+|      groupB_01| 1443|
+-----------------------

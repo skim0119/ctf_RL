@@ -52,6 +52,8 @@ try:
     episode = 0
     player1, player2 = 'Roomba', 'Zeros'
     policy1, policy2 = [], []
+
+    resetCount = 0
     while True:
         # Reread Players
         if episode % 100 == 0:
@@ -62,6 +64,13 @@ try:
 
         # Player Selection
         p1, p2 = random.sample(players + basic_policies_name, 2)
+        p1_name = p1 if p1 in basic_policies_name else p1[2]
+        p2_name = p2 if p2 in basic_policies_name else p2[2]
+        if abs(elo.getPlayerRating(p1_name)-elo.getPlayerRating(p2_name)) > 471.0+resetCount*0.1: # Resample
+            resetCount += 1
+            continue
+        else:
+            resetCount = 0
         if p1 in basic_policies_name:
             player1 = p1
             policy1 = basic_policies[player1]

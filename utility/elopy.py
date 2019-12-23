@@ -26,6 +26,8 @@ class Elo:
         if os.path.isfile(filename):
             with open(filename, 'rb') as file:
                 self.players = pickle.load(file)
+            print(self.players)
+            print(self.__str__())
 
     def getPlayer(self, name):
         for player in self.players:
@@ -85,8 +87,8 @@ class Elo:
             newRating1 = rating1 - rating2
 
         if verbose:
-            print(f'player1 : {player1.rating} -> {newRating1}')
-            print(f'player2 : {player2.rating} -> {newRating2}')
+            print(f'{player1.name} : {player1.rating} -> {newRating1}')
+            print(f'{player2.name} : {player2.rating} -> {newRating2}')
         player1.rating = newRating1
         player2.rating = newRating2
 

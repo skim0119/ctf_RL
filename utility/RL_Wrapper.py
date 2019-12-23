@@ -56,6 +56,7 @@ class TrainedNetwork:
 
         if step is None:
             ckpt = tf.train.get_checkpoint_state(self.model_path)
+            tf.keras.backend.clear_session()
             with self.sess.graph.as_default():
                 if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
                     self.saver.restore(self.sess, ckpt.model_checkpoint_path)
@@ -63,6 +64,7 @@ class TrainedNetwork:
                     raise AssertionError
         else:
             full_path = self.model_path + '/ctf_policy.ckpt-' + str(step)
+            tf.keras.backend.clear_session()
             with self.sess.graph.as_default():
                 self.saver = tf.train.import_meta_graph(
                         full_path+'.meta',

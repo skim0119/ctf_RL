@@ -33,8 +33,8 @@ class PPO:
         with self.sess.as_default(), self.sess.graph.as_default():
             with tf.variable_scope(scope):
                 self.state_input = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state')
-                self.prev_reward_ = tf.placeholder(shape=[None, 1], dtype=tf.float32, name='prereward_hold')
-                self.prev_action_ = tf.placeholder(shape=[None, 1], dtype=tf.float32, name='preaction_hold')
+                self.prev_action_ = tf.placeholder(shape=[None, 4, 1], dtype=tf.float32, name='preaction_hold')
+                self.prev_reward_ = tf.placeholder(shape=[None, 4, 1], dtype=tf.float32, name='prereward_hold')
                 self.hidden_ = [tf.placeholder(shape=[None, 256], dtype=tf.float32, name='hiddenh_hold'),
                                 tf.placeholder(shape=[None, 256], dtype=tf.float32, name='hiddenc_hold')]
 
@@ -45,7 +45,8 @@ class PPO:
 
                 # Build Network
                 model = PPO_LSTM_V1(action_size);  self.model = model
-                self.actor, self.logits, self.log_logits, self.critic, self.hidden = model(self.state_input)
+                state_tuples = (self.state_input, self.prev_action_, self.prev_reward_, self.hidden_)
+                self.actor, self.logits, self.log_logits, self.critic, self.hidden = model(state_tuples)
                 loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_)
                 model.summary()
 

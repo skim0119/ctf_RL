@@ -48,7 +48,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 4
+NENV = 2 #multiprocessing.cpu_count() // 4
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_partial.ini'
@@ -87,9 +87,9 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 2
-minimum_batch_size = 4096
+minimum_batch_size = 1024
 print(minimum_batch_size)
 
 ## Setup
@@ -127,7 +127,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None)
+    progbar = tf.keras.utils.Progbar(None, unit_name='episode : '+TRAIN_NAME)
 
 sess = tf.Session(config=config)
 
@@ -168,8 +168,13 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         traj_buffer['logit'].extend(traj[4])
         traj_buffer['hh'].extend(traj[5])
         traj_buffer['hc'].extend(traj[6])
-        traj_buffer['prev_action'].extend([0]+traj[1][1:])
-        traj_buffer['prev_reward'].extend([0]+traj[2][1:])
+
+        window_indexer = np.arange(keep_frame)[None, :] + np.arange(len(traj))[:, None]
+        roll_actions = np.array([0]*(keep_frame-1)+traj[1])[window_indexer][:,:,np.newaxis]
+        roll_rewards = np.array([0]*(keep_frame-1)+traj[2])[window_indexer][:,:,np.newaxis]
+
+        traj_buffer['prev_action'].extend(roll_actions)
+        traj_buffer['prev_reward'].extend(roll_rewards)
 
     if buffer_size < 10:
         return
@@ -196,7 +201,7 @@ def get_action(states, prev_action, prev_reward, prev_hidden):
     # BLUE GET ACTION
     states_tuples = [states, prev_action, prev_reward, prev_hidden]
     action, value, logit, hidden_h, hidden_c = network.run_network(states_tuples)
-    action_rsh = np.reshape(action_ground, [NENV, 5])
+    action_rsh = np.reshape(action, [NENV, num_blue])
     return states, action, value, logit, action_rsh, hidden_h, hidden_c
 
 batch_ground = []
@@ -211,27 +216,29 @@ while global_episodes < total_episodes:
     episode_rew = np.zeros(NENV)
     was_alive = [True for _ in range(NENV*num_blue)]
     was_done = [False for env in range(NENV)]
-    prev_reward = np.zeros((NENV*num_blue, 1))
-    prev_action = np.zeros((NENV*num_blue, 1))
+    prev_reward = np.zeros((NENV*num_blue, keep_frame, 1))
+    prev_action = np.zeros((NENV*num_blue, keep_frame, 1))
     prev_hidden = network.hidden_init(NENV*num_blue)
 
     trajs = [Trajectory(depth=7) for _ in range(num_blue*NENV)] # Trajectory per agent
     
     # Bootstrap
-    s1 = envs.reset(config_path=env_setting_path)
+    s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba)
     s1, a1, v1, logits1, actions, hh1, hc1 = get_action(s1, prev_action, prev_reward, prev_hidden)
 
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
-        prev_action, v0 = a1, v1
+        a0, v0 = a1, v1
         logits = logits1
         hh0, hc0 = hh1, hc1
         prev_hidden = [hh0, hc0]
+        prev_action[:,:-1,:] = prev_action[:,1:,:]; prev_action[:,-1,:] = a0.reshape((NENV*num_blue,1))
         
         s1, reward, done, info = envs.step(actions)
-        prev_reward = np.repeat(reward, num_blue)
+        r0 = np.repeat(reward, num_blue)
+        prev_reward[:,:-1,:] = prev_reward[:,1:,:]; prev_reward[:,-1,:] = r0.reshape((NENV*num_blue,1))
 
         is_alive = np.array([agent.isAlive for agent in envs.get_team_blue().flat])
 
@@ -243,7 +250,7 @@ while global_episodes < total_episodes:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue)
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], prev_action[idx], prev_reward[idx], v0[idx], logits[idx], hh0[idx], hc0[idx]])
+                trajs[idx].append([s0[idx], a0[idx], r0[idx], v0[idx], logits[idx], hh0[idx], hc0[idx]])
 
         was_alive = is_alive
         was_done = done

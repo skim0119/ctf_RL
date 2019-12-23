@@ -62,7 +62,7 @@ class PPO_LSTM_V1(tf.keras.Model):
         net = self.td_conv2(net)
         net = self.td_flat(net)
         net = self.td_dense1(net)
-        net = tf.concat([net, prev_action, prev_reward], axis=1)
+        net = tf.concat([net, prev_action, prev_reward], axis=2)
         net, state_h, state_c = self.lstm1(net, initial_state=hidden)
         hidden = [state_h, state_c]
 
