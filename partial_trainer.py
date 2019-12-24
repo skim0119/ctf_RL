@@ -48,7 +48,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 2 #multiprocessing.cpu_count() // 4
+NENV = multiprocessing.cpu_count() 
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_partial.ini'

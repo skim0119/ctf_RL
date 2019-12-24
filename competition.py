@@ -18,6 +18,10 @@ env = gym.make("cap-v0")
 map_path = 'fair_uav'
 map_paths = [join(map_path,f) for f in os.listdir(map_path) if isfile(join(map_path, f))]
 
+# Scoreboard
+elo = Elo()
+elo.load()
+
 # Read Possible Player
 players = []
 def read_player(fpath):
@@ -30,15 +34,12 @@ def read_player(fpath):
     return players
 players = read_player('competition_player.txt')
 
-# Scoreboard
-elo = Elo()
 for _,_,name in players:
     if not elo.contains(name):
         elo.addPlayer(name)
 elo.addPlayer('Roomba')
 elo.addPlayer('Zeros')
 elo.addPlayer('Random')
-elo.load()
 
 # Set Config
 N = 5 # Length of set
@@ -54,13 +55,13 @@ try:
     policy1, policy2 = [], []
 
     resetCount = 0
-    while True:
-        # Reread Players
-        if episode % 100 == 0:
-            players = read_player('competition_player.txt')
-            for _,_,name in players:
-                if not elo.contains(name):
-                    elo.addPlayer(name)
+    for _ in range(100):
+        ## Reread Players
+        #if episode % 100 == 0:
+        #    players = read_player('competition_player.txt')
+        #    for _,_,name in players:
+        #        if not elo.contains(name):
+        #            elo.addPlayer(name)
 
         # Player Selection
         p1, p2 = random.sample(players + basic_policies_name, 2)
@@ -125,13 +126,12 @@ try:
 
         episode += 1
 
-        # Draw Table
-        if episode % 100 == 0:
-            elo_string = str(elo)
-            with open('competition_result.txt', 'w') as f:
-                print(elo_string)
-                f.write(elo_string)
-            elo.save()
+    # Draw Table
+    elo_string = str(elo)
+    with open('competition_result.txt', 'w') as f:
+        print(elo_string)
+        f.write(elo_string)
+    elo.save()
 
 except KeyboardInterrupt:
     env.close()

@@ -29,7 +29,7 @@ class PPO_LSTM_V1(tf.keras.Model):
                 depth_multiplier=2,
                 activation='relu',
             )
-        self.td_conv1 = layers.TimeDistributed(conv1, input_shape=(4,39,39,6))
+        self.td_conv1 = layers.TimeDistributed(conv1, input_shape=(None,4,39,39,6))
 
         conv2 = layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='relu')
         self.td_conv2 = layers.TimeDistributed(conv2)
@@ -63,7 +63,8 @@ class PPO_LSTM_V1(tf.keras.Model):
         net = self.td_flat(net)
         net = self.td_dense1(net)
         net = tf.concat([net, prev_action, prev_reward], axis=2)
-        net, state_h, state_c = self.lstm1(net, initial_state=hidden)
+        #net, state_h, state_c = self.lstm1(net, initial_state=hidden)
+        net, state_h, state_c = self.lstm1(net)
         hidden = [state_h, state_c]
 
         logits = self.actor_dense1(net) 

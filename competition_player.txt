@@ -13,3 +13,8 @@ model/UAV_TRAIN_SF, 106536, groupB_04
 model/UAV_TRAIN_SF, 142368, groupB_05
 model/UAV_TRAIN_SF, 178200, groupB_06
 model/UAV_TRAIN_SF, 193560, groupB_07
+model/UAV_TRAIN_SF_2, 13332, groupC_01
+model/UAV_TRAIN_SF_2, 61452, groupC_02
+model/UAV_TRAIN_SF_2, 140304, groupC_03
+model/UAV_TRAIN_SF_2, 232464, groupC_04
+model/UAV_TRAIN_SF_2, 293904, groupC_05
