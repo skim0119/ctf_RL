@@ -18,3 +18,12 @@ model/UAV_TRAIN_SF_2, 61452, groupC_02
 model/UAV_TRAIN_SF_2, 140304, groupC_03
 model/UAV_TRAIN_SF_2, 232464, groupC_04
 model/UAV_TRAIN_SF_2, 293904, groupC_05
+model/UAV_TRAIN_SF_3, 18444, groupD_01
+model/UAV_TRAIN_SF_3, 37908, groupD_02
+model/UAV_TRAIN_SF_3, 67596, groupD_03
+model/UAV_TRAIN_SF_3, 95244, groupD_04
+model/UAV_TRAIN_SF_3, 126996, groupD_05
+model/UAV_TRAIN_SF_3, 157716, groupD_06
+model/UAV_TRAIN_SF_3, 192528, groupD_07
+model/UAV_TRAIN_SF_3, 228372, groupD_08
+model/UAV_TRAIN_SF_3, 242700, groupD_09

@@ -37,9 +37,9 @@ players = read_player('competition_player.txt')
 for _,_,name in players:
     if not elo.contains(name):
         elo.addPlayer(name)
-elo.addPlayer('Roomba')
-elo.addPlayer('Zeros')
-elo.addPlayer('Random')
+for name in ['Roomba', 'Zeros', 'Random']:
+    if not elo.contains(name):
+        elo.addPlayer(name)
 
 # Set Config
 N = 5 # Length of set

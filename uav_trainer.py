@@ -42,7 +42,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'UAV_TRAIN_SF_3'
+TRAIN_NAME = 'TEST'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -267,7 +267,14 @@ while global_episodes < total_episodes:
         s1, a1, v1, logits1, actions = get_action(s1)
 
         # push to buffer
-        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~done,dtype=int), 2)
+        #TODO: completely separate the reward function for ground and air agents
+        # For air : Give extra reward for flag (not sure how much), and extra reward for revealing the map
+        #TODO: Reconsider parallelization construction
+        # Problem arise when environment does not end simultaneously, and matrix operations are asynchronized due to it.
+
+        was_done = np.array(was_done, dtype=bool)
+        pre_air_reward = (np.isin(s0[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
+        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
         for idx in range(NENV*(num_blue+num_red)):
         #for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue+num_red)
@@ -275,8 +282,10 @@ while global_episodes < total_episodes:
             if was_alive[idx] and not was_done[env_idx]:
                 if is_air[idx]:
                     agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
+                    agent_reward = air_reward[env_team_idx] - pre_air_reward[env_team_idx]
                 else:
                     agent_reward = env_reward[env_team_idx]
+                    agent_reward = -1
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx]])
 
         was_alive = is_alive
