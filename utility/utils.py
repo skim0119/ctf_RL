@@ -112,7 +112,7 @@ def discount_rewards(rewards, gamma, normalized=False, mask_array=None):
     """
 
     if mask_array is None:
-        return scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1], axis=0)[::-1]
+        return scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1], axis=-1)[::-1]
     else:
         y, adv = 0.0, []
         mask_reverse = mask_array[::-1]
