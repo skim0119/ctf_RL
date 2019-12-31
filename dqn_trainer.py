@@ -32,7 +32,7 @@ from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record
 from utility.gae import gae
 
-from method.ppo_lstm import PPO as Network
+from method.DQN import DQN as Network
 
 device_ground = '/gpu:0'
 
@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'LSTM_TEST'
+TRAIN_NAME = 'DQN_TEST'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -83,7 +83,7 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
+keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
@@ -163,18 +163,9 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
-        traj_buffer['td_target'].extend(td_target)
-        traj_buffer['advantage'].extend(advantages)
-        traj_buffer['logit'].extend(traj[4])
-        traj_buffer['hh'].extend(traj[5])
-        traj_buffer['hc'].extend(traj[6])
-
-        window_indexer = np.arange(keep_frame)[None, :] + np.arange(len(traj))[:, None]
-        roll_actions = np.array([0]*(keep_frame-1)+traj[1])[window_indexer][:,:,np.newaxis]
-        roll_rewards = np.array([0]*(keep_frame-1)+traj[2])[window_indexer][:,:,np.newaxis]
-
-        traj_buffer['prev_action'].extend(roll_actions)
-        traj_buffer['prev_reward'].extend(roll_rewards)
+        traj_buffer['reward'].extend(traj[2])
+        traj_buffer['done'].extend(traj[3])
+        traj_buffer['next_state'].extend(traj[4])
 
     if buffer_size < 10:
         return
@@ -183,26 +174,21 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
             batch_size,
             epoch,
             np.stack(traj_buffer['state']),
+            np.stack(traj_buffer['next_state']),
             np.stack(traj_buffer['action']),
-            np.stack(traj_buffer['td_target']),
-            np.stack(traj_buffer['advantage']),
-            np.stack(traj_buffer['logit']),
-            np.stack(traj_buffer['prev_action']),
-            np.stack(traj_buffer['prev_reward']),
-            np.stack(traj_buffer['hh']),
-            np.stack(traj_buffer['hc']),
+            np.stack(traj_buffer['reward']),
+            np.stack(traj_buffer['done']),
         )
     i = 0
     for mdp_tuple in it:
         nn.update_network(*mdp_tuple, global_episodes, writer, log and (i==0))
         i+=1
 
-def get_action(states, prev_action, prev_reward, prev_hidden):
+def get_action(states):
     # BLUE GET ACTION
-    states_tuples = [states, prev_action, prev_reward, prev_hidden]
-    action, value, logit, hidden_h, hidden_c = network.run_network(states_tuples)
+    action, value = network.run_network(states)
     action_rsh = np.reshape(action, [NENV, num_blue])
-    return states, action, value, logit, action_rsh, hidden_h, hidden_c
+    return states, action, value, action_rsh
 
 batch_ground = []
 num_batch = 0
@@ -216,41 +202,34 @@ while global_episodes < total_episodes:
     episode_rew = np.zeros(NENV)
     was_alive = [True for _ in range(NENV*num_blue)]
     was_done = [False for env in range(NENV)]
-    prev_reward = np.zeros((NENV*num_blue, keep_frame, 1))
-    prev_action = np.zeros((NENV*num_blue, keep_frame, 1))
-    prev_hidden = network.hidden_init(NENV*num_blue)
 
-    trajs = [Trajectory(depth=7) for _ in range(num_blue*NENV)] # Trajectory per agent
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)] # Trajectory per agent
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba)
-    s1, a1, v1, logits1, actions, hh1, hc1 = get_action(s1, prev_action, prev_reward, prev_hidden)
+    s1, a1, v1, actions = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a0, v0 = a1, v1
-        logits = logits1
-        hh0, hc0 = hh1, hc1
-        prev_hidden = [hh0, hc0]
-        prev_action[:,:-1,:] = prev_action[:,1:,:]; prev_action[:,-1,:] = a0.reshape((NENV*num_blue,1))
         
         s1, reward, done, info = envs.step(actions)
         r0 = np.repeat(reward, num_blue)
-        prev_reward[:,:-1,:] = prev_reward[:,1:,:]; prev_reward[:,-1,:] = r0.reshape((NENV*num_blue,1))
 
         is_alive = np.array([agent.isAlive for agent in envs.get_team_blue().flat])
 
         episode_rew += reward * (1-np.array(was_done, dtype=int))
 
-        s1, a1, v1, logits1, actions, hh1, hc1 = get_action(s1, prev_action, prev_reward, prev_hidden)
+        s1, a1, v1, actions = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue)
+            indv_done = not is_alive[idx] or done[env_idx]
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a0[idx], r0[idx], v0[idx], logits[idx], hh0[idx], hc0[idx]])
+                trajs[idx].append([s0[idx], a0[idx], r0[idx], indv_done, s1[idx]])
 
         was_alive = is_alive
         was_done = done
@@ -259,7 +238,6 @@ while global_episodes < total_episodes:
             break
     etime_roll = time.time()
             
-    # Split air trajectory and ground trajectory
     for idx, agent in enumerate(envs.get_team_blue().flat):
         batch_ground.append(trajs[idx])
     num_batch += sum([len(traj) for traj in trajs])
