@@ -274,8 +274,8 @@ while global_episodes < total_episodes:
         # Problem arise when environment does not end simultaneously, and matrix operations are asynchronized due to it.
 
         was_done = np.array(was_done, dtype=bool)
-        pre_air_reward = (np.isin(s0[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
-        air_reward = (np.isin(s0[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s0[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
+        pre_air_reward = (np.isin(s1[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
+        air_reward = (np.isin(s1[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
         for idx in range(NENV*(num_blue+num_red)):
         #for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue+num_red)
