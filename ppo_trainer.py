@@ -45,14 +45,14 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline'
+TRAIN_NAME = 'ppo_baseline'+"_"+str(time.time())
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count()
+NENV = 8
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'setting_full.ini'
@@ -64,7 +64,7 @@ path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read('config_1f.ini')
 
 # Training
 total_episodes = 150000#config.getint('TRAINING', 'TOTAL_EPISODES')
