@@ -129,7 +129,7 @@ class Roomba(Policy):
         # 2. Scan with enemy range
         in_home = self.free_map[agent.get_loc()] == agent.team
         _, enemy_locs = self.obj_in_range(lx, ly, self.enemy_range, obs, 4)
-        _, enemy_locs_tank = self.obj_in_range(lx, ly, self.enemy_range, obs, 6)
+        #_, enemy_locs_tank = self.obj_in_range(lx, ly, self.enemy_range, obs, 6)
         opposite_move = [0, 3, 4, 1, 2]
         for ex, ey in enemy_locs:
             if not in_home:

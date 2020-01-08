@@ -70,6 +70,8 @@ class V2(tf.keras.Model):
 
         self._layers_snapshot = _layers
 
+        #IMPALA
+
         if self.trainable:
             return net
         else:
@@ -78,7 +80,7 @@ class V2(tf.keras.Model):
 
 class V2_PPO(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, critic_beta=0.5, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.05, critic_beta=0.5, name='PPO'):
         super(V2_PPO, self).__init__(name=name)
 
         # Feature Encoder
@@ -127,7 +129,7 @@ class V2_PPO(tf.keras.Model):
             old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
 
             # Clipped surrogate function
-            ratio = tf.exp(log_prob - old_log_prob)
+            ratio = tf.exp(log_prob - old_log_prob) # precision
             #ratio = log_prob / old_log_prob
             surrogate = ratio * advantage
             clipped_surrogate = tf.clip_by_value(ratio, 1-self.eps, 1+self.eps) * advantage
@@ -136,7 +138,7 @@ class V2_PPO(tf.keras.Model):
 
             total_loss = actor_loss
             if self.entropy_beta != 0:
-                total_loss = actor_loss - entropy * self.entropy_beta
+                total_loss = actor_loss + entropy * self.entropy_beta
             if self.critic_beta != 0:
                 total_loss = actor_loss + critic_loss * self.critic_beta
 

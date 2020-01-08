@@ -83,7 +83,6 @@ gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
-entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
 lr_a           = config.getfloat('TRAINING', 'LR_ACTOR')
 lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 

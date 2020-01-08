@@ -24,7 +24,6 @@ from method.base import put_flat_on_grid
 from method.base import put_ctf_state_on_grid
 from method.base import initialize_uninitialized_vars as iuv
 
-
 from network.attention import self_attention
 from network.model_V2 import V2_PPO
 
@@ -101,10 +100,9 @@ class PPO:
             for summary in summaries:
                 writer.add_summary(summary, global_episodes)
             summary = tf.Summary()
-            summary.value.add(tag='summary/learning_rate', simple_value=lr)
-            summary.value.add(tag='summary/actor_loss', simple_value=aloss)
-            summary.value.add(tag='summary/critic_loss', simple_value=closs)
-            summary.value.add(tag='summary/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/'+self.scope+'_actor_loss', simple_value=aloss)
+            summary.value.add(tag='summary/'+self.scope+'_critic_loss', simple_value=closs)
+            summary.value.add(tag='summary/'+self.scope+'_entropy', simple_value=entropy)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients, feed_dict)
@@ -125,7 +123,7 @@ class PPO:
             grid = put_channels_on_grid(net[0], Y, X)
             image_summary.append(tf.summary.image(name, grid, max_outputs=1))
 
-        add_image(snapshot['input'], '1_input', X=7)
+        add_image(snapshot['input'], '1_input', X=6)
         add_image(snapshot['sepCNN1'], '2_sepCNN')
         add_image(snapshot['attention'], '3_attention')
         add_image(snapshot['NLNN'], '4_nonlocal')
@@ -137,15 +135,21 @@ class PPO:
         # Collect Summary
         cnn_summary = tf.summary.merge(image_summary)
 
-        # Visualization
-        #self.feature_static = snapshot['sepCNN1']
-        #self.feature_dynamic = snapshot['attention']
-        #self.feature_attention = snapshot['NLNN']
-        #labels = tf.one_hot(self.action_, self.action_size, dtype=tf.float32)
-        #yc = tf.reduce_sum(logits * labels, axis=1)
-        #self.conv_layer_grad_dynamic = tf.gradients(yc, self.feature_dynamic)[0]
-        #self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
-        #self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
+        # Visualization (action)
+        self.feature_static = snapshot['sepCNN1']
+        self.feature_dynamic = snapshot['attention']
+        self.feature_attention = snapshot['NLNN']
+        labels = tf.one_hot(self.action_, self.action_size, dtype=tf.float32)
+        yc = tf.reduce_sum(self.logits * labels, axis=1)
+        self.conv_layer_grad_dynamic = tf.gradients(yc, self.feature_dynamic)[0]
+        self.conv_layer_grad_static = tf.gradients(yc, self.feature_static)[0]
+        self.conv_layer_grad_attention = tf.gradients(yc, self.feature_attention)[0]
+
+        # Visualization (Critic)
+        self.latent = snapshot['dense1']
+        self.critic_gradcam_cnn1 = [
+                tf.gradients(snapshot['dense1'][:,i], self.feature_static)[0]
+                for i in range(128)]  # number of critic nodes
 
         return cnn_summary
 

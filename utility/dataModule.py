@@ -4,20 +4,16 @@ from gym_cap.envs.const import *
 
 def centering(obs, agents, H, W, padder=[0,0,0,1,0,0,0]):
     olx, oly, ch = obs.shape
-    assert ch == len(padder)
-
-    partial = np.any(obs[:,:,CHANNEL[UNKNOWN]])
-    if partial: padder[0] = 1
+    padder = padder[:ch]
+    #padder = [0] * ch; padder[3] = 1
+    #if len(padder) >= 10: padder[7] = 1
 
     cx, cy = (W-1)//2, (H-1)//2
     states = np.zeros([len(agents), H, W, len(padder)])
     states[:,:,:] = np.array(padder)
     for idx, agent in enumerate(agents):
         x, y = agent.get_loc()
-        states[idx, max(cx-x,0):min(cx-x+olx,W), max(cy-y,0):min(cy-y+oly,H), :] = obs
-        if partial:
-            mask = states[idx,:,:,CHANNEL[UNKNOWN]].astype(bool)
-            states[idx][mask,CHANNEL[OBSTACLE]] = 0
+        states[idx,max(cx-x,0):min(cx-x+olx,W),max(cy-y,0):min(cy-y+oly,H),:] = obs
 
     return states
 
@@ -37,6 +33,15 @@ class Stacked_state:
         self.stack.append(obj)
         self.stack.pop(0)
         return np.concatenate(self.stack, axis=self.axis)
+
+
+class VStacked_state(Stacked_state):
+    def __call__(self, obj=None):
+        if obj is None:
+            return np.stack(self.stack, axis=self.axis)
+        self.stack.append(obj)
+        self.stack.pop(0)
+        return np.stack(self.stack, axis=self.axis)
 
 
 def oh_to_rgb(state):

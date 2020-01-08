@@ -41,10 +41,16 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 2
+assert len(sys.argv) == 6
 
-PROGBAR = True
+device_t = sys.argv[2]
+N_ATT = int(sys.argv[3])
+N_SCT = int(sys.argv[4])
+N_DEF = int(sys.argv[5])
+
+PROGBAR = False
 LOGDEVICE = False
+RBETA = 0.8
 
 num_mode = 3
 
@@ -56,9 +62,9 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() 
+NENV = 8 # multiprocessing.cpu_count() 
 
-MODEL_LOAD_PATH = './model/fix_baseline2/' # initialize values
+MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
@@ -96,7 +102,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minbatch_size = 100
+minbatch_size = 2000
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
@@ -145,14 +151,15 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOGDEVICE, allow_soft_placement=True)
 
 sess = tf.Session(config=config)
 
 global_episodes = 0
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
-network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
+with tf.device(device_t):
+    network = Network(in_size=input_size, action_size=action_space, sess=sess, num_mode=num_mode, scope='main')
 saver = tf.train.Saver(max_to_keep=3, var_list=network.get_vars+[global_step])
 
 # Resotre / Initialize
@@ -168,6 +175,7 @@ restoring_saver = tf.train.Saver(max_to_keep=3, var_list=pretrained_vars)
 network.initiate(restoring_saver, MODEL_LOAD_PATH)
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
+global_episodes = sess.run(global_step)
 
 def train(trajs, bootstrap=0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None, mode=None):
     traj_buffer = defaultdict(list)
@@ -211,30 +219,36 @@ def reward_shape(prev_red_alive, red_alive, done):
         # Attack (C/max enemy)
         num_prev_enemy = sum(prev_red_alive[i])
         num_enemy = sum(red_alive[i])
-        r.append((num_prev_enemy - num_enemy)*0.25)
-        r.append((num_prev_enemy - num_enemy)*0.25) # two attack
+        for _ in range(N_ATT):
+            r.append((num_prev_enemy - num_enemy)*0.25)
         # Scout
-        if red_flags[i]:
-            r.append(1)
-        else:
-            r.append(0)
+        for _ in range(N_SCT):
+            if red_flags[i]:
+                r.append(1)
+            else:
+                r.append(0)
         # Defense
-        if blue_flags[i]:
-            r.append(-1)
-        else:
-            r.append(0)
+        for _ in range(N_DEF):
+            if blue_flags[i]:
+                r.append(-1)
+            elif done[i]:
+                r.append(1)
+            else:
+                r.append(0)
     return np.array(r)
 
 print('Training Initiated:')
 def get_action(states):
+    cnt1 = N_ATT
+    cnt2 = cnt1 + N_SCT
     a1, v1, logits1 = [], [], []
     res = network.run_network_all(states)
     a, v, logits = res[:3]
-    a1.extend(a[:2]); v1.extend(v[:2]); logits1.extend(logits[:2])
+    a1.extend(a[:cnt1]); v1.extend(v[:cnt1]); logits1.extend(logits[:cnt1])
     a, v, logits = res[3:6]
-    a1.extend(a[2:3]); v1.extend(v[2:3]); logits1.extend(logits[2:3])
+    a1.extend(a[cnt1:cnt2]); v1.extend(v[cnt1:cnt2]); logits1.extend(logits[cnt1:cnt2])
     a, v, logits = res[6:]
-    a1.extend(a[3:]); v1.extend(v[3:]); logits1.extend(logits[3:])
+    a1.extend(a[cnt2:]); v1.extend(v[cnt2:]); logits1.extend(logits[cnt2:])
 
     actions = np.reshape(a1, [NENV, num_blue])
     return np.array(a1), np.array(v1), np.array(logits1), actions
@@ -298,7 +312,8 @@ while True:
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a[idx], reward[idx]+env_reward[env_idx], v0[idx], logits[idx]])
+                reward_function = (RBETA) * reward[idx] + (1-RBETA) * env_reward[env_idx]
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -314,13 +329,19 @@ while True:
         progbar.update(global_episodes)
     
     for i in range(NENV):
-        batch_att.append(trajs[4*i+0])
-        batch_att.append(trajs[4*i+1])
-        batch_sct.append(trajs[4*i+2])
-        batch_def.append(trajs[4*i+3])
-        num_batch_att += len(trajs[4*i+0]) + len(trajs[4*i+1])
-        num_batch_sct += len(trajs[4*i+2])
-        num_batch_def += len(trajs[4*i+3])
+        j = 0
+        for _ in range(N_ATT):
+            batch_att.append(trajs[4*i+j])
+            num_batch_att += len(trajs[4*i+j])
+            j += 1
+        for _ in range(N_SCT): 
+            batch_sct.append(trajs[4*i+j])
+            num_batch_sct += len(trajs[4*i+j])
+            j += 1
+        for _ in range(N_DEF): 
+            batch_def.append(trajs[4*i+j])
+            num_batch_def += len(trajs[4*i+j])
+            j += 1
 
     if num_batch_att >= minbatch_size:
         stime = time.time()
@@ -347,7 +368,7 @@ while True:
 
     if log_on:
         step = sess.run(global_step)
-        tag = 'adapt_train_log/'
+        tag = 'fix_baseline/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

@@ -1,14 +1,16 @@
-'''
-- Self-play
-- Flat
-- PPO
-- No UAV
-'''
+"
+TODO:
+- Implememnt SF
+- Look over TF2.0
+- Try to build environment similar to the paper
+- Try to build game for task-specific and heterogeneity environment
+"
 
 import pickle
 
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+import sys
 
 import shutil
 import configparser
@@ -40,22 +42,26 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-PROGBAR = True
+assert len(sys.argv) == 6
+device_t = sys.argv[4]
+
+PROGBAR = False
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'ppo_baseline'+"_"+str(time.time())
+TRAIN_NAME = sys.argv[2]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8
+NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_full.ini'
+#env_setting_path = 'setting_full.ini'
+env_setting_path = sys.argv[5]
 
 ## Data Path
 path_create(LOG_PATH)
@@ -63,11 +69,12 @@ path_create(MODEL_PATH)
 path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
+config_path = sys.argv[1]
 config = configparser.ConfigParser()
-config.read('config_1f.ini')
+config.read(config_path)
 
 # Training
-total_episodes = 150000#config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -80,7 +87,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ') * 4
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -106,6 +113,10 @@ log_winrate = MovingAverage(moving_average_step)
 log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
+
+log_attack_reward = MovingAverage(moving_average_step)
+log_scout_reward = MovingAverage(moving_average_step)
+log_defense_reward = MovingAverage(moving_average_step)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -147,16 +158,17 @@ num_red = len(envs.get_team_red()[0])
 
 ## Launch TF session and create Graph
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_growth=True)
-config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE)
+config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None)
 
 sess = tf.Session(config=config)
 
-global_step = tf.Variable(0, trainable=False, name='global_step')
-global_step_next = tf.assign_add(global_step, NENV)
-network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
+with tf.device(device_t):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    network = Network(input_shape=input_size, action_size=action_space, scope='main', sess=sess)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -209,9 +221,39 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
+def reward_shape(prev_red_alive, red_alive, done):
+    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
+    red_alive = np.reshape(red_alive, [NENV, num_red])
+    reward = []
+    red_flags = envs.red_flag_captured()
+    blue_flags = envs.blue_flag_captured()
+    for i in range(NENV):
+        possible_reward = []
+        # Attack (C/max enemy)
+        num_prev_enemy = sum(prev_red_alive[i])
+        num_enemy = sum(red_alive[i])
+        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
+        # Scout
+        if red_flags[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+        # Defense
+        if blue_flags[i]:
+            possible_reward.append(-1)
+        elif done[i]:
+            possible_reward.append(1)
+        else:
+            possible_reward.append(0)
+
+        reward.append(possible_reward)
+
+    return np.array(reward)
+
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
+#while global_episodes < total_episodes:
+while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -219,8 +261,10 @@ while global_episodes < total_episodes:
 
     # initialize parameters
     episode_rew = np.zeros(NENV)
+    case_rew = [np.zeros(NENV) for _ in range(3)]
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
@@ -242,13 +286,18 @@ while global_episodes < total_episodes:
 
         s1, raw_reward, done, info = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
         reward = (raw_reward - prev_rew - 0.01)/100.0
-
         if step == max_ep:
             reward[:] = -1
             done[:] = True
-
         episode_rew += reward
+
+        shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
+        for i in range(NENV):
+            if not was_done[i]:
+                for j in range(3):
+                    case_rew[j][i] += shaped_reward[i,j]
 
         a1, v1, logits1, actions = get_action(s1)
 
@@ -260,6 +309,7 @@ while global_episodes < total_episodes:
 
         prev_rew = raw_reward
         was_alive = is_alive
+        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
@@ -286,6 +336,10 @@ while global_episodes < total_episodes:
     log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
+    log_attack_reward.extend(case_rew[0].tolist())
+    log_scout_reward.extend(case_rew[1].tolist())
+    log_defense_reward.extend(case_rew[2].tolist())
+
     global_episodes += NENV
     sess.run(global_step_next)
     if PROGBAR:
@@ -297,9 +351,12 @@ while global_episodes < total_episodes:
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),
             tag+'redwin-rate': log_redwinrate(),
-            tag+'reward': log_episodic_reward(),
+            tag+'env_reward': log_episodic_reward(),
             tag+'rollout_time': log_looptime(),
             tag+'train_time': log_traintime(),
+            tag+'reward_attack': log_attack_reward(),
+            tag+'reward_scout': log_scout_reward(),
+            tag+'reward_defense': log_defense_reward(),
         }, writer, global_episodes)
 
     if save_on:

@@ -15,6 +15,7 @@ eval*
 
 *.swp
 .*.swp
+*.pkl
 
 
 # Byte-compiled / optimized / DLL files

@@ -1,181 +1,180 @@
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
+import tensorflow.keras.layers as layers
 
 import numpy as np
 import random
 
 import utility
+from utility.utils import store_args
 
+from method.pg import Backpropagation
+
+from method.a3c import a3c
+from method.base import put_channels_on_grid
+from method.base import put_flat_on_grid
+from method.base import put_ctf_state_on_grid
+from method.base import initialize_uninitialized_vars as iuv
+
+
+class Encoder(tf.keras.Model):
+    @store_args
+    def __init__(self, action_size=5, trainable=True, name='DQN_encoder'):
+        super(Encoder, self).__init__(name=name, trainable=trainable)
+
+        # Feature Encoder
+        self.encoder = tf.keras.Sequential([
+                layers.SeparableConv2D(
+                        filters=16,
+                        kernel_size=5,
+                        strides=3,
+                        padding='valid',
+                        depth_multiplier=2,
+                        activation='relu',
+                    ),
+                layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='relu'),
+                layers.Flatten(),
+                layers.Dense(units=256, activation='relu'),
+            ])
+
+        # Value Stream
+        self.value_stream = tf.keras.Sequential([
+                layers.Dense(256, activation='relu'),
+                layers.Dense(action_size, activation='linear'),
+            ])
+
+        # Advantage Stream
+        self.advantage_stream = tf.keras.Sequential([
+                layers.Dense(256, activation='relu'),
+                layers.Dense(1, activation='linear'),
+            ])
+
+    def call(self, inputs):
+        latent = self.encoder(inputs)
+        values = self.value_stream(latent)
+        advantages = self.advantage_stream(latent)
+        with tf.name_scope('qvals'):
+            qvals = values + tf.subtract(advantages, tf.reduce_mean(advantages, axis=-1, keepdims=True))
+
+        predict = tf.argmax(self.qvals, axis=-1)
+        
+        return qvals, predict
 
 class DQN:
-    """Deep Q-Network Implementation for multi-agent usage
+    @store_args
+    def __init__(
+        self,
+        input_shape,
+        action_size,
+        scope,
+        lr=1e-4,
+        gamma=0.98,
+        entropy_beta=0.01,
+        sess=None,
+        **kwargs
+    ):
+        assert sess is not None, "TF Session is not given."
 
-    This module contains building network and pipelines to use.
+        with self.sess.as_default(), self.sess.graph.as_default():
+            with tf.variable_scope(scope):
+                self.states_ = tf.placeholder(shape=input_shape, dtype=tf.float32, name='states')
+                self.next_states_ = tf.placeholder(shape=input_shape, dtype=tf.float32, name='next_states')
+                self.actions_ = tf.placeholder(shape=[None], dtype=tf.int32, name='actions_hold')
+                self.rewards_ = tf.placeholder(shape=[None], dtype=tf.float32, name='rewards_hold')
+                self.dones_ = tf.placeholder(shape=[None], dtype=tf.int32, name='dones_hold')
 
-    Attributes:
-        @ Private
-        _build_Q_network:
-        _build_training:
-
-        @ Public
-        run_network:
-        update_target:
-        pull_global:
-    Todo:
-        pass
-
-    """
-    def __init__(self,
-                 in_size,
-                 action_size,
-                 scope,
-                 num_agent,
-                 trainer=None,
-                 tau=0.001,
-                 gamma=0.99,
-                 grad_clip_norm=0,
-                 global_step=None,
-                 initial_step=0,
-                 sess=None,
-                 target_network=None):
+                # Build Network
+                model = Encoder(action_size); self.model = model
+                model.summary()
+                self.q, self.predict = model(self.states_)
+                q_next, _ = model(self.next_states_)
                 
-        """ Initialize AC network and required parameters
+                # Build Trainer
+                loss = self.build_loss(self.q, self.actions_, self.rewards_, q_next, self.dones_)
+                optimizer = tf.keras.optimizers.Adam(lr)
+                self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
+                self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
-        Keyword arguments:
-            pass
-
-        Note:
-            Any tensorflow holder is marked with underscore at the end of the name.
-                ex) action holder -> action_
-                    td_target holder -> td_target_
-                - Also indicating that the value will not pass on backpropagation.
-
-        TODO:
-            * Separate the building trainsequence to separete method.
-            * Organize the code with pep8 formating
-        """
-
-        # Class Environment
-        self.sess = sess
-        if target_network is None:
-            self.target_network = self
-            self.tau = 1.0
-        else:
-            self.target_network = target_network
-            self.tau = tau
-
-        # Parameters & Configs
-        self.in_size = in_size
-        self.action_size = action_size
-        self.scope = scope
-        self.trainer = trainer
-        self.num_agent = num_agent
-        self.grad_clip_norm = grad_clip_norm
-        self.global_step = global_step
-        self.initial_step = initial_step
-        self.gamma = gamma
+    def build_loss(self, curr_q, actions, rewards, next_q, dones):
+        with tf.name_scope('current_Q'):
+            oh_action = tf.one_hot(actions, self.action_size, dtype=tf.float32) # [?, num_agent, action_size]
+            curr_q = tf.reduce_sum(tf.multiply(curr_q, oh_action), axis=-1) # [?, num_agent]
         
-        with tf.variable_scope(scope), tf.device('/gpu:0'):
-            self._build_Q_network()
-            self.graph_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.scope)
-            if scope != 'target':
-                self._build_training()
-                self._build_pipeline()
-                            
-    def _build_Q_network(self):
-        """_build_Q_network
-        The network recieves a state of all agencies, and they are represented in [-1,4,19,19,11]
-        (number of agencies and channels are subjected to change)
+        with tf.name_scope('target_Q'):
+            max_next_q = tf.reduce_max(next_q, axis=-1, keepdims=True)
+            td_target = rewards + tf.multiply(self.gamma * max_next_q , (1-self.dones))
 
-        Series of reshape is require to evaluate the action for each agent.
-        """
-        in_size = [None, self.num_agent] + self.in_size[1:]
-        self.state_input_ = tf.placeholder(shape=in_size,dtype=tf.float32, name='state')
-        with tf.name_scope('input_pipeline'):
-            n_entry = tf.shape(self.state_input_)[0]
-            n_row = tf.shape(self.state_input_)[0] * tf.shape(self.state_input_)[1]
-            flat_shape = [n_row] + self.in_size[1:]
-            net = tf.reshape(self.state_input_, flat_shape)
-        net = layers.conv2d(net , 32, [5,5],
-                            activation_fn=tf.nn.relu,
-                            weights_initializer=layers.xavier_initializer_conv2d(),
-                            biases_initializer=tf.zeros_initializer(),
-                            padding='SAME')
-        net = layers.max_pool2d(net, [2,2])
-        net = layers.conv2d(net, 64, [3,3],
-                            activation_fn=tf.nn.relu,
-                            weights_initializer=layers.xavier_initializer_conv2d(),
-                            biases_initializer=tf.zeros_initializer(),
-                            padding='SAME')
-        net = layers.max_pool2d(net, [2,2])
-        net = layers.conv2d(net, 64, [2,2],
-                            activation_fn=tf.nn.relu,
-                            weights_initializer=layers.xavier_initializer_conv2d(),
-                            biases_initializer=tf.zeros_initializer(),
-                            padding='SAME')
-        # Separate value/advantage stream
-        adv_net, value_net = tf.split(net, 2, 3)
-        adv_net, value_net = layers.flatten(adv_net), layers.flatten(value_net)
-        adv_net = layers.fully_connected(adv_net, self.action_size, activation_fn=None)
-        value_net = layers.fully_connected(value_net, 1, activation_fn=None)
-        with tf.name_scope('concat'):
-            net = value_net + tf.subtract(adv_net, tf.reduce_mean(adv_net, axis=1, keepdims=True))
-        with tf.name_scope('rebuild'):
-            self.Qout = tf.reshape(net, [-1, self.num_agent, self.action_size])
-            self.predict = tf.argmax(self.Qout,2)
+        with tf.name_scope('td_error'):
+            loss = tf.keras.losses.MeanSquaredError(td_target, curr_q)
+            softmax_q = tf.softmax(curr_q)
+            entropy = -tf.reduce_mean(softmax_q * tf.log(softmax_q))
 
-    def _build_training(self):
-        """_build_training
-        Build training sequence for DQN
-        Use mask to deprecate dead agency
-        """
-        self.targetQ_ = tf.placeholder(shape=[None], dtype=tf.float32)
-        self.action_ = tf.placeholder(shape=[None, self.num_agent],dtype=tf.int32)
-        self.mask_ = tf.placeholder(shape=[None, self.num_agent], dtype=tf.float32)
+        self.loss, self.entropy = loss, entropy
 
-        with tf.name_scope('Q'):
-            oh_action = tf.one_hot(self.action_, self.action_size, dtype=tf.float32) # [?, num_agent, action_size]
-            self.Q_ind = tf.reduce_sum(tf.multiply(self.Qout, oh_action), axis=-1) # [?, num_agent]
-            self.Q_sum = tf.reduce_sum(self.Q_ind*self.mask_, axis=-1)
+        return loss + self.entropy_beta * entropy
+
+    def run_network(self, states, return_action=True):
+        feed_dict = {self.states_: states}
+        action, q = self.sess.run([self.predict, self.q], feed_dict)
+        return action, q
+
+    def update_network(self, states, next_states, actions, rewards, dones, global_episodes, writer=None, log=False):
+        feed_dict = {
+                self.states_: states,
+                self.next_states_: next_states,
+                self.action_: action,
+                self.rewards_: rewards,
+                self.dones_: dones,
+            }
+        ops = [self.loss, self.entropy, self.update_ops]
+        aloss, entropy, _ = self.sess.run(ops, feed_dict)
+
+        if log:
+            # Record losses
+            summary = tf.Summary()
+            summary.value.add(tag='summary/'+self.scope+'_actor_loss', simple_value=aloss)
+            summary.value.add(tag='summary/'+self.scope+'_entropy', simple_value=entropy)
+
+            # Check vanish gradient
+            grads = self.sess.run(self.gradients, feed_dict)
+            total_counter = 0
+            vanish_counter = 0
+            for grad in grads:
+                total_counter += np.prod(grad.shape) 
+                vanish_counter += (np.absolute(grad)<1e-8).sum()
+            summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
+            writer.add_summary(summary,global_episodes)
+            writer.flush()
+
+    def initialize_vars(self):
+        var_list = self.get_vars
+        init = tf.initializers.variables(var_list)
+        self.sess.run(init)
+
+    def initiate(self, saver, model_path):
+        # Restore if savepoint exist. Initialize everything else
+        with self.sess.graph.as_default():
+            ckpt = tf.train.get_checkpoint_state(model_path)
+            if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+                saver.restore(self.sess, ckpt.model_checkpoint_path)
+                print("Load Model : ", ckpt.model_checkpoint_path)
+            else:
+                self.sess.run(tf.global_variables_initializer())
+                print("Initialized Variables")
+
+    def save(self, saver, model_path, global_step):
+        saver.save(self.sess, model_path, global_step=global_step)
+
+    @property
+    def get_vars(self):
+        return self.model.variables
         
-        with tf.name_scope('Q_train'):
-            self.td_error = tf.square(self.targetQ_-self.Q_sum)
-            self.loss = tf.reduce_mean(self.td_error)
-            self.entropy = -tf.reduce_sum(tf.nn.softmax(self.Qout) * tf.log(tf.nn.softmax(self.Qout)))
-            self.grads = tf.gradients(self.loss, self.graph_vars)
 
-        self.update= self.trainer.apply_gradients(zip(self.grads, self.graph_vars))
-
-    def _build_pipeline(self):
-        op_push = [target_var.assign(this_var*self.tau + target_var*(1.0-self.tau)) for target_var, this_var in zip(self.target_network.graph_vars, self.graph_vars)]
-        self.op_push = tf.group(op_push)
-
-    def run_network(self, state):
-        """run_network
-        Choose Action
-
-        :param state:
-        """
-        return self.sess.run(self.predict, feed_dict={self.state_input_:state}).tolist()
-
-    def update_full(self, states0, actions, rewards, states1, dones, masks):
-        n_entry = len(states0)
-        q1 = self.sess.run(self.predict, feed_dict={self.state_input_:states1})
-        q2 = self.sess.run(self.target_network.Qout, feed_dict={self.target_network.state_input_:states1})
-        end_masks = -(dones-1)
-        dq = np.zeros_like(q1)
-        for idx in range(self.num_agent):
-            dq[:,idx] = q2[range(n_entry),idx,q1[:,idx]]
-        
-        dq = np.sum(dq*masks, axis=1)
-        targetQ = rewards + (self.gamma * dq * end_masks)
-
-        feed_dict = {self.state_input_ : states0,
-                     self.targetQ_ : targetQ,
-                     self.action_ : actions,
-                     self.mask_ : masks}
-        loss, entropy, _ = self.sess.run([self.loss, self.entropy, self.update], feed_dict)
-
-        self.sess.run(self.op_push)
-
-        return loss, entropy
+if __name__ == '__main__':
+    a = Encoder(5, trainable=False)
+    a(tf.placeholder(tf.float32, [None,39,39,12]))
+    print(len(a.trainable_weights))
+    print(len(a.non_trainable_weights))
+    a = Encoder(5, trainable=True)
+    a(tf.placeholder(tf.float32, [None,39,39,12]))
+    print(len(a.trainable_weights))
+    print(len(a.non_trainable_weights))
