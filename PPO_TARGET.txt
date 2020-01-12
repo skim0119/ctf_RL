@@ -1,0 +1,40 @@
+/projects/tran-research-group/skim449/conda/ctf/bin/python d1.ini PPO_XD /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python f1.ini PPO_XF /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1.ini PPO_SX /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1.ini PPO_WX /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_d1.ini PPO_SD /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_f1.ini PPO_SF /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_f1.ini PPO_WF /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_d1.ini PPO_WD /device:CPU:0 1 ./model/ppo_baseline_1578470262.010241/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python d1.ini PPO_XD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/
+/projects/tran-research-group/skim449/conda/ctf/bin/python f1.ini PPO_XF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1.ini PPO_SX /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1.ini PPO_WX /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_d1.ini PPO_SD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_f1.ini PPO_SF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_f1.ini PPO_WF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_d1.ini PPO_WD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101717/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python d1.ini PPO_XD /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python f1.ini PPO_XF /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1.ini PPO_SX /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1.ini PPO_WX /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_d1.ini PPO_SD /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_f1.ini PPO_SF /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_f1.ini PPO_WF /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_d1.ini PPO_WD /device:CPU:0 1 ./model/ppo_baseline_1578470841.567535/
+/projects/tran-research-group/skim449/conda/ctf/bin/python d1.ini PPO_XD /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python f1.ini PPO_XF /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1.ini PPO_SX /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1.ini PPO_WX /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_d1.ini PPO_SD /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_f1.ini PPO_SF /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_f1.ini PPO_WF /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_d1.ini PPO_WD /device:CPU:0 1 ./model/ppo_baseline_1578470841.5948918/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python d1.ini PPO_XD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/
+/projects/tran-research-group/skim449/conda/ctf/bin/python f1.ini PPO_XF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1.ini PPO_SX /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1.ini PPO_WX /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_d1.ini PPO_SD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python s1_f1.ini PPO_SF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/ &
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_f1.ini PPO_WF /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/
+/projects/tran-research-group/skim449/conda/ctf/bin/python w1_d1.ini PPO_WD /device:CPU:0 1 ./model/ppo_baseline_1578470262.0101461/

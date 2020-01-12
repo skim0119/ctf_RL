@@ -50,7 +50,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2]
+TRAIN_NAME = sys.argv[2] +"_"+str(time.time())
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
