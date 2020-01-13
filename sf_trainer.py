@@ -35,7 +35,7 @@ from utility.gae import gae
 from method.SF import Network
 
 device_ground = '/gpu:0'
-device_air = '/gpu:1'
+device_air = '/gpu:0'
 
 PROGBAR = True
 LOG_DEVICE = False
@@ -49,7 +49,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = 8
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'uav_settings.ini'
@@ -63,7 +63,7 @@ path_create(SAVE_PATH)
 config_path = 'config.ini'
 config = configparser.ConfigParser()
 config.read(config_path)
-N = 16
+N = 1024
 
 # Training
 total_episodes = 1000000#config.getint('TRAINING', 'TOTAL_EPISODES')

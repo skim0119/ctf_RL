@@ -49,7 +49,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-N=16
+N=1024
 
 NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
@@ -196,7 +196,7 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         nn.update_network(*mdp_tuple, global_episodes, writer, log and (i==0))
         i+=1
 
-def get_action(states, N=5):
+def get_action_SF(states, N=5):
     states_rsh = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
     blue_air, blue_ground, red_air, red_ground = np.split(states_rsh, [2,6,8], axis=1)
     blue_states, red_states = np.split(states_rsh, [6], axis=1)
@@ -205,46 +205,51 @@ def get_action(states, N=5):
     blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
     blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
 
-    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network_sample.run_network(blue_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air_sample.run_network(blue_air)
+    action_ground, value_ground, logit_ground, phi_ground1, psi_ground1 = network_sample.run_network(blue_ground)
+    action_air, value_air, logit_air, phi_air1, psi_air1 = network_air_sample.run_network(blue_air)
 
     action_rsh = np.concatenate([action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
     value = np.concatenate([value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
     logit = np.concatenate([logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
-    phi = np.concatenate([phi_air.reshape([NENV,2,N]), phi_ground.reshape([NENV,4,N])], axis=1)
-    psi = np.concatenate([psi_air.reshape([NENV,2,N]), psi_ground.reshape([NENV,4,N])], axis=1)
+    # phi = np.concatenate([phi_air.reshape([NENV,2,N]), phi_ground.reshape([NENV,4,N])], axis=1)
 
     # RED GET ACTION (Comment this section to make it single-side control and return blue_states)
     red_air = np.reshape(red_air, [NENV*2]+input_size[1:])
     red_ground = np.reshape(red_ground, [NENV*4]+input_size[1:])
 
-    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network_sample.run_network(red_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air_sample.run_network(blue_air)
+    action_ground, value_ground, logit_ground, phi_ground2, psi_ground2 = network_sample.run_network(red_ground)
+    action_air, value_air, logit_air, phi_air2, psi_air2 = network_air_sample.run_network(blue_air)
 
     action_rsh = np.concatenate([action_rsh, action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
     value = np.concatenate([value, value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
     logit = np.concatenate([logit, logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
-    phi = np.concatenate([phi, phi_air.reshape([NENV,2,N]), phi_ground.reshape([NENV,4,N])], axis=1)
-    psi = np.concatenate([psi, psi_air.reshape([NENV,2,N]), psi_ground.reshape([NENV,4,N])], axis=1)
+    # phi = np.concatenate([phi, phi_air.reshape([NENV,2,N]), phi_ground.reshape([NENV,4,N])], axis=1)
+
+    psi_air = np.concatenate([ psi_air1.reshape([NENV,2,N]), psi_air2.reshape([NENV,2,N])], axis=1)
+    psi_ground = np.concatenate([psi_ground1.reshape([NENV,4,N]), psi_ground2.reshape([NENV,4,N])], axis=1)
+    phi_air = np.concatenate([ phi_air1.reshape([NENV,2,N]), phi_air2.reshape([NENV,2,N])], axis=1)
+    phi_ground = np.concatenate([phi_ground1.reshape([NENV,4,N]), phi_ground2.reshape([NENV,4,N])], axis=1)
 
     # RESHAPE
     action = action_rsh.reshape([-1])
     value = value.reshape([-1])
     logit = logit.reshape([NENV*12, 5])
-    phi = phi.reshape([NENV*12, N])
-    psi = psi.reshape([NENV*12, N])
+    # phi = phi.reshape([NENV*12, N])
+    # psi = psi.reshape([NENV*12, N])
 
-    return states, action, value, logit, action_rsh, phi, psi
+    return states, action, value, logit, action_rsh, phi_air, phi_ground, psi_air, psi_ground
 
 
 batch_ground, batch_air = [], []
 num_batch = 0
 
 
-SF_samples = []
-samples = 0
+SF_samples_air = []
+SF_samples_ground = []
+samples_air = 0
+samples_ground = 0
 #Collecting Samples for eigenvalue processing.
-while samples < N:
+while (samples_ground < N or samples_air < N):
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -262,14 +267,14 @@ while samples < N:
 
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path)
-    s1, a1, v1, logits1, actions, phi, psi = get_action(s1,N=N)
+    s1, a1, v1, logits1, actions, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
         a, v0 = a1, v1
-        psi0 = psi
+        # psi0 = psi
         logits = logits1
 
         s1, reward, done, info = envs.step(actions)
@@ -284,27 +289,38 @@ while samples < N:
 
         episode_rew += reward * (1-np.array(was_done, dtype=int))
 
-        s1, a1, v1, logits1, actions, phi, psi = get_action(s1,N=N)
+        s1, a1, v1, logits1, actions, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
-        print(phi.shape)
-        print(psi.shape)
-        print(actions.shape)
-        SF_samples.append(psi)
-        samples+=actions.shape[0]*actions.shape[1]
+        if samples_ground < N:
+            SF_samples_ground.append(psi_ground)
+        if samples_air < N:
+            SF_samples_air.append(psi_air)
+        samples_air+=2
+        samples_ground+=2
 
 
 
-        if np.all(done) or samples >= N:
+        if np.all(done) or (samples_ground >= N and samples_air >= N):
             break
-for i,sample in enumerate(SF_samples):
+
+#Ground Eigenvalue Decomposition
+for i,sample in enumerate(SF_samples_ground):
     if i==0:
-        SF_Matrix=sample
+        SF_Matrix_g=sample
     else:
-        print(SF_Matrix.shape)
-        print(sample.shape)
-        SF_Matrix= np.concatenate([SF_Matrix,sample],axis=1)
-SF_Matrix = np.resize(SF_Matrix,[N,N])
-w,v = np.linalg.eig(SF_Matrix)
+        SF_Matrix_g= np.concatenate([SF_Matrix_g,sample],axis=1)
+SF_Matrix_g = np.resize(SF_Matrix_g,[N,N])
+w_g,v_g = np.linalg.eig(SF_Matrix_g)
+##Air Eigenvalue Decompostion
+for i,sample in enumerate(SF_samples_air):
+    if i==0:
+        SF_Matrix_a=sample
+    else:
+
+        SF_Matrix_a= np.concatenate([SF_Matrix_a,sample],axis=1)
+SF_Matrix_a = np.resize(SF_Matrix_a,[N,N])
+w_a,v_a = np.linalg.eig(SF_Matrix_a)
+
 
 TRAIN_NAME = 'DECOMP_TRAIN_01'
 LOG_PATH = './logs/'+TRAIN_NAME
@@ -314,10 +330,15 @@ SAVE_PATH = './save/' + TRAIN_NAME
 #Choose the Max three Eigenvalues to continue with and their corresponding Eigenvectors.
 #The reward for each of the subpolicies is the vector multiplied with the Phi output.
 num_mode = 5
-eigValIdx = w.argsort()[-num_mode:][::-1]
-eigVect = []
+eigValIdx = w_g.argsort()[-num_mode:][::-1]
+eigVect_g = []
 for idx in eigValIdx:
-    eigVect.append(v[:,i])
+    eigVect_g.append(v_g[:,idx])
+
+eigValIdx = w_a.argsort()[-num_mode:][::-1]
+eigVect_a = []
+for idx in eigValIdx:
+    eigVect_a.append(v_a[:,idx])
 
 ##Creating the new subpolicies based on the eigen decomposition.
 from method.ppo import PPO_multimodes as Network2
@@ -333,13 +354,22 @@ with tf.device(device_t):
     global_step_next = tf.assign_add(global_step, NENV)
     subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
     subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
-    network = Network2(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
+    network_g = Network2(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
+    network_a = Network2(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
 
 #Reward Shaping based on the Eigen Decomposition.
-def reward_shape(phi, idx=None, additional_reward=None):
+def reward_shape(phi, air, idx=None, additional_reward=None):
+    if air:
+        eigVect = eigVect_a
+    else:
+        eigVect = eigVect_g
+
     reward = []
     for i in range(NENV):
-        reward.append(eigVect[idx]*phi[:,idx])
+        rew = 0
+        for j in range(phi.shape[1]):
+            rew += eigVect[idx]*phi[i,j,:]
+        reward.append(rew)
 
     if additional_reward is not None:
         return np.array(reward) + additional_reward
@@ -348,9 +378,39 @@ def reward_shape(phi, idx=None, additional_reward=None):
 
 print('Training Initiated:')
 def get_action(states):
-    a1, v1, logits1 = network.run_network(states, MODE)
-    actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, logits1, actions
+    states_rsh = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
+    blue_air, blue_ground, red_air, red_ground = np.split(states_rsh, [2,6,8], axis=1)
+    blue_states, red_states = np.split(states_rsh, [6], axis=1)
+
+    # BLUE GET ACTION
+    blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
+    blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
+
+    action_ground, value_ground, logit_ground = network_g.run_network(blue_ground, MODE)
+    action_air, value_air, logit_air = network_a.run_network(blue_air, MODE)
+
+    action_rsh = np.concatenate([action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
+    value = np.concatenate([value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
+    logit = np.concatenate([logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
+
+    # RED GET ACTION (Comment this section to make it single-side control and return blue_states)
+    red_air = np.reshape(red_air, [NENV*2]+input_size[1:])
+    red_ground = np.reshape(red_ground, [NENV*4]+input_size[1:])
+
+    action_ground, value_ground, logit_ground = network_g.run_network(red_ground, MODE)
+    action_air, value_air, logit_air = network_a.run_network(blue_air, MODE)
+
+    action_rsh = np.concatenate([action_rsh, action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
+    value = np.concatenate([value, value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
+    logit = np.concatenate([logit, logit_air.reshape([NENV,2,5]), logit_ground.reshape([NENV,4,5])], axis=1)
+
+    # RESHAPE
+    action = action_rsh.reshape([-1])
+    value = value.reshape([-1])
+    logit = logit.reshape([NENV*12, 5])
+
+    return action
+
 
 batch = []
 num_batch = 0
@@ -391,6 +451,7 @@ while True:
     trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
 
     a1, v1, logits1, actions = get_action(s1)
+    _,_,_,_,_, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
     # Rollout
     stime = time.time()
@@ -405,7 +466,8 @@ while True:
 
         if step == max_ep:
             done[:] = True
-        reward = reward_shape(was_alive_red, is_alive_red, done, MODE)
+        reward_a = reward_shape(phi_air, True, MODE)
+        reward_g = reward_shape(phi_ground, False, MODE)
 
         if step == max_ep:
             env_reward[:] = -1
@@ -419,16 +481,24 @@ while True:
                 episode_env_rew[i] += env_reward[i]
 
         a1, v1, logits1, actions = get_action(s1)
+        _,_,_,_,_, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
+
         for idx, d in enumerate(done):
             if d:
                 v1[idx*num_blue: (idx+1)*num_blue] = 0.0
 
         # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // num_blue
+        for idx, agent in range(NENV*(num_blue+num_red)):
+            env_idx = idx // (num_blue+num_red)
+            env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
-                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx]
-                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
+                if is_air[idx]:
+                    #agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
+                    agent_reward = reward_a[env_idx]
+                else:
+                    agent_reward = reward_g[env_idx]
+                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx],])
+        # Split air trajectory and ground trajectory
 
         prev_rew = raw_reward
         was_alive = is_alive
@@ -444,11 +514,16 @@ while True:
     if PROGBAR:
         progbar.update(global_episodes)
 
-    batch.extend(trajs)
+    for idx in range(NENV*(num_blue+num_red)):
+        if is_air[idx]:
+            batch_air.append(trajs[idx])
+        else:
+            batch_ground.append(trajs[idx])
     num_batch += sum([len(traj) for traj in trajs])
 
     if num_batch >= minbatch_size:
-        train(batch, network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        train(batch_air, network_a.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        train(batch_ground, network_g.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
         batch = []
         num_batch = 0
         mode_changed = True
