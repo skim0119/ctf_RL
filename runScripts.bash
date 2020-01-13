@@ -2,10 +2,10 @@
 
 FILE=$1
 BatchSize=$2
-i=0
+i=1
 while IFS= read -r line
 do
-  if [ $i = 0 ]
+  if [ $i = 1 ]
   then
     echo "Creating File for Batch"
     touch batch.pbs
@@ -33,14 +33,15 @@ which pip
 conda env list
 pwd" >> batch.pbs
   fi
-  echo "$line" >> batch.pbs
-  i=$((i+1))
-  if [ $i -gt 2 ]
-  then
+  if [ $i -lt $BatchSize ]; then
+    echo "${line} &" >> batch.pbs
+    i=$((i+1))
+  else
+    echo "${line}" >> batch.pbs
     echo "Sending Batch to the queue"
     # qsub batch.pbs
     echo "Deleting File for Batch"
     # rm batch.pbs
-    i=0
+    i=1
   fi
 done < "$1"

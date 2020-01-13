@@ -54,7 +54,7 @@ class Network:
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_hold')
 
                 # Build Network
-                model = PPO_SF(action_size);  self.model = model
+                model = PPO_SF(action_size,N=N);  self.model = model
                 self.actor, self.logits, self.log_logits, self.critic, self.phi, self.sf_reward, self.psi = model(self.state_input)
                 actor_loss, sf_loss, reward_loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_, self.reward_)
                 model.summary()
@@ -115,10 +115,10 @@ class Network:
             total_counter = 0
             vanish_counter = 0
             for grad in grads:
-                total_counter += np.prod(grad.shape) 
+                total_counter += np.prod(grad.shape)
                 vanish_counter += (np.absolute(grad)<1e-8).sum()
             summary.value.add(tag='summary/grad_vanish_rate', simple_value=vanish_counter/total_counter)
-            
+
             writer.add_summary(summary,global_episodes)
 
             writer.flush()
@@ -145,5 +145,3 @@ class Network:
     @property
     def get_vars(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
-        
-

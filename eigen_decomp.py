@@ -35,7 +35,8 @@ from utility.gae import gae
 from method.SF import Network
 
 device_ground = '/gpu:0'
-device_air = '/gpu:1'
+device_air = '/gpu:0'
+device_t = '/gpu:0'
 
 PROGBAR = True
 LOG_DEVICE = False
@@ -48,6 +49,7 @@ MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
+N=16
 
 NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
@@ -63,7 +65,6 @@ path_create(SAVE_PATH)
 config_path = 'config.ini'
 config = configparser.ConfigParser()
 config.read(config_path)
-N = 16
 
 # Training
 total_episodes = 1000000#config.getint('TRAINING', 'TOTAL_EPISODES')
@@ -137,21 +138,21 @@ sess = tf.Session(config=config)
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 with tf.device(device_ground):
-    network = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess, N=N)
+    network_sample = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess, N=N)
 with tf.device(device_air):
-    network_air = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess, N=N)
+    network_air_sample = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess, N=N)
 
 # Resotre / Initialize
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=4)
-network.initiate(saver, MODEL_PATH)
+network_sample.initiate(saver, MODEL_PATH)
 if OVERRIDE:
     sess.run(tf.assign(global_step, 0)) # Reset the counter
 else:
     global_episodes = sess.run(global_step)
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes) # It save both network
+network_sample.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes) # It save both network
 
 
 ### TRAINING ###
@@ -204,8 +205,8 @@ def get_action(states, N=5):
     blue_air = np.reshape(blue_air, [NENV*2]+input_size[1:])
     blue_ground = np.reshape(blue_ground, [NENV*4]+input_size[1:])
 
-    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network.run_network(blue_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(blue_air)
+    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network_sample.run_network(blue_ground)
+    action_air, value_air, logit_air, phi_air, psi_air = network_air_sample.run_network(blue_air)
 
     action_rsh = np.concatenate([action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
     value = np.concatenate([value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
@@ -217,8 +218,8 @@ def get_action(states, N=5):
     red_air = np.reshape(red_air, [NENV*2]+input_size[1:])
     red_ground = np.reshape(red_ground, [NENV*4]+input_size[1:])
 
-    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network.run_network(red_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(blue_air)
+    action_ground, value_ground, logit_ground, phi_ground, psi_ground = network_sample.run_network(red_ground)
+    action_air, value_air, logit_air, phi_air, psi_air = network_air_sample.run_network(blue_air)
 
     action_rsh = np.concatenate([action_rsh, action_air.reshape([NENV,2]), action_ground.reshape([NENV,4])], axis=1)
     value = np.concatenate([value, value_air.reshape([NENV,2]), value_ground.reshape([NENV,4])], axis=1)
@@ -238,7 +239,12 @@ def get_action(states, N=5):
 
 batch_ground, batch_air = [], []
 num_batch = 0
-while global_episodes < total_episodes:
+
+
+SF_samples = []
+samples = 0
+#Collecting Samples for eigenvalue processing.
+while samples < N:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -280,83 +286,191 @@ while global_episodes < total_episodes:
 
         s1, a1, v1, logits1, actions, phi, psi = get_action(s1,N=N)
 
+        print(phi.shape)
+        print(psi.shape)
+        print(actions.shape)
+        SF_samples.append(psi)
+        samples+=actions.shape[0]*actions.shape[1]
+
+
+
+        if np.all(done) or samples >= N:
+            break
+for i,sample in enumerate(SF_samples):
+    if i==0:
+        SF_Matrix=sample
+    else:
+        print(SF_Matrix.shape)
+        print(sample.shape)
+        SF_Matrix= np.concatenate([SF_Matrix,sample],axis=1)
+SF_Matrix = np.resize(SF_Matrix,[N,N])
+w,v = np.linalg.eig(SF_Matrix)
+
+TRAIN_NAME = 'DECOMP_TRAIN_01'
+LOG_PATH = './logs/'+TRAIN_NAME
+MODEL_PATH = './model/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
+
+#Choose the Max three Eigenvalues to continue with and their corresponding Eigenvectors.
+#The reward for each of the subpolicies is the vector multiplied with the Phi output.
+num_mode = 5
+eigValIdx = w.argsort()[-num_mode:][::-1]
+eigVect = []
+for idx in eigValIdx:
+    eigVect.append(v[:,i])
+
+##Creating the new subpolicies based on the eigen decomposition.
+from method.ppo import PPO_multimodes as Network2
+
+heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.Random, policy.AStar]
+heur_weight = [1,1,1,1,1]
+heur_weight = np.array(heur_weight) / sum(heur_weight)
+def use_this_policy():
+    return np.random.choice(heur_policy_list, p=heur_weight)
+
+with tf.device(device_t):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step_next = tf.assign_add(global_step, NENV)
+    subtrain_step = [tf.Variable(0, trainable=False) for _ in range(num_mode)]
+    subtrain_step_next = [tf.assign_add(step, NENV) for step in subtrain_step]
+    network = Network2(in_size=input_size, action_size=action_space, scope='main', sess=sess, num_mode=num_mode, model_path=MODEL_PATH)
+
+#Reward Shaping based on the Eigen Decomposition.
+def reward_shape(phi, idx=None, additional_reward=None):
+    reward = []
+    for i in range(NENV):
+        reward.append(eigVect[idx]*phi[:,idx])
+
+    if additional_reward is not None:
+        return np.array(reward) + additional_reward
+    else:
+        return np.array(reward)
+
+print('Training Initiated:')
+def get_action(states):
+    a1, v1, logits1 = network.run_network(states, MODE)
+    actions = np.reshape(a1, [NENV, num_blue])
+    return a1, v1, logits1, actions
+
+batch = []
+num_batch = 0
+mode_changed = False
+MODE = 0
+config_path = "setting_partial.ini"
+if PROGBAR:
+    progbar = tf.keras.utils.Progbar(None)
+while True:
+    if mode_changed:
+        mode_changed = False
+        MODE = (MODE + 1) % num_mode
+    #MODE = np.argmin(sess.run(subtrain_step))
+    mode_episode = sess.run(subtrain_step[MODE])
+
+    log_on = interval_flag(mode_episode, save_stat_frequency, 'log{}'.format(MODE))
+    log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
+    save_on = interval_flag(global_episodes, save_network_frequency, 'save')
+    reload_on = False # interval_flag(global_episodes,selfplay_reload, 'reload')
+
+    # Bootstrap
+    s1 = envs.reset(
+            config_path=config_path,
+            custom_board=use_this_map(global_episodes, max_at, max_epsilon),
+            policy_red=use_this_policy()
+        )
+    num_blue = len(envs.get_team_blue()[0])
+    num_red = len(envs.get_team_red()[0])
+
+    # initialize parameters
+    episode_rew = np.zeros(NENV)
+    episode_env_rew = np.zeros(NENV)
+    prev_rew = np.zeros(NENV)
+    was_alive = [True for agent in envs.get_team_blue().flat]
+    was_alive_red = [True for agent in envs.get_team_red().flat]
+    was_done = [False for env in range(NENV)]
+
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
+
+    a1, v1, logits1, actions = get_action(s1)
+
+    # Rollout
+    stime = time.time()
+    for step in range(max_ep+1):
+        s0 = s1
+        a, v0 = a1, v1
+        logits = logits1
+
+        s1, raw_reward, done, info = envs.step(actions)
+        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
+        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
+
+        if step == max_ep:
+            done[:] = True
+        reward = reward_shape(was_alive_red, is_alive_red, done, MODE)
+
+        if step == max_ep:
+            env_reward[:] = -1
+        else:
+            env_reward = (raw_reward - prev_rew - 0.01)/100
+
+
+        for i in range(NENV):
+            if not was_done[i]:
+                episode_rew[i] += reward[i]
+                episode_env_rew[i] += env_reward[i]
+
+        a1, v1, logits1, actions = get_action(s1)
+        for idx, d in enumerate(done):
+            if d:
+                v1[idx*num_blue: (idx+1)*num_blue] = 0.0
+
         # push to buffer
-        #TODO: completely separate the reward function for ground and air agents
-        # For air : Give extra reward for flag (not sure how much), and extra reward for revealing the map
-        #TODO: Reconsider parallelization construction
-        # Problem arise when environment does not end simultaneously, and matrix operations are asynchronized due to it.
-
-        was_done = np.array(was_done, dtype=bool)
-        pre_air_reward = (np.isin(s1[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
-        air_reward = (np.isin(s1[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
-        for idx in range(NENV*(num_blue+num_red)):
-        #for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // (num_blue+num_red)
-            env_team_idx = idx // 6
+        for idx, agent in enumerate(envs.get_team_blue().flat):
+            env_idx = idx // num_blue
             if was_alive[idx] and not was_done[env_idx]:
-                if is_air[idx]:
-                    #agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
-                    agent_reward = air_reward[env_team_idx] - pre_air_reward[env_team_idx]
-                else:
-                    agent_reward = env_reward[env_team_idx]
-                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx], s1[idx], phi[idx], psi0[idx]])
+                reward_function = (RBETA) * reward[env_idx] + (1-RBETA) * env_reward[env_idx]
+                trajs[idx].append([s0[idx], a[idx], reward_function, v0[idx], logits[idx]])
 
+        prev_rew = raw_reward
         was_alive = is_alive
+        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
-            explore_factor = np.mean(air_reward)
             break
-    etime_roll = time.time()
 
-    # Split air trajectory and ground trajectory
-    for idx in range(NENV*(num_blue+num_red)):
-        if is_air[idx]:
-            batch_air.append(trajs[idx])
-        else:
-            batch_ground.append(trajs[idx])
+    global_episodes += NENV
+    sess.run(global_step_next)
+    sess.run(subtrain_step_next[MODE])
+    if PROGBAR:
+        progbar.update(global_episodes)
+
+    batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
-    if num_batch >= minimum_batch_size:
-        stime_train = time.time()
-        train(network, batch_ground, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        train(network_air, batch_air, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        etime_train = time.time()
-        batch_ground, batch_air = [], []
+
+    if num_batch >= minbatch_size:
+        train(batch, network.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
+        batch = []
         num_batch = 0
-        log_traintime.append(etime_train - stime_train)
+        mode_changed = True
 
     steps = []
     for env_id in range(NENV):
         steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
+    global_episode_rewards[MODE].extend(episode_rew.tolist())
+    global_environment_rewards[MODE].extend(episode_env_rew.tolist())
+    global_length[MODE].extend(steps)
+    global_succeed[MODE].extend(envs.blue_win())
 
-    log_episodic_reward.extend(episode_rew.tolist())
-    log_length.extend(steps)
-    log_winrate.extend(envs.blue_win())
-    log_redwinrate.extend(envs.red_win())
-    log_looptime.append(etime_roll - stime_roll)
-    log_explore.append(explore_factor)
-
-    global_episodes += NENV
-    sess.run(global_step_next)
-    if PROGBAR:
-        progbar.update(global_episodes)
 
     if log_on:
-        tag = 'uav_training/'
+        tag = 'baseline_training/'
+        step = sess.run(subtrain_step[MODE])
         record({
-            tag+'length': log_length(),
-            tag+'win-rate': log_winrate(),
-            tag+'redwin-rate': log_redwinrate(),
-            tag+'env_reward': log_episodic_reward(),
-            tag+'rollout_time': log_looptime(),
-            tag+'explore': log_explore(),
-            tag+'train_time': log_traintime(),
-        }, writer, global_episodes)
+            tag+'length'+str(MODE): global_length[MODE](),
+            tag+'win-rate'+str(MODE): global_succeed[MODE](),
+            tag+'reward'+str(MODE): global_episode_rewards[MODE](),
+            tag+'env_reward'+str(MODE): global_environment_rewards[MODE](),
+        }, writer, step)
 
     if save_on:
         network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes)
-
-    if play_save_on:
-        for i in range(NENV):
-            with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
-                pickle.dump(info[i], handle)

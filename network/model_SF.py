@@ -17,7 +17,7 @@ from method.base import put_channels_on_grid
 
 class PPO_SF(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, name='PPO'):
+    def __init__(self, action_size=5, trainable=True, lr=1e-4, eps=0.2, entropy_beta=0.01, name='PPO',N=5):
         super(PPO_SF, self).__init__(name=name)
 
         # Feature Encoder
@@ -38,7 +38,7 @@ class PPO_SF(tf.keras.Model):
         self.softmax = layers.Activation('softmax')
 
         # Successor Feature
-        self.N = 5
+        self.N = N
         self.phi_dense1 = layers.Dense(256, activation='relu')
         self.phi_dense2 = layers.Dense(self.N, activation='relu', name='phi')
         self.successor_layer = layers.Dense(1, activation='linear', name='reward_prediction', use_bias=False)
@@ -54,7 +54,7 @@ class PPO_SF(tf.keras.Model):
         net = self.flat(net)
         net = self.dense1(net)
 
-        logits = self.actor_dense1(net) 
+        logits = self.actor_dense1(net)
         actor = self.softmax(logits)
         log_logits = tf.nn.log_softmax(logits)
 
