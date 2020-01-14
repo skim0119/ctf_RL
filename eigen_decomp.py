@@ -438,7 +438,6 @@ while True:
 
     # initialize parameters
     episode_rew = np.zeros(NENV)
-    episode_env_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in range(NENV*(num_blue*num_red))]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -468,16 +467,11 @@ while True:
         reward_a = reward_shape(phi_air, True, MODE)
         reward_g = reward_shape(phi_ground, False, MODE)
 
-        if step == max_ep:
-            env_reward[:] = -1
-        else:
-            env_reward = (raw_reward - prev_rew - 0.01)/100
+        reward_red = np.array([i['red_reward'] for i in info])
+        env_reward = np.vstack((reward, reward_red)).T.reshape([-1])
 
 
-        for i in range(NENV):
-            if not was_done[i]:
-                episode_rew[i] += reward[i]
-                episode_env_rew[i] += env_reward[i]
+        episode_rew += reward * (1-np.array(was_done, dtype=int))
 
         s1, a1, v1, logits1, actions = get_action(s1)
         _,_,_,_,_, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
@@ -492,10 +486,9 @@ while True:
             env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
                 if is_air[idx]:
-                    #agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
-                    agent_reward = reward_a[env_idx]
+                    agent_reward = reward_a[env_idx] + env_reward[env_team_idx]
                 else:
-                    agent_reward = reward_g[env_idx]
+                    agent_reward = reward_g[env_idx] + env_reward[env_team_idx]
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx],])
         # Split air trajectory and ground trajectory
 
