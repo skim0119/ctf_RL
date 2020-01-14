@@ -171,13 +171,13 @@ class SubprocVecEnv:
         if self.closed:
             return
         if self.waiting:
-            for remote in self.remotes:            
+            for remote in self.remotes:
                 remote.recv()
         for remote in self.remotes:
             remote.send(('_close', None))
         for p in self.ps:
             p.join()
             self.closed = True
-            
+
     def __len__(self):
         return self.nenvs

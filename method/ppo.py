@@ -187,7 +187,7 @@ class PPO(a3c):
         # Feature encoder
         with tf.variable_scope('encoder'):
             feature, _layers = build_network(input_hold)
-            add_image(_layers['input'], '1_input', X=7)
+            add_image(_layers['input'], '1_input', X=6)
             add_image(_layers['sepCNN1'], '2_sepCNN')
             add_image(_layers['attention'], '3_attention')
             add_image(_layers['NLNN'], '4_nonlocal')
@@ -578,7 +578,7 @@ class PPO_multimodes(a3c):
         # Encoder
         with tf.variable_scope('encoder'):
             feature, _layers = build_network(input_hold)
-            add_image(_layers['input'], '1_input', X=7)
+            add_image(_layers['input'], '1_input', X=6)
             add_image(_layers['sepCNN1'], '2_sepCNN')
             add_image(_layers['attention'], '3_attention')
             add_image(_layers['NLNN'], '4_nonlocal')
