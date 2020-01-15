@@ -457,7 +457,7 @@ while True:
         a, v0 = a1, v1
         logits = logits1
 
-        s1, raw_reward, done, info = envs.step(actions)
+        s1, reward, done, info = envs.step(actions)
         is_alive = np.array([agent.isAlive for agent in envs.get_team_blue().flat]).reshape([NENV, num_blue])
         is_alive_red = np.array([agent.isAlive for agent in envs.get_team_red().flat]).reshape([NENV, num_red])
         is_alive = np.concatenate([is_alive, is_alive_red], axis=1).reshape([-1])
@@ -474,7 +474,7 @@ while True:
         episode_rew += reward * (1-np.array(was_done, dtype=int))
 
         s1, a1, v1, logits1, actions = get_action(s1)
-        _,_,_,_,_, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
+        _,_,_,_,_, phi_air, phi_ground, _, _ = get_action_SF(s1,N=N)
 
         for idx, d in enumerate(done):
             if d:
@@ -492,7 +492,7 @@ while True:
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx],])
         # Split air trajectory and ground trajectory
 
-        prev_rew = raw_reward
+        prev_rew = reward
         was_alive = is_alive
         was_alive_red = is_alive_red
         was_done = done
@@ -517,7 +517,7 @@ while True:
     if num_batch >= minimum_batch_size:
         train(batch_air, network_a.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
         train(batch_ground, network_g.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
-        batch = []
+        batch_ground, batch_air = [], []
         num_batch = 0
         mode_changed = True
 
