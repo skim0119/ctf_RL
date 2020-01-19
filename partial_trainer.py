@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'LSTM_TEST'
+TRAIN_NAME = 'LSTM_TEST_02'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -87,9 +87,9 @@ keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = 40 # config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024
+minimum_batch_size = 2048
 print(minimum_batch_size)
 
 ## Setup
@@ -118,7 +118,7 @@ def make_env(map_size):
             config_path=env_setting_path
         )
 envs_list = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs_list, keep_frame)
+envs = SubprocVecEnv(envs_list, keep_frame, map_size)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 

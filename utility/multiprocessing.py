@@ -20,7 +20,7 @@ class CloudpickleWrapper(object):
         import pickle
         self.x = pickle.loads(ob)
 
-def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1):
+def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1, size=39):
     parent_remote.close()
     env = env_fn_wrapper.x()
 
@@ -37,9 +37,9 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1):
                 ob, reward, done, info = env.step(data)
                 if done:
                     pause = True
-                ob = centering(ob, env.get_team_blue, 39, 39)
+                ob = centering(ob, env.get_team_blue, size, size)
                 if ctrl_red:
-                    rob = centering(env.get_obs_red, env.get_team_red, 39, 39)
+                    rob = centering(env.get_obs_red, env.get_team_red, size, size)
                     ob = np.concatenate([ob, rob], axis=0)
                 ob = stacked_state(ob)
                 remote.send((ob, reward, done, info))
@@ -51,9 +51,9 @@ def worker(idx, remote, parent_remote, env_fn_wrapper, keep_frame=1):
                 data['policy_blue'] = data['policy_blue']()
 
             ob = env.reset(**data)
-            ob = centering(ob, env.get_team_blue, 39, 39)
+            ob = centering(ob, env.get_team_blue, size, size)
             if ctrl_red:
-                rob = centering(env.get_obs_red, env.get_team_red, 39, 39)
+                rob = centering(env.get_obs_red, env.get_team_red, size, size)
                 initial_map = np.concatenate([ob, rob], axis=0)
             else:
                 initial_map = ob
@@ -73,7 +73,7 @@ class SubprocVecEnv:
     """
     Asynchronous Environment Vectorized run
     """
-    def __init__(self, env_fns, keep_frame=1):
+    def __init__(self, env_fns, keep_frame=1, size=39):
         """
         envs: list of gym environments to run in subprocesses
         """
@@ -90,7 +90,7 @@ class SubprocVecEnv:
         idx = 0
         for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
             self.ps.append(Process(target=worker,
-                args=(idx, work_remote, remote, CloudpickleWrapper(env_fn), keep_frame) ) )
+                args=(idx, work_remote, remote, CloudpickleWrapper(env_fn), keep_frame, size) ) )
             idx += 1
 
         for p in self.ps:
