@@ -223,7 +223,7 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=7) for _ in range(num_blue*NENV)] # Trajectory per agent
     
     # Bootstrap
-    s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba, custom_board=)
+    s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba, custom_board='fair_map_40/board_0001.txt')
     s1, a1, v1, logits1, actions, hh1, hc1 = get_action(s1, prev_action, prev_reward, prev_hidden)
 
     # Rollout
