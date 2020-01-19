@@ -84,7 +84,7 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
-map_size     = config.getint('DEFAULT', 'MAP_SIZE')
+map_size     = 40 # config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 128
@@ -223,7 +223,7 @@ while global_episodes < total_episodes:
     trajs = [Trajectory(depth=7) for _ in range(num_blue*NENV)] # Trajectory per agent
     
     # Bootstrap
-    s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba)
+    s1 = envs.reset(config_path=env_setting_path, policy_red=policy.Roomba, custom_board=)
     s1, a1, v1, logits1, actions, hh1, hc1 = get_action(s1, prev_action, prev_reward, prev_hidden)
 
     # Rollout

@@ -63,8 +63,9 @@ class PPO_LSTM_V1(tf.keras.Model):
         net = self.td_flat(net)
         net = self.td_dense1(net)
         net = tf.concat([net, prev_action, prev_reward], axis=2)
-        #net, state_h, state_c = self.lstm1(net, initial_state=hidden)
-        net, state_h, state_c = self.lstm1(net)
+        #net, state_h, state_c = self.lstm1(net, initial_state=hidden) # Continuation hidden state
+        #net, state_h, state_c = self.lstm1(net) # Arbitrary (noisy) hidden state (not sure if implemented)
+        net, state_h, state_c = self.lstm1(net, initial_state=None) # Zero hidden state
         hidden = [state_h, state_c]
 
         logits = self.actor_dense1(net) 
@@ -82,6 +83,10 @@ class PPO_LSTM_V1(tf.keras.Model):
         self.hidden_state = hidden
 
         return actor, logits, log_logits, critic, hidden
+
+    def reset_lstm(self):
+        # Reset every lstm layer to initial state.
+        self.lstm1.reset_states()
 
     def build_loss(self, old_log_logit, action, advantage, td_target):
         def _log(val):

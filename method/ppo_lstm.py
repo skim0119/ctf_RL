@@ -1,17 +1,7 @@
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
-
 import numpy as np
 
 from utility.utils import store_args
-
-from method.pg import Backpropagation
-
-from method.a3c import a3c
-from method.base import put_channels_on_grid
-from method.base import put_flat_on_grid
-from method.base import put_ctf_state_on_grid
-from method.base import initialize_uninitialized_vars as iuv
 
 from network.model_lstm import PPO_LSTM_V1
 
@@ -32,6 +22,7 @@ class PPO:
 
         with self.sess.as_default(), self.sess.graph.as_default():
             with tf.variable_scope(scope):
+                # Build Inputs
                 self.state_input = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state')
                 self.prev_action_ = tf.placeholder(shape=[None, 4, 1], dtype=tf.float32, name='preaction_hold')
                 self.prev_reward_ = tf.placeholder(shape=[None, 4, 1], dtype=tf.float32, name='prereward_hold')
@@ -67,6 +58,8 @@ class PPO:
                 self.hidden_[1] : states[3][1],
             }
         a_probs, critics, logits, hidden_h, hidden_c = self.sess.run([self.actor, self.critic, self.log_logits, self.hidden[0], self.hidden[1]], feed_dict)
+
+        self.model.reset_lstm()
         if return_action:
             actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
             return actions, critics, logits, hidden_h, hidden_c
@@ -86,6 +79,7 @@ class PPO:
                 self.old_logits_: old_logit
             }
         self.sess.run(self.update_ops, feed_dict)
+        self.model.reset_lstm()
 
         if log:
             ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]
