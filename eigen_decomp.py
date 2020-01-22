@@ -33,6 +33,7 @@ from utility.logger import record
 from utility.gae import gae
 
 from method.SF import Network
+from vector_clustering import clique,ProcessClusters
 
 device_ground = '/gpu:0'
 device_air = '/gpu:0'
@@ -43,13 +44,13 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_01'
+TRAIN_NAME = 'SF_TRAIN_N8'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-N=16
+N=8
 
 NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
@@ -204,10 +205,10 @@ num_batch = 0
 
 SF_samples_air = []
 SF_samples_ground = []
-samples_air = 0
-samples_ground = 0
+sample_episodes = 50
+episodes=0
 #Collecting Samples for eigenvalue processing.
-while (samples_ground < N or samples_air < N):
+while (episodes < sample_episodes):
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -249,19 +250,30 @@ while (samples_ground < N or samples_air < N):
 
         s1, a1, v1, logits1, actions, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
-        if samples_ground < N:
-            SF_samples_ground.append(psi_ground)
-        if samples_air < N:
-            SF_samples_air.append(psi_air)
-        samples_air+=2
-        samples_ground+=2
 
+        SF_samples_ground.append(psi_ground)
+        SF_samples_air.append(psi_air)
 
-
-        if np.all(done) or (samples_ground >= N and samples_air >= N):
+        if np.all(done):
+            episodes+=NENV
             break
 
+#Clustering to improve sample efficiency
+print("Clustering")
+intervals = 8  # defines amount of cells in grid in each dimension
+threshold = 0   # lets consider each point as non-outlier
+SF_samples_ground = np.array(SF_samples_ground)
+clique_ground = clique(SF_samples_ground, intervals, threshold)
+clique_ground.process()
+clusters_ground = clique_ground.get_clusters()
+clique_air = clique(SF_samples_air, intervals, threshold)
+clique_air.process()
+clusters_air = clique_air.get_clusters()
+labels_ground=ProcessClusters(clusters_ground)
+labels_air=ProcessClusters(clusters_air)
+exit()
 #Ground Eigenvalue Decomposition
+
 for i,sample in enumerate(SF_samples_ground):
     if i==0:
         SF_Matrix_g=sample
@@ -279,12 +291,6 @@ for i,sample in enumerate(SF_samples_air):
 SF_Matrix_a = np.resize(SF_Matrix_a,[N,N])
 w_a,v_a = np.linalg.eig(SF_Matrix_a)
 
-
-TRAIN_NAME = 'DECOMP_TRAIN_01'
-LOG_PATH = './logs/'+TRAIN_NAME
-MODEL_PATH = './model/' + TRAIN_NAME
-SAVE_PATH = './save/' + TRAIN_NAME
-
 #Choose the Max three Eigenvalues to continue with and their corresponding Eigenvectors.
 #The reward for each of the subpolicies is the vector multiplied with the Phi output.
 num_mode = 5
@@ -293,13 +299,18 @@ eigVect_g = []
 for idx in eigValIdx:
     eigVect_g.append(v_g[:,idx])
 
-eigValIdx = w_a.argsort()[-num_mode:][::-1]
-eigVect_a = []
-for idx in eigValIdx:
-    eigVect_a.append(v_a[:,idx])
+    eigValIdx = w_a.argsort()[-num_mode:][::-1]
+    eigVect_a = []
+    for idx in eigValIdx:
+        eigVect_a.append(v_a[:,idx])
+
 
 ##Creating the new subpolicies based on the eigen decomposition.
 from method.ppo import PPO_multimodes as Network2
+TRAIN_NAME = 'DECOMP_TRAIN_01'
+LOG_PATH = './logs/'+TRAIN_NAME
+MODEL_PATH = './model/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
 
 heur_policy_list = [policy.Patrol, policy.Roomba, policy.Defense, policy.Random, policy.AStar]
 heur_weight = [1,1,1,1,1]

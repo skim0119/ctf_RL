@@ -42,7 +42,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_01'
+TRAIN_NAME = 'SF_TRAIN_N8'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -63,7 +63,7 @@ path_create(SAVE_PATH)
 config_path = 'config.ini'
 config = configparser.ConfigParser()
 config.read(config_path)
-N = 1024
+N = 8
 
 # Training
 total_episodes = 1000000#config.getint('TRAINING', 'TOTAL_EPISODES')
