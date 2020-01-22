@@ -1,31 +1,8 @@
-"""
-a3c.py module includes basic modules and implementation of A3C for CtF environment.
-
-Some of the methods are left unimplemented which makes the a3c module to be parent abstraction.
-
-Script contains example A3C
-
-TODO:
-    - Include gradient and weight histograph for nan debug
-"""
-
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
-
 import numpy as np
 
 from utility.utils import store_args
 
-from method.pg import Backpropagation
-
-from method.a3c import a3c
-from method.base import put_channels_on_grid
-from method.base import put_flat_on_grid
-from method.base import put_ctf_state_on_grid
-from method.base import initialize_uninitialized_vars as iuv
-
-
-from network.attention import self_attention
 from network.model_SF import PPO_SF
 
 
@@ -38,7 +15,6 @@ class Network:
         scope,
         lr=1e-4,
         sess=None,
-        target_network=None,
         N=5,
         **kwargs
     ):
@@ -123,6 +99,18 @@ class Network:
 
             writer.flush()
 
+    @property
+    def get_successor_feature_gradcam(self):
+        with tf.name_scope('gradcam_module'):
+            scope = self.state_input 
+            phi_gradcam = [tf.gradients(self.phi[:,i], self.state_input)[0] for i in range(self.N)]
+            psi_gradcam = [tf.gradients(self.psi[:,i], self.state_input)[0] for i in range(self.N)]
+        return phi_gradcam, psi_gradcam
+
+    @property
+    def get_successor_weight(self):
+        return self.model.successor_layer.weights
+
     def initialize_vars(self):
         var_list = self.get_vars
         init = tf.initializers.variables(var_list)
@@ -141,6 +129,13 @@ class Network:
 
     def save(self, saver, model_path, global_step):
         saver.save(self.sess, model_path, global_step=global_step)
+
+    def load(self, model_path):
+        # Restore if savepoint exist. Error if checkpoint does not exist
+        with self.sess.graph.as_default():
+            ckpt = tf.train.latest_checkpoint(model_path)
+            self.model.load_weights(ckpt)
+        print("Load Model : ", ckpt)
 
     @property
     def get_vars(self):

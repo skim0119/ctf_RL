@@ -18,7 +18,7 @@ from method.base import initialize_uninitialized_vars as iuv
 
 class Encoder(tf.keras.Model):
     @store_args
-    def __init__(self, action_size=5, trainable=True, name='DQN_encoder'):
+    def __init__(self, phi_n=16, action_size=5, trainable=True, name='DQN_encoder'):
         super(Encoder, self).__init__(name=name, trainable=trainable)
 
         # Feature Encoder
@@ -36,11 +36,12 @@ class Encoder(tf.keras.Model):
                 layers.Dense(units=256, activation='relu'),
             ])
 
+        # Phi Stream
+        self.phi_dense = layers.Dense(phi_n, activation='relu')
+        self.successor_layer = layers.Dense(action_size, activation='linear')
+
         # Value Stream
-        self.value_stream = tf.keras.Sequential([
-                layers.Dense(256, activation='relu'),
-                layers.Dense(action_size, activation='linear'),
-            ])
+        self.psi_dense = layers.Dense(phi_n, activation='relu'),
 
         # Advantage Stream
         self.advantage_stream = tf.keras.Sequential([
@@ -50,14 +51,17 @@ class Encoder(tf.keras.Model):
 
     def call(self, inputs):
         latent = self.encoder(inputs)
-        values = self.value_stream(latent)
+        phi = self.phi_dense(latent); self.phi = phi
+        rewards = self.successor_layer(phi)
+        psi = self.psi_dense(latent); self.psi = psi
+        values = self.successor_layer(psi)
         advantages = self.advantage_stream(latent)
         with tf.name_scope('qvals'):
             qvals = values + tf.subtract(advantages, tf.reduce_mean(advantages, axis=-1, keepdims=True))
 
-        predict = tf.argmax(self.qvals, axis=-1)
+        predict = tf.argmax(qvals, axis=-1)
         
-        return qvals, predict
+        return qvals, predict, rewards
 
 class DQN:
     @store_args
@@ -80,37 +84,41 @@ class DQN:
                 self.next_states_ = tf.placeholder(shape=input_shape, dtype=tf.float32, name='next_states')
                 self.actions_ = tf.placeholder(shape=[None], dtype=tf.int32, name='actions_hold')
                 self.rewards_ = tf.placeholder(shape=[None], dtype=tf.float32, name='rewards_hold')
-                self.dones_ = tf.placeholder(shape=[None], dtype=tf.int32, name='dones_hold')
+                self.dones_ = tf.placeholder(shape=[None], dtype=tf.float32, name='dones_hold')
 
                 # Build Network
                 model = Encoder(action_size); self.model = model
+                self.q, self.predict, self.reward_predict = model(self.states_)
+                q_next, _, _ = model(self.next_states_)
                 model.summary()
-                self.q, self.predict = model(self.states_)
-                q_next, _ = model(self.next_states_)
                 
                 # Build Trainer
-                loss = self.build_loss(self.q, self.actions_, self.rewards_, q_next, self.dones_)
+                loss = self.build_loss(self.q, self.actions_, self.rewards_, q_next, self.dones_, self.reward_predict)
                 optimizer = tf.keras.optimizers.Adam(lr)
                 self.gradients = optimizer.get_gradients(loss, model.trainable_variables)
                 self.update_ops = optimizer.apply_gradients(zip(self.gradients, model.trainable_variables))
 
-    def build_loss(self, curr_q, actions, rewards, next_q, dones):
+    def build_loss(self, curr_q, actions, rewards, next_q, dones, reward_predict):
         with tf.name_scope('current_Q'):
             oh_action = tf.one_hot(actions, self.action_size, dtype=tf.float32) # [?, num_agent, action_size]
             curr_q = tf.reduce_sum(tf.multiply(curr_q, oh_action), axis=-1) # [?, num_agent]
+
+        with tf.name_scope('reward_pred'):
+            reward_predict = tf.reduce_sum(tf.multiply(reward_predict, oh_action), axis=-1)
         
         with tf.name_scope('target_Q'):
-            max_next_q = tf.reduce_max(next_q, axis=-1, keepdims=True)
-            td_target = rewards + tf.multiply(self.gamma * max_next_q , (1-self.dones))
+            max_next_q = tf.reduce_max(next_q, axis=-1)
+            td_target = reward_predict + tf.multiply(self.gamma * max_next_q , (1.0-self.dones_))
 
         with tf.name_scope('td_error'):
-            loss = tf.keras.losses.MeanSquaredError(td_target, curr_q)
-            softmax_q = tf.softmax(curr_q)
+            loss = tf.keras.losses.MSE(td_target, curr_q)
+            reward_loss = tf.keras.losses.MSE(rewards, reward_predict)
+            softmax_q = tf.nn.softmax(curr_q)
             entropy = -tf.reduce_mean(softmax_q * tf.log(softmax_q))
+            total_loss = loss + self.entropy_beta * entropy + 0.5*reward_loss
 
-        self.loss, self.entropy = loss, entropy
-
-        return loss + self.entropy_beta * entropy
+        self.loss, self.entropy, self.reward_loss = loss, entropy, self.reward_loss
+        return total_loss
 
     def run_network(self, states, return_action=True):
         feed_dict = {self.states_: states}
@@ -121,18 +129,19 @@ class DQN:
         feed_dict = {
                 self.states_: states,
                 self.next_states_: next_states,
-                self.action_: action,
+                self.actions_: actions,
                 self.rewards_: rewards,
                 self.dones_: dones,
             }
-        ops = [self.loss, self.entropy, self.update_ops]
-        aloss, entropy, _ = self.sess.run(ops, feed_dict)
+        ops = [self.loss, self.entropy, self.reward_loss, self.update_ops]
+        aloss, entropy, rloss, _ = self.sess.run(ops, feed_dict)
 
         if log:
             # Record losses
             summary = tf.Summary()
             summary.value.add(tag='summary/'+self.scope+'_actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/'+self.scope+'_entropy', simple_value=entropy)
+            summary.value.add(tag='summary/'+self.scope+'_reward_loss', simple_value=rloss)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients, feed_dict)
