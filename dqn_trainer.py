@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DQN_TEST_FULL_01'
+TRAIN_NAME = 'DQN_SF_FULL_01'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME

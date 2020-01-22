@@ -41,7 +41,7 @@ class Encoder(tf.keras.Model):
         self.successor_layer = layers.Dense(action_size, activation='linear')
 
         # Value Stream
-        self.psi_dense = layers.Dense(phi_n, activation='relu'),
+        self.psi_dense = layers.Dense(phi_n, activation='relu')
 
         # Advantage Stream
         self.advantage_stream = tf.keras.Sequential([
@@ -117,7 +117,7 @@ class DQN:
             entropy = -tf.reduce_mean(softmax_q * tf.log(softmax_q))
             total_loss = loss + self.entropy_beta * entropy + 0.5*reward_loss
 
-        self.loss, self.entropy, self.reward_loss = loss, entropy, self.reward_loss
+        self.loss, self.entropy, self.reward_loss = loss, entropy, reward_loss
         return total_loss
 
     def run_network(self, states, return_action=True):
