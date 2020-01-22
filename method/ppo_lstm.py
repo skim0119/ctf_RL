@@ -59,7 +59,6 @@ class PPO:
             }
         a_probs, critics, logits, hidden_h, hidden_c = self.sess.run([self.actor, self.critic, self.log_logits, self.hidden[0], self.hidden[1]], feed_dict)
 
-        self.model.reset_lstm()
         if return_action:
             actions = np.array([np.random.choice(self.action_size, p=prob / sum(prob)) for prob in a_probs])
             return actions, critics, logits, hidden_h, hidden_c
@@ -79,7 +78,6 @@ class PPO:
                 self.old_logits_: old_logit
             }
         self.sess.run(self.update_ops, feed_dict)
-        self.model.reset_lstm()
 
         if log:
             ops = [self.model.actor_loss, self.model.critic_loss, self.model.entropy]

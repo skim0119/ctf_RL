@@ -34,14 +34,14 @@ from utility.gae import gae
 
 from method.ppo_lstm import PPO as Network
 
-device_ground = '/gpu:0'
+device_ground = '/gpu:1'
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'LSTM_TEST_02'
+TRAIN_NAME = 'LSTM_TEST_03'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -51,7 +51,8 @@ GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count() 
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_partial.ini'
+#env_setting_path = 'setting_partial.ini'
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -82,9 +83,9 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
-vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = 40 # config.getint('DEFAULT', 'MAP_SIZE')
+vision_range = 39# config.getint('DEFAULT', 'VISION_RANGE')
+keep_frame   = config.getint('DEFAULT', 'KEEP_FRAME')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -118,7 +119,7 @@ def make_env(map_size):
             config_path=env_setting_path
         )
 envs_list = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs_list, keep_frame, map_size)
+envs = SubprocVecEnv(envs_list, keep_frame, map_size*2-1)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 

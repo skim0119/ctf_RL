@@ -29,7 +29,7 @@ class PPO_LSTM_V1(tf.keras.Model):
                 depth_multiplier=2,
                 activation='relu',
             )
-        self.td_conv1 = layers.TimeDistributed(conv1, input_shape=(None,4,39,39,6))
+        self.td_conv1 = layers.TimeDistributed(conv1, input_shape=(None,4,79,79,6))
 
         conv2 = layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='relu')
         self.td_conv2 = layers.TimeDistributed(conv2)
