@@ -39,7 +39,7 @@ class Network:
         lr=1e-4,
         sess=None,
         target_network=None,
-        N=5,
+        N=16,
         **kwargs
     ):
         assert sess is not None, "TF Session is not given."

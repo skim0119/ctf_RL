@@ -42,7 +42,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_01'
+TRAIN_NAME = 'SF_TRAIN_05'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -194,7 +194,7 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         nn.update_network(*mdp_tuple, global_episodes, writer, log and (i==0))
         i+=1
 
-def get_action(states, N=5):
+def get_action(states, N=16):
     states_rsh = np.reshape(states, [NENV, num_blue+num_red]+input_size[1:])
     blue_air, blue_ground, red_air, red_ground = np.split(states_rsh, [2,6,8], axis=1)
     blue_states, red_states = np.split(states_rsh, [6], axis=1)
@@ -279,22 +279,15 @@ while global_episodes < total_episodes:
 
         s1, a1, v1, logits1, actions, phi, psi = get_action(s1)
 
-        # push to buffer
-        #TODO: completely separate the reward function for ground and air agents
-        # For air : Give extra reward for flag (not sure how much), and extra reward for revealing the map
-        #TODO: Reconsider parallelization construction
-        # Problem arise when environment does not end simultaneously, and matrix operations are asynchronized due to it.
-
         was_done = np.array(was_done, dtype=bool)
-        pre_air_reward = (np.isin(s1[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
-        air_reward = (np.isin(s1[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)) * np.repeat(np.array(~was_done,dtype=int), 2)
+        pre_air_reward = (np.isin(s1[::6,:,:,-12],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-10], [1, -1]).astype(int).sum(axis=2).sum(axis=1)*10.0) * np.repeat(np.array(~was_done,dtype=int), 2)
+        air_reward = (np.isin(s1[::6,:,:,-6],-1).sum(axis=2).sum(axis=1) * (-0.1) + np.isin(s1[::6,:,:,-4], [1, -1]).astype(int).sum(axis=2).sum(axis=1)*10.0) * np.repeat(np.array(~was_done,dtype=int), 2)
         for idx in range(NENV*(num_blue+num_red)):
         #for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // (num_blue+num_red)
             env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
                 if is_air[idx]:
-                    #agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
                     agent_reward = air_reward[env_team_idx] - pre_air_reward[env_team_idx]
                 else:
                     agent_reward = env_reward[env_team_idx]

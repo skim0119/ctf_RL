@@ -38,7 +38,7 @@ class PPO_SF(tf.keras.Model):
         self.softmax = layers.Activation('softmax')
 
         # Successor Feature
-        self.N = 5
+        self.N = 16
         self.phi_dense1 = layers.Dense(256, activation='relu')
         self.phi_dense2 = layers.Dense(self.N, activation='relu', name='phi')
         self.successor_layer = layers.Dense(1, activation='linear', name='reward_prediction', use_bias=False)
