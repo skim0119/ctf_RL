@@ -27,7 +27,7 @@ from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
-from utility.multiprocessing_seq import SubprocVecEnv
+from utility.multiprocessing import SubprocVecEnv
 from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record
 from utility.gae import gae
@@ -41,17 +41,17 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DQN_TEST'
+TRAIN_NAME = 'DQN_TEST_FULL_01'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() 
+NENV = multiprocessing.cpu_count()//2 
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_partial.ini'
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -89,13 +89,13 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minimum_batch_size = 1024
+minimum_batch_size = 4096 * 2
 print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6
-input_size = [None, keep_frame, vision_dx, vision_dy, nchannel]
+input_size = [None, vision_dx, vision_dy, nchannel*keep_frame]
 
 ## Logger Initialization 
 log_episodic_reward = MovingAverage(moving_average_step)
