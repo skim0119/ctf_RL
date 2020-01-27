@@ -43,13 +43,13 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_01'
+TRAIN_NAME = 'SF_TRAIN_N8'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
-N=16
+N=8
 
 NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
@@ -204,10 +204,12 @@ num_batch = 0
 
 SF_samples_air = []
 SF_samples_ground = []
-samples_air = 0
-samples_ground = 0
+phi_samples_air = []
+phi_samples_ground = []
+samples=0
+sample_size=50
 #Collecting Samples for eigenvalue processing.
-while (samples_ground < N or samples_air < N):
+while (samples < sample_size):
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -249,17 +251,45 @@ while (samples_ground < N or samples_air < N):
 
         s1, a1, v1, logits1, actions, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
-        if samples_ground < N:
-            SF_samples_ground.append(psi_ground)
-        if samples_air < N:
-            SF_samples_air.append(psi_air)
-        samples_air+=2
-        samples_ground+=2
+        SF_samples_ground.append(psi_ground)
+        SF_samples_air.append(psi_air)
+        phi_samples_ground.append(phi_ground)
+        phi_samples_air.append(phi_air)
 
-
-
-        if np.all(done) or (samples_ground >= N and samples_air >= N):
+        if np.all(done):
+            samples+=NENV
             break
+
+#Proecces the samples into a usable form
+def ProcessSamples(sampleList):
+    for i,sample in enumerate(sampleList):
+        if i == 0:
+            samples = sample.reshape([NENV*8,N])
+        else:
+            samples = np.concatenate([samples,sample.reshape([NENV*8,N])],axis=0)
+    return samples
+
+psiGround = ProcessSamples(SF_samples_ground)
+phiGround = ProcessSamples(SF_samples_ground)
+
+for dim in range(N):
+    print("Psi statistics",dim,np.min(psiGround[:,dim]),np.mean(psiGround[:,dim]), np.max(psiGround[:,dim]))
+    print("Phi statistics",dim,np.min(phiGround[:,dim]),np.mean(phiGround[:,dim]), np.max(phiGround[:,dim]))
+    # np.min(phiGround[:,dim])
+    # np.mean(phiGround[:,dim])
+    # np.max(phiGround[:,dim])
+
+from mpl_toolkits import mplot3d
+import numpy as np
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.scatter3D(groundSamples[:,5], groundSamples[:,6], groundSamples[:,7], )
+plt.show()
+
+
+exit()
 
 #Ground Eigenvalue Decomposition
 for i,sample in enumerate(SF_samples_ground):
