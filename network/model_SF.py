@@ -31,7 +31,7 @@ class PPO_SF(tf.keras.Model):
             )
         self.conv2 = layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='relu')
         self.flat = layers.Flatten()
-        self.dense1 = layers.Dense(units=256, activation='relu')
+        self.dense1 = layers.Dense(units=128, activation='relu')
 
         # Actor
         self.actor_dense1 = layers.Dense(action_size)
@@ -39,10 +39,9 @@ class PPO_SF(tf.keras.Model):
 
         # Successor Feature
         self.N = 16
-        self.phi_dense1 = layers.Dense(256, activation='relu')
-        self.phi_dense2 = layers.Dense(self.N, activation='relu', name='phi')
+        self.phi_dense1 = layers.Dense(self.N, activation='relu', name='phi')
         self.successor_layer = layers.Dense(1, activation='linear', name='reward_prediction', use_bias=False)
-        self.psi_dense1 = layers.Dense(256, activation='relu')
+        self.psi_dense1 = layers.Dense(128, activation='relu')
         self.psi_dense2 = layers.Dense(self.N, activation='relu', name='psi')
 
     def call(self, inputs):
@@ -59,7 +58,6 @@ class PPO_SF(tf.keras.Model):
         log_logits = tf.nn.log_softmax(logits)
 
         phi = self.phi_dense1(net)
-        phi = self.phi_dense2(phi)
         sf_reward = self.successor_layer(phi)
         sf_reward = tf.reshape(sf_reward, [-1])
 
@@ -88,7 +86,7 @@ class PPO_SF(tf.keras.Model):
 
     @property
     def get_phi_variables(self):
-        return self.get_feature_variables+self.phi_dense1.variables+self.phi_dense2.variables
+        return self.get_feature_variables+self.phi_dense1.variables+self.successor_layer.variables
 
     @property
     def get_psi_variables(self):

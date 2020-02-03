@@ -87,7 +87,7 @@ keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 2
 minimum_batch_size = 4096 * 2
 print(minimum_batch_size)
@@ -147,7 +147,6 @@ else:
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes) # It save both network
-
 
 ### TRAINING ###
 def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -212,6 +211,8 @@ while global_episodes < total_episodes:
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep+1):
+        if global_episodes < 30000:
+            actions = np.random.randint(0,5,actions.shape)
         s0 = s1
         a0, v0 = a1, v1
         
@@ -265,7 +266,7 @@ while global_episodes < total_episodes:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'lstm_training/'
+        tag = 'dqn_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

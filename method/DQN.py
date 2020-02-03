@@ -115,7 +115,7 @@ class DQN:
             reward_loss = tf.keras.losses.MSE(rewards, reward_predict)
             softmax_q = tf.nn.softmax(curr_q)
             entropy = -tf.reduce_mean(softmax_q * tf.log(softmax_q))
-            total_loss = loss + self.entropy_beta * entropy + 0.5*reward_loss
+            total_loss = loss + self.entropy_beta * entropy + reward_loss
 
         self.loss, self.entropy, self.reward_loss = loss, entropy, reward_loss
         return total_loss
