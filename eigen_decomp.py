@@ -250,7 +250,6 @@ while (episodes < sample_episodes):
 
         s1, a1, v1, logits1, actions, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
 
-
         SF_samples_ground.append(psi_ground)
         SF_samples_air.append(psi_air)
 
@@ -262,7 +261,15 @@ while (episodes < sample_episodes):
 print("Clustering")
 intervals = 8  # defines amount of cells in grid in each dimension
 threshold = 0   # lets consider each point as non-outlier
+
+#writing to a file
 SF_samples_ground = np.array(SF_samples_ground)
+SF_samples_ground = np.array(SF_samples_air)
+# from tempfile import TemporaryFile
+# outfile = TemporaryFile()
+
+np.save("test_air",SF_samples_air)
+
 clique_ground = clique(SF_samples_ground, intervals, threshold)
 clique_ground.process()
 clusters_ground = clique_ground.get_clusters()

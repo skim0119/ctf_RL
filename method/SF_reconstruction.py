@@ -26,7 +26,7 @@ from method.base import initialize_uninitialized_vars as iuv
 
 
 from network.attention import self_attention
-from network.model_SF_v2 import PPO_SF
+from network.model_SF_reconstruction import PPO_SF
 
 
 class Network:
@@ -40,23 +40,25 @@ class Network:
         sess=None,
         target_network=None,
         N=5,
+        keep_frames=1,
         **kwargs
     ):
         assert sess is not None, "TF Session is not given."
 
         with self.sess.as_default(), self.sess.graph.as_default():
-            with tf.variable_scope(scope, reuse=True):
+            with tf.variable_scope(scope):
                 self.state_input = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state')
                 self.action_ = tf.placeholder(shape=[None], dtype=tf.int32, name='action_hold')
                 self.td_target_ = tf.placeholder(shape=[None, N], dtype=tf.float32, name='td_target_hold')
                 self.reward_ = tf.placeholder(shape=[None], dtype=tf.float32, name='reward_hold')
                 self.advantage_ = tf.placeholder(shape=[None], dtype=tf.float32, name='adv_hold')
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_hold')
+                self.state_next_ = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state_next')
 
                 # Build Network
-                model = PPO_SF(action_size,N=N);  self.model = model
-                self.actor, self.logits, self.log_logits, self.critic, self.phi, self.sf_reward, self.psi = model(self.state_input)
-                actor_loss, sf_loss, reward_loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_, self.reward_, self.phi)
+                model = PPO_SF(action_size,N=N,keep_frames=keep_frames);  self.model = model
+                self.actor, self.logits, self.log_logits, self.critic, self.phi, self.sf_reward, self.psi,self.state_pred = model(self.state_input)
+                actor_loss, sf_loss, reward_loss, state_loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_, self.reward_,self.state_next_, self.phi)
                 model.summary()
 
                 # Build Trainer
@@ -68,12 +70,16 @@ class Network:
                 sf_grad = sf_optimizer.get_gradients(sf_loss, model.get_psi_variables)
                 sf_update = sf_optimizer.apply_gradients(zip(sf_grad, model.get_psi_variables))
 
-                reward_optimizer = tf.keras.optimizers.Adam(lr*10)
+                reward_optimizer = tf.keras.optimizers.Adam(lr)
                 reward_grad = reward_optimizer.get_gradients(reward_loss, model.get_phi_variables)
                 reward_update = reward_optimizer.apply_gradients(zip(reward_grad, model.get_phi_variables))
 
-                self.gradients = actor_grad + sf_grad + reward_grad
-                self.update_rl = tf.group([actor_update, sf_update])
+                state_optimizer = tf.keras.optimizers.Adam(lr)
+                state_grad = state_optimizer.get_gradients(state_loss, model.get_state_pred_variables)
+                state_update = state_optimizer.apply_gradients(zip(state_grad, model.get_state_pred_variables))
+
+                self.gradients = actor_grad + sf_grad + reward_grad + state_grad
+                self.update_rl = tf.group([actor_update, sf_update, state_update])
                 self.update_sl = reward_update
 
     def run_network(self, states, return_action=True):
@@ -92,7 +98,8 @@ class Network:
                      self.td_target_: td_target,
                      self.reward_: reward,
                      self.advantage_: advantage,
-                     self.old_logits_: old_logit}
+                     self.old_logits_: old_logit,
+                     self.state_next_:state_next}
         self.sess.run(self.update_rl, feed_dict)
 
 
@@ -101,14 +108,15 @@ class Network:
 
         if log:
             feed_dict[self.state_input] = state_input
-            ops = [self.model.actor_loss, self.model.critic_loss, self.model.reward_loss, self.model.entropy]
-            aloss, closs, rloss, entropy = self.sess.run(ops, feed_dict)
+            ops = [self.model.actor_loss, self.model.critic_loss, self.model.reward_loss, self.model.entropy, self.model.state_loss]
+            aloss, closs, rloss, entropy, sloss = self.sess.run(ops, feed_dict)
 
             summary = tf.Summary()
             summary.value.add(tag='summary/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/critic_loss', simple_value=closs)
             summary.value.add(tag='summary/reward_mse_loss', simple_value=rloss)
             summary.value.add(tag='summary/entropy', simple_value=entropy)
+            summary.value.add(tag='summary/sloss', simple_value=sloss)
 
             # Check vanish gradient
             grads = self.sess.run(self.gradients, feed_dict)

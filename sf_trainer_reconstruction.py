@@ -32,17 +32,17 @@ from utility.RL_Wrapper import TrainedNetwork
 from utility.logger import record
 from utility.gae import gae
 
-from method.SF import Network
+from method.SF_reconstruction import Network
 
 device_ground = '/gpu:0'
-device_air = '/gpu:0'
+device_air = '/cpu:0'
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_sf_loss_sl2'
+TRAIN_NAME = 'SF_TRAIN_sf_reconstruction'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -63,7 +63,7 @@ path_create(SAVE_PATH)
 config_path = 'config.ini'
 config = configparser.ConfigParser()
 config.read(config_path)
-N = 5
+N = 256
 
 # Training
 total_episodes = 1000000#config.getint('TRAINING', 'TOTAL_EPISODES')
@@ -78,7 +78,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ') // 100
+save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ') // 20
 save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ') // 2
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
@@ -107,11 +107,6 @@ log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_explore = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
-phi0 = MovingAverage(moving_average_step*5)
-phi1 = MovingAverage(moving_average_step*5)
-phi2 = MovingAverage(moving_average_step*5)
-phi3 = MovingAverage(moving_average_step*5)
-phi4 = MovingAverage(moving_average_step*5)
 
 ## Map Setting
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH)]
@@ -142,10 +137,9 @@ sess = tf.Session(config=config)
 global_step = tf.Variable(0, trainable=False, name='global_step')
 global_step_next = tf.assign_add(global_step, NENV)
 with tf.device(device_ground):
-    network = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess, N=N)
+    network = Network(input_shape=input_size, action_size=action_space, scope='ground', sess=sess, N=N,keep_frames=keep_frame)
 with tf.device(device_air):
-    network_air = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess, N=N)
-
+    network_air = Network(input_shape=input_size, action_size=action_space, scope='uav', sess=sess, N=N,keep_frames=keep_frame)
 # Resotre / Initialize
 global_episodes = 0
 saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=4)
@@ -157,7 +151,6 @@ else:
 
 writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
 network.save(saver, MODEL_PATH+'/ctf_policy.ckpt', global_episodes) # It save both network
-
 
 ### TRAINING ###
 def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, global_episodes=None):
@@ -309,11 +302,6 @@ while global_episodes < total_episodes:
         was_alive = is_alive
         was_done = done
 
-        phi0.append(np.average(phi[0,:]))
-        phi1.append(np.average(phi[1,:]))
-        phi2.append(np.average(phi[2,:]))
-        phi3.append(np.average(phi[3,:]))
-        phi4.append(np.average(phi[4,:]))
         if np.all(done):
             # print(psi)
             explore_factor = np.mean(air_reward)
@@ -330,7 +318,7 @@ while global_episodes < total_episodes:
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         train(network, batch_ground, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
-        train(network_air, batch_air, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        # train(network_air, batch_air, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
         batch_ground, batch_air = [], []
         num_batch = 0
@@ -353,7 +341,6 @@ while global_episodes < total_episodes:
         progbar.update(global_episodes)
 
     if log_on:
-        # print(network.model.successor_layer.get_weights())
         tag = 'uav_training/'
         record({
             tag+'length': log_length(),
@@ -363,11 +350,6 @@ while global_episodes < total_episodes:
             tag+'rollout_time': log_looptime(),
             tag+'explore': log_explore(),
             tag+'train_time': log_traintime(),
-            tag+'phi0': phi0(),
-            tag+'phi1': phi1(),
-            tag+'phi2': phi2(),
-            tag+'phi3': phi3(),
-            tag+'phi4': phi4(),
         }, writer, global_episodes)
 
     if save_on:
