@@ -100,7 +100,7 @@ class PPO_SF(tf.keras.Model):
 
     @property
     def get_feature_variables(self):
-        return self.conv1.variables+self.conv2.variables+self.dense1.variables
+        return self.conv1.variables+self.conv2.variables+self.dense1.variables+self.phi_dense1.variables+self.phi_dense2.variables
 
     @property
     def get_actor_variables(self):
@@ -108,15 +108,15 @@ class PPO_SF(tf.keras.Model):
 
     @property
     def get_phi_variables(self):
-        return self.get_feature_variables+self.phi_dense1.variables+self.phi_dense2.variables
+        return self.get_feature_variables + self.successor_layer.variables
 
     @property
     def get_psi_variables(self):
-        return self.get_phi_variables+self.psi_dense1.variables+self.psi_dense2.variables
+        return self.get_feature_variables+self.psi_dense1.variables+self.psi_dense2.variables
 
     @property
     def get_state_pred_variables(self):
-        return self.get_phi_variables+self.sp_dense.variables+self.sp_conv1.variables+self.sp_conv2.variables+self.sp_conv3.variables
+        return self.get_feature_variables+self.sp_dense.variables+self.sp_conv1.variables+self.sp_conv2.variables+self.sp_conv3.variables
 
     def build_loss(self, old_log_logit, action, advantage, td_target, reward, state_next,phi):
         def _log(val):
