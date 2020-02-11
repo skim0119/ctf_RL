@@ -35,7 +35,7 @@ from utility.gae import gae
 from method.SF_reconstruction import Network
 
 device_ground = '/gpu:0'
-device_air = '/cpu:0'
+device_air = '/gpu:0'
 
 PROGBAR = True
 LOG_DEVICE = False

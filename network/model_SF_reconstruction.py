@@ -156,7 +156,7 @@ class PPO_SF(tf.keras.Model):
             reward_loss = tf.keras.losses.MSE(reward, self.sf_reward)
 
             #State prediction loss
-            state_loss = tf.reduce_mean(tf.keras.losses.MSE(state_next, self.state_prediction))
+            state_loss = tf.reduce_mean(tf.math.pow(tf.subtract(state_next, self.state_prediction),3))
             print(state_loss)
 
             self.actor_loss = actor_loss
