@@ -49,7 +49,7 @@ SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = 8
+NENV = 1
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'uav_settings.ini'

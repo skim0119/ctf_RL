@@ -205,10 +205,19 @@ num_batch = 0
 
 SF_samples_air = []
 SF_samples_ground = []
+<<<<<<< HEAD
 sample_episodes = 50
 episodes=0
 #Collecting Samples for eigenvalue processing.
 while (episodes < sample_episodes):
+=======
+phi_samples_air = []
+phi_samples_ground = []
+samples=0
+sample_size=50
+#Collecting Samples for eigenvalue processing.
+while (samples < sample_size):
+>>>>>>> b0fc69619b5e0dc213512db6c5bca0a10cf30cad
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -252,10 +261,50 @@ while (episodes < sample_episodes):
 
         SF_samples_ground.append(psi_ground)
         SF_samples_air.append(psi_air)
+<<<<<<< HEAD
 
         if np.all(done):
             episodes+=NENV
             break
+=======
+        phi_samples_ground.append(phi_ground)
+        phi_samples_air.append(phi_air)
+
+        if np.all(done):
+            samples+=NENV
+            break
+
+#Proecces the samples into a usable form
+def ProcessSamples(sampleList):
+    for i,sample in enumerate(sampleList):
+        if i == 0:
+            samples = sample.reshape([NENV*8,N])
+        else:
+            samples = np.concatenate([samples,sample.reshape([NENV*8,N])],axis=0)
+    return samples
+
+psiGround = ProcessSamples(SF_samples_ground)
+phiGround = ProcessSamples(SF_samples_ground)
+
+for dim in range(N):
+    print("Psi statistics",dim,np.min(psiGround[:,dim]),np.mean(psiGround[:,dim]), np.max(psiGround[:,dim]))
+    print("Phi statistics",dim,np.min(phiGround[:,dim]),np.mean(phiGround[:,dim]), np.max(phiGround[:,dim]))
+    # np.min(phiGround[:,dim])
+    # np.mean(phiGround[:,dim])
+    # np.max(phiGround[:,dim])
+
+from mpl_toolkits import mplot3d
+import numpy as np
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.scatter3D(groundSamples[:,5], groundSamples[:,6], groundSamples[:,7], )
+plt.show()
+
+
+exit()
+>>>>>>> b0fc69619b5e0dc213512db6c5bca0a10cf30cad
 
 #Clustering to improve sample efficiency
 print("Clustering")
@@ -456,7 +505,6 @@ while True:
 
     # initialize parameters
     episode_rew = np.zeros(NENV)
-    episode_env_rew = np.zeros(NENV)
     prev_rew = np.zeros(NENV)
     was_alive = [True for agent in range(NENV*(num_blue*num_red))]
     was_alive_red = [True for agent in envs.get_team_red().flat]
@@ -476,7 +524,7 @@ while True:
         a, v0 = a1, v1
         logits = logits1
 
-        s1, raw_reward, done, info = envs.step(actions)
+        s1, reward, done, info = envs.step(actions)
         is_alive = np.array([agent.isAlive for agent in envs.get_team_blue().flat]).reshape([NENV, num_blue])
         is_alive_red = np.array([agent.isAlive for agent in envs.get_team_red().flat]).reshape([NENV, num_red])
         is_alive = np.concatenate([is_alive, is_alive_red], axis=1).reshape([-1])
@@ -486,19 +534,14 @@ while True:
         reward_a = reward_shape(phi_air, True, MODE)
         reward_g = reward_shape(phi_ground, False, MODE)
 
-        if step == max_ep:
-            env_reward[:] = -1
-        else:
-            env_reward = (raw_reward - prev_rew - 0.01)/100
+        reward_red = np.array([i['red_reward'] for i in info])
+        env_reward = np.vstack((reward, reward_red)).T.reshape([-1])
 
 
-        for i in range(NENV):
-            if not was_done[i]:
-                episode_rew[i] += reward[i]
-                episode_env_rew[i] += env_reward[i]
+        episode_rew += reward * (1-np.array(was_done, dtype=int))
 
         s1, a1, v1, logits1, actions = get_action(s1)
-        _,_,_,_,_, phi_air, phi_ground, psi_air, psi_ground = get_action_SF(s1,N=N)
+        _,_,_,_,_, phi_air, phi_ground, _, _ = get_action_SF(s1,N=N)
 
         for idx, d in enumerate(done):
             if d:
@@ -510,14 +553,13 @@ while True:
             env_team_idx = idx // 6
             if was_alive[idx] and not was_done[env_idx]:
                 if is_air[idx]:
-                    #agent_reward = air_reward[env_team_idx] + env_reward[env_team_idx]
-                    agent_reward = reward_a[env_idx]
+                    agent_reward = reward_a[env_idx] + env_reward[env_team_idx]
                 else:
-                    agent_reward = reward_g[env_idx]
+                    agent_reward = reward_g[env_idx] + env_reward[env_team_idx]
                 trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx],])
         # Split air trajectory and ground trajectory
 
-        prev_rew = raw_reward
+        prev_rew = reward
         was_alive = is_alive
         was_alive_red = is_alive_red
         was_done = done
@@ -542,7 +584,7 @@ while True:
     if num_batch >= minimum_batch_size:
         train(batch_air, network_a.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
         train(batch_ground, network_g.update_global, 0, epoch, minibatch_size, writer=writer, log=log_image_on, global_episodes=global_episodes)
-        batch = []
+        batch_ground, batch_air = [], []
         num_batch = 0
         mode_changed = True
 
