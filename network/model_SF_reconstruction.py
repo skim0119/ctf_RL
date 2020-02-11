@@ -47,6 +47,7 @@ class PPO_SF(tf.keras.Model):
         self.psi_dense2 = layers.Dense(self.N, activation='relu', name='psi')
 
         #State Prediction
+        self.sp_conc = layers.Concatenate()
         self.sp_dense = layers.Dense(units=4*4*16, name="State_Prediction_Dense")
         self.reshape = layers.Reshape(target_shape=(4,4,16))
         self.sp_conv1 = layers.Conv2DTranspose(filters=32,kernel_size=3, strides=3,activation='relu', name="State_Prediction_Conv1")
@@ -77,7 +78,8 @@ class PPO_SF(tf.keras.Model):
         critic = self.successor_layer(psi)
         critic = tf.reshape(critic, [-1])
 
-        sp = self.sp_dense(phi)
+        sp = self.sp_conc([phi,actor])
+        sp = self.sp_dense(sp)
         sp = self.reshape(sp)
         sp = self.sp_conv1(sp)
         sp = self.sp_conv2(sp)
@@ -156,7 +158,8 @@ class PPO_SF(tf.keras.Model):
             reward_loss = tf.keras.losses.MSE(reward, self.sf_reward)
 
             #State prediction loss
-            state_loss = tf.reduce_mean(tf.math.pow(tf.subtract(state_next, self.state_prediction),3))
+            # state_loss = tf.reduce_mean(tf.math.pow(tf.subtract(state_next, self.state_prediction),3))
+            state_loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(state_next, self.state_prediction))))
             print(state_loss)
 
             self.actor_loss = actor_loss
