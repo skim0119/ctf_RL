@@ -62,13 +62,13 @@ class PPO_SF(tf.keras.Model):
         net = self.conv2(net)
         net = self.flat(net)
         net = self.dense1(net)
+        phi = self.phi_dense1(net)
+        phi = self.phi_dense2(phi)
 
-        logits = self.actor_dense1(net)
+        logits = self.actor_dense1(phi)
         actor = self.softmax(logits)
         log_logits = tf.nn.log_softmax(logits)
 
-        phi = self.phi_dense1(net)
-        phi = self.phi_dense2(phi)
         sf_reward = self.successor_layer(phi)
         sf_reward = tf.reshape(sf_reward, [-1])
 
