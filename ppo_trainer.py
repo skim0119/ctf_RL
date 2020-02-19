@@ -29,7 +29,7 @@ import random
 import math
 from collections import defaultdict
 
-import policy
+import gym_cap.heuristics as policy
 
 from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
@@ -42,10 +42,9 @@ from utility.gae import gae
 
 from method.ppo2 import PPO as Network
 
-assert len(sys.argv) == 6
-device_t = sys.argv[4]
+device_t = '/gpu:0'
 
-PROGBAR = False
+PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
@@ -60,8 +59,7 @@ GPU_CAPACITY = 0.95
 NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-#env_setting_path = 'setting_full.ini'
-env_setting_path = sys.argv[5]
+env_setting_path = 'setting_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -99,7 +97,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = int(sys.argv[3])
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup
