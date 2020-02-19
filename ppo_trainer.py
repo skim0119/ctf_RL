@@ -49,7 +49,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2]
+TRAIN_NAME = sys.argv[3]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -59,7 +59,7 @@ GPU_CAPACITY = 0.95
 NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'setting_full.ini'
+env_setting_path = sys.argv[2] # env_settings/setting_full.ini
 
 ## Data Path
 path_create(LOG_PATH)
