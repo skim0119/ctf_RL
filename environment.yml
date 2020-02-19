@@ -1,0 +1,12 @@
+name: ctf
+channels:
+  - defaults
+dependencies:
+  - pip=20.0.2
+  - python=3.8.1
+  - pip:
+    - gym
+    - gym-cap
+    - numpy
+    - tensorflow-gpu
+
