@@ -1,11 +1,3 @@
-"
-TODO:
-- Implememnt SF
-- Look over TF2.0
-- Try to build environment similar to the paper
-- Try to build game for task-specific and heterogeneity environment
-"
-
 import pickle
 
 import os
@@ -29,7 +21,7 @@ import random
 import math
 from collections import defaultdict
 
-import gym_cap.heuristics as policy
+import gym_cap.heuristic as policy
 
 from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
@@ -102,7 +94,7 @@ print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
-nchannel = 7 * keep_frame
+nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
@@ -160,7 +152,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None)
+    progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_NAME)
 
 sess = tf.Session(config=config)
 
