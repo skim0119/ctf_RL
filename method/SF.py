@@ -26,13 +26,15 @@ class Network:
                 self.state_input = tf.placeholder(shape=input_shape, dtype=tf.float32, name='state')
                 self.action_ = tf.placeholder(shape=[None], dtype=tf.int32, name='action_hold')
                 self.td_target_ = tf.placeholder(shape=[None, N], dtype=tf.float32, name='td_target_hold')
-                self.reward_ = tf.placeholder(shape=[None], dtype=tf.float32, name='reward_hold')
+                self.reward_ = tf.placeholder(shape=[None], dtype=tf.int32, name='reward_hold')
                 self.advantage_ = tf.placeholder(shape=[None], dtype=tf.float32, name='adv_hold')
                 self.old_logits_ = tf.placeholder(shape=[None, action_size], dtype=tf.float32, name='old_logit_hold')
+                self.done_state_ = tf.placeholder(shape=[None], dtype=tf.float32, name='done_hold')
 
                 # Build Network
                 model = PPO_SF(action_size);  self.model = model
-                self.actor, self.logits, self.log_logits, self.critic, self.phi, self.sf_reward, self.psi = model(self.state_input)
+                inputs = (self.state_input, self.done_state_)
+                self.actor, self.logits, self.log_logits, self.critic, self.phi, self.sf_reward, self.psi = model(inputs)
                 actor_loss, sf_loss, reward_loss = model.build_loss(self.old_logits_, self.action_, self.advantage_, self.td_target_, self.reward_)
                 model.summary()
 

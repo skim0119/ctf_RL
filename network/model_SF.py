@@ -21,14 +21,15 @@ class PPO_SF(tf.keras.Model):
         super(PPO_SF, self).__init__(name=name)
 
         # Feature Encoder
-        self.conv1 = layers.SeparableConv2D(
-                filters=16,
-                kernel_size=5,
-                strides=3,
-                padding='valid',
-                depth_multiplier=2,
-                activation='relu',
-            )
+        #self.conv1 = layers.SeparableConv2D(
+        #        filters=16,
+        #        kernel_size=5,
+        #        strides=3,
+        #        padding='valid',
+        #        depth_multiplier=2,
+        #        activation='relu',
+        #    )
+        self.conv1 = layers.Conv2D(filters=16, kernel_size=5, strides=2, activation='relu')
         self.conv2 = layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='relu')
         self.flat = layers.Flatten()
         self.dense1 = layers.Dense(units=128, activation='relu')
@@ -40,30 +41,43 @@ class PPO_SF(tf.keras.Model):
         # Successor Feature
         self.N = 16
         self.phi_dense1 = layers.Dense(self.N, activation='relu', name='phi')
-        self.successor_layer = layers.Dense(1, activation='linear', name='reward_prediction', use_bias=False)
-        self.psi_dense1 = layers.Dense(128, activation='relu')
+        self.successor_layer = layers.Dense(3, activation='linear', name='reward_prediction', use_bias=False)
+        self.spectrum_adder = layers.Dense(1, trainable=False, name='spectrum', use_bias=False, activation='linear',
+                kernel_initializer=tf.constant_initializer([-1,0,1]))
+        self.reward_layer = tf.keras.layers.Multiply()
+        #self.psi_dense1 = layers.Dense(128, activation='relu')
         self.psi_dense2 = layers.Dense(self.N, activation='relu', name='psi')
 
     def call(self, inputs):
-        # state_input : [None, 39, 39, 6*keep_frame]
+        # state_input : [None(batch_size), 39, 39, 6*keep_frame]
+        # done_state : [None(batch_size), 1]
 
-        net = inputs
+        state_input, done_state = inputs
+
+        # Encoding
+        net = state_input
         net = self.conv1(net)
         net = self.conv2(net)
         net = self.flat(net)
         net = self.dense1(net)
 
+        # Actor
         logits = self.actor_dense1(net) 
         actor = self.softmax(logits)
         log_logits = tf.nn.log_softmax(logits)
 
+        # SF
         phi = self.phi_dense1(net)
-        sf_reward = self.successor_layer(phi)
-        sf_reward = tf.reshape(sf_reward, [-1])
+        sf_result = self.successor_layer(phi)
+        sf = self.spectrum_adder(sf_result)
+        sf_reward = tf.reshape(self.reward_layer([sf, done_state]), [-1])
 
-        psi = self.psi_dense1(net)
-        psi = self.psi_dense2(psi)
+        # Value
+        #psi = self.psi_dense1(net)
+        #psi = self.psi_dense2(psi)
+        psi = self.psi_dense2(net)
         critic = self.successor_layer(psi)
+        critic = self.spectrum_adder(critic)
         critic = tf.reshape(critic, [-1])
 
         self.actor = actor
@@ -72,6 +86,7 @@ class PPO_SF(tf.keras.Model):
         self.critic = critic
         self.phi = phi
         self.sf_reward = sf_reward
+        self.sf_result = sf_result
         self.psi = psi
 
         return actor, logits, log_logits, critic, phi, sf_reward, psi
@@ -90,9 +105,9 @@ class PPO_SF(tf.keras.Model):
 
     @property
     def get_psi_variables(self):
-        return self.get_feature_variables+self.psi_dense1.variables+self.psi_dense2.variables
+        return self.get_feature_variables+self.psi_dense2.variables#self.psi_dense1.variables+self.psi_dense2.variables
 
-    def build_loss(self, old_log_logit, action, advantage, td_target, reward):
+    def build_loss(self, old_log_logit, action, advantage, td_target, result):
         def _log(val):
             return tf.log(tf.clip_by_value(val, 1e-10, 10.0))
 
@@ -127,7 +142,9 @@ class PPO_SF(tf.keras.Model):
             #critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
 
             # Reward Supervised Training
-            reward_loss = tf.keras.losses.MSE(reward, self.sf_reward)
+            result = tf.one_hot(result, 3, dtype=tf.float32)
+            reward_loss = tf.keras.losses.categorical_crossentropy(result, self.sf_result)
+            #reward_loss = tf.keras.losses.MSE(reward, self.sf_reward)
 
             self.actor_loss = actor_loss
             self.critic_loss = sf_loss

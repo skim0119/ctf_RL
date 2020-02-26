@@ -35,14 +35,14 @@ from utility.gae import gae
 from method.SF import Network
 
 device_ground = '/gpu:0'
-device_air = '/gpu:0'
+device_air = '/gpu:1'
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'SF_TRAIN_06'
+TRAIN_NAME = 'SF_TRAIN_softmax_01'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -169,11 +169,13 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
-        traj_buffer['td_target'].extend(td_target)
+        traj_buffer['td_target'].extend([(np.array(td)*d).tolist() for td, d in zip(td_target,traj[8])])
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['logit'].extend(traj[4])
-        traj_buffer['reward'].extend(traj[2])
+        #traj_buffer['reward'].extend(traj[2])
         traj_buffer['state_next'].extend(traj[5])
+        result = np.ones_like(traj[2])*traj[2][-1] + 1
+        traj_buffer['result'].extend(result)
 
     if buffer_size < 10:
         return
@@ -187,7 +189,7 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
             np.stack(traj_buffer['advantage']),
             np.stack(traj_buffer['logit']),
             np.stack(traj_buffer['state_next']),
-            np.stack(traj_buffer['reward']),
+            np.stack(traj_buffer['result']),
         )
     i = 0
     for mdp_tuple in it:
@@ -251,7 +253,7 @@ while global_episodes < total_episodes:
     is_air_red = np.array([agent.is_air for agent in envs.get_team_red().flat]).reshape([NENV, num_red])
     is_air = np.concatenate([is_air, is_air_red], axis=1).reshape([-1])
 
-    trajs = [Trajectory(depth=8) for _ in range((num_blue+num_red)*NENV)] # Trajectory per agent
+    trajs = [Trajectory(depth=9) for _ in range((num_blue+num_red)*NENV)] # Trajectory per agent
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path)
@@ -291,7 +293,7 @@ while global_episodes < total_episodes:
                     agent_reward = air_reward[env_team_idx] - pre_air_reward[env_team_idx]
                 else:
                     agent_reward = env_reward[env_team_idx]
-                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx], s1[idx], phi[idx], psi0[idx]])
+                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx], s1[idx], phi[idx], psi0[idx], done[env_idx]])
 
         was_alive = is_alive
         was_done = done
