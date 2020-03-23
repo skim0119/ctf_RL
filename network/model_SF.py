@@ -41,12 +41,15 @@ class PPO_SF(tf.keras.Model):
         # Successor Feature
         self.N = 16
         self.phi_dense1 = layers.Dense(self.N, activation='relu', name='phi')
-        self.successor_layer = layers.Dense(3, activation='linear', name='reward_prediction', use_bias=False)
+        self.successor_layer = layers.Dense(3, activation='linear', name='reward_prediction', use_bias=False,
+                kernel_regularizer=tf.keras.regularizers.l2(0.0001))
         self.spectrum_adder = layers.Dense(1, trainable=False, name='spectrum', use_bias=False, activation='linear',
                 kernel_initializer=tf.constant_initializer([-1,0,1]))
         self.reward_layer = tf.keras.layers.Multiply()
+
         #self.psi_dense1 = layers.Dense(128, activation='relu')
-        self.psi_dense2 = layers.Dense(self.N, activation='relu', name='psi')
+        self.psi_dense2 = layers.Dense(self.N, activation='relu', name='psi',
+                kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 
     def call(self, inputs):
         # state_input : [None(batch_size), 39, 39, 6*keep_frame]

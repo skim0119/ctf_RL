@@ -43,11 +43,11 @@ class Network:
                 actor_grad = actor_optimizer.get_gradients(actor_loss, model.get_actor_variables)
                 actor_update = actor_optimizer.apply_gradients(zip(actor_grad, model.get_actor_variables))
 
-                sf_optimizer = tf.keras.optimizers.Adam(lr)
+                sf_optimizer = tf.keras.optimizers.Adam(lr*5e-1)
                 sf_grad = sf_optimizer.get_gradients(sf_loss, model.get_psi_variables)
                 sf_update = sf_optimizer.apply_gradients(zip(sf_grad, model.get_psi_variables))
 
-                reward_optimizer = tf.keras.optimizers.Adam(lr*10)
+                reward_optimizer = tf.keras.optimizers.Adam(lr*5e-1)
                 reward_grad = reward_optimizer.get_gradients(reward_loss, model.get_phi_variables)
                 reward_update = reward_optimizer.apply_gradients(zip(reward_grad, model.get_phi_variables))
 
@@ -86,7 +86,7 @@ class Network:
             summary = tf.Summary()
             summary.value.add(tag='summary/actor_loss', simple_value=aloss)
             summary.value.add(tag='summary/critic_loss', simple_value=closs)
-            summary.value.add(tag='summary/reward_mse_loss', simple_value=rloss)
+            #summary.value.add(tag='summary/reward_mse_loss', simple_value=rloss)
             summary.value.add(tag='summary/entropy', simple_value=entropy)
 
             # Check vanish gradient
