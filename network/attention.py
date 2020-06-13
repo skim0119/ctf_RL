@@ -184,14 +184,13 @@ class Non_local_nn(tf.keras.layers.Layer):
         
     def build(self, input_shape):
         # Define layers
-        with tf.variable_scope(self.name):
-            self.f_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='f_conv')
-            self.f_conv_pool = tf.keras.layers.MaxPool2D(name='f_conv_pool')
-            self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
-            self.h_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='h_conv')
-            self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
-            self.att_conv = tf.keras.layers.Conv2D(filters=input_shape[-1].value, kernel_size=1, strides=1, name='att_conv')
-            self.gamma = tf.Variable(1.0, self.train_gamma, name='att_gamma', dtype=tf.float32)
+        self.f_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='f_conv')
+        self.f_conv_pool = tf.keras.layers.MaxPool2D(name='f_conv_pool')
+        self.g_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='g_conv')
+        self.h_conv = tf.keras.layers.Conv2D(filters=self.channels, kernel_size=1, strides=1, name='h_conv')
+        self.h_conv_pool = tf.keras.layers.MaxPool2D(name='h_conv_pool')
+        self.att_conv = tf.keras.layers.Conv2D(filters=input_shape[-1], kernel_size=1, strides=1, name='att_conv')
+        self.gamma = tf.Variable(1.0, self.train_gamma, name='att_gamma', dtype=tf.float32)
 
     def call(self, input_layer, normalize=True):
         batch_size, height, width, num_channels = input_layer.get_shape().as_list()
