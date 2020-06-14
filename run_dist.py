@@ -41,9 +41,8 @@ OVERRIDE = False
 
 ## Training Directory Reset
 TRAIN_NAME = 'C51_00'
-LOG_PATH = './boot/logs/'+TRAIN_NAME
-MODEL_PATH = './boot/model/' + TRAIN_NAME
-SAVE_PATH = './boot/save/' + TRAIN_NAME
+LOG_PATH = './logs/'+TRAIN_NAME
+MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
 
 NENV = 8 # multiprocessing.cpu_count() // 2
@@ -54,7 +53,6 @@ env_setting_path = 'env_settings_3v3_boot.ini'
 ## Data Path
 path_create(LOG_PATH)
 path_create(MODEL_PATH)
-path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config_path = 'config.ini'
@@ -87,7 +85,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024
+minimum_batch_size = 512
 print(minimum_batch_size)
 
 ## Setup
@@ -102,10 +100,6 @@ log_winrate = MovingAverage(moving_average_step)
 log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
-
-log_attack_reward = MovingAverage(moving_average_step)
-log_scout_reward = MovingAverage(moving_average_step)
-log_defense_reward = MovingAverage(moving_average_step)
 
 ## Environment Initialization
 def make_env(map_size):
@@ -172,35 +166,6 @@ def get_action(states):
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, logits1, actions
 
-def reward_shape(prev_red_alive, red_alive, done):
-    prev_red_alive = np.reshape(prev_red_alive, [NENV, num_red])
-    red_alive = np.reshape(red_alive, [NENV, num_red])
-    reward = []
-    red_flags = envs.red_flag_captured()
-    blue_flags = envs.blue_flag_captured()
-    for i in range(NENV):
-        possible_reward = []
-        # Attack (C/max enemy)
-        num_prev_enemy = sum(prev_red_alive[i])
-        num_enemy = sum(red_alive[i])
-        possible_reward.append((num_prev_enemy - num_enemy)*0.25)
-        # Scout
-        if red_flags[i]:
-            possible_reward.append(1)
-        else:
-            possible_reward.append(0)
-        # Defense
-        if blue_flags[i]:
-            possible_reward.append(-1)
-        elif done[i]:
-            possible_reward.append(1)
-        else:
-            possible_reward.append(0)
-
-        reward.append(possible_reward)
-
-    return np.array(reward)
-
 batch = []
 num_batch = 0
 #while global_episodes < total_episodes:
@@ -212,7 +177,6 @@ while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    case_rew = [np.zeros(NENV) for _ in range(3)]
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
@@ -240,12 +204,6 @@ while True:
             reward[:] = -1
             done[:] = True
         episode_rew += reward
-
-        shaped_reward = reward_shape(was_alive_red, is_alive_red, done)
-        for i in range(NENV): 
-            if not was_done[i]:
-                for j in range(3):
-                    case_rew[j][i] += shaped_reward[i,j]
 
         a1, v1, logits1, actions = get_action(s1)
 
@@ -286,10 +244,6 @@ while True:
     log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
-    log_attack_reward.extend(case_rew[0].tolist())
-    log_scout_reward.extend(case_rew[1].tolist())
-    log_defense_reward.extend(case_rew[2].tolist())
-
     global_episodes += NENV
     if PROGBAR:
         progbar.update(global_episodes)
@@ -303,16 +257,7 @@ while True:
             tf.summary.scalar(tag+'env_reward', log_episodic_reward(), step=global_episodes)
             tf.summary.scalar(tag+'rollout_time', log_looptime(), step=global_episodes)
             tf.summary.scalar(tag+'train_time', log_traintime(), step=global_episodes)
-            tf.summary.scalar(tag+'reward_attack', log_attack_reward(), step=global_episodes)
-            tf.summary.scalar(tag+'reward_scout', log_scout_reward(), step=global_episodes)
-            tf.summary.scalar(tag+'reward_defense', log_defense_reward(), step=global_episodes)
             writer.flush()
         
     if save_on:
         network.save(global_episodes)
-
-    if play_save_on:
-        for i in range(NENV):
-            with open(SAVE_PATH+f'/replay{global_episodes}_{i}.pkl', 'wb') as handle:
-                pickle.dump(info[i], handle)
-

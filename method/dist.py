@@ -64,7 +64,6 @@ class PPO_DistCritic:
                 tf.summary.scalar('summary/'+self.scope+'_entropy', entropy, step=step)
                 writer.flush()
 
-
     def initiate(self):
         return self.manager.restore_or_initialize()
 

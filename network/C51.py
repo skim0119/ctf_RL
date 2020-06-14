@@ -48,7 +48,7 @@ class V2Dist(tf.keras.Model):
             layers.Dense(units=atoms, activation='softmax')])
 
         # Loss
-        self.loss = tf.keras.losses.CategoricalCrossentropy()
+        self.zloss = tf.keras.losses.CategoricalCrossentropy()
 
     def call(self, inputs):
         net = self.feature_network(inputs)
@@ -88,22 +88,13 @@ def loss(model, state, action, td_target, advantage, old_log_logit, reward, done
     # Critic Loss
     # Project Next State Value Distribution (of optimal action) to Current State
     m_prob = np.zeros((num_sample, model.atoms))
-    for i in range(num_sample):
-        if done[i]: # Terminal State
-            # Distribution collapses to a single point
-            Tz = min(model.v_max, max(model.v_min, reward[i]))
-            bj = (Tz - model.v_min) / model.delta_z 
-            m_l, m_u = math.floor(bj), math.ceil(bj)
-            m_prob[i][int(m_l)] += (m_u - bj)
-            m_prob[i][int(m_u)] += (bj - m_l)
-        else:
-            for j in range(model.atoms):
-                Tz = min(model.v_max, max(model.v_min, reward[i] + gamma * model.z[0,j]))
-                bj = (Tz - model.v_min) / model.delta_z 
-                m_l, m_u = math.floor(bj), math.ceil(bj)
-                m_prob[i][int(m_l)] += z_next[i][j] * (m_u - bj)
-                m_prob[i][int(m_u)] += z_next[i][j] * (bj - m_l)
-    critic_loss = model.loss(m_prob, z_out)
+    for j in range(model.atoms):
+        Tz = tf.minimum(model.v_max, tf.maximum(model.v_min, reward + gamma * model.z[0,j] * (1-done)))
+        bj = (Tz - model.v_min) / model.delta_z 
+        m_l, m_u = tf.math.floor(bj).numpy().astype(int), tf.math.ceil(bj).numpy().astype(int)
+        m_prob[:,m_l] += (z_next[:,j]**(1-done)) * (m_u - bj)
+        m_prob[:,m_u] += (z_next[:,j]**(1-done)) * (bj - m_l)
+    critic_loss = model.zloss(m_prob, z_out)
     #td_error = td_target - critic
     #critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
 
@@ -119,10 +110,6 @@ def loss(model, state, action, td_target, advantage, old_log_logit, reward, done
     clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
-
-    model.actor_loss = actor_loss
-    model.critic_loss = critic_loss
-    model.entropy = entropy
 
     total_loss = actor_loss + (beta_critic * critic_loss) - (beta_entropy * entropy)
     if return_losses:
