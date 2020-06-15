@@ -128,6 +128,16 @@ class SubprocVecEnv:
             remote.send(('_static_map', None))
         return np.stack([remote.recv() for remote in self.remotes])
 
+    def get_obs_blue(self):
+        for remote in self.remotes:
+            remote.send(('get_obs_blue', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
+    def get_obs_red(self):
+        for remote in self.remotes:
+            remote.send(('get_obs_red', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
     def get_full_state(self):
         for remote in self.remotes:
             remote.send(('get_full_state', None))
@@ -137,7 +147,6 @@ class SubprocVecEnv:
         for remote in self.remotes:
             remote.send(('get_team_blue', None))
         return np.stack([remote.recv() for remote in self.remotes])
-        return np.concatenate([remote.recv() for remote in self.remotes], axis=None).tolist()
 
     def get_team_red(self):
         for remote in self.remotes:

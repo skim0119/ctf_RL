@@ -40,49 +40,31 @@ class V2Dist(tf.keras.Model):
             layers.Flatten(),
             layers.Dense(units=128, activation='relu')])
 
-        # Actor
-        self.actor_dense1 = layers.Dense(action_size)
-
         # Critic
         self.critic_dist = layers.Dense(units=atoms, activation='softmax')
 
-        # Loss
+        # Critic Loss
         self.zloss = tf.keras.losses.CategoricalCrossentropy()
 
     def call(self, inputs):
         net = self.feature_network(inputs)
 
-        logits = self.actor_dense1(net) 
-        actor = tf.nn.softmax(logits)
-        log_logits = tf.nn.log_softmax(logits)
-
         critic_dist = self.critic_dist(net)
         critic = tf.reduce_sum(critic_dist * self.z, axis=1)
 
-        return actor, log_logits, critic, critic_dist
+        return critic, critic_dist
 
 def _log(val):
     return tf.math.log(tf.clip_by_value(val, 1e-10, 10.0))
 
-def get_action(model, state):
-    actor, log_logit, critic, critic_dist = model(state)
-    action_size = actor.shape[1]
-    actor_prob = actor.numpy() / actor.numpy().sum(axis=1, keepdims=True)
-    action = np.array([np.random.choice(action_size, p=prob) for prob in actor_prob])
-    return action, critic, log_logit
-
-def loss(model, state, action, td_target, advantage, old_log_logit, reward, done, next_state,
-        action_size=5, eps=0.2, beta_actor=1.0, beta_entropy=0.05, beta_critic=0.5, gamma=0.98,
-        training=True, return_losses=False):
+def loss(model, target_model, state, reward, done, next_state,
+        gamma=0.98, training=True):
     num_sample = state.shape[0]
 
     # Run Model
-    actor, log_logit, v_out, z_out  = model(state, training=training)
-    _, _, v_next, z_next = model(next_state)
-    #_,_,v_next_targ, z_next_targ = self.target_model(next_state) # target network
-
-    # Entropy
-    entropy = -tf.reduce_mean(actor * _log(actor), name='entropy')
+    v_out, z_out  = model(state, training=training)
+    v_next, z_next = model(next_state)
+    #_,_,v_next_targ, z_next_targ = target_model(next_state) # target network
 
     # Critic Loss
     # Project Next State Value Distribution (of optimal action) to Current State
@@ -91,34 +73,17 @@ def loss(model, state, action, td_target, advantage, old_log_logit, reward, done
         Tz = tf.minimum(model.v_max, tf.maximum(model.v_min, reward + gamma * model.z[0,j] * (1-done)))
         bj = (Tz - model.v_min) / model.delta_z 
         m_l, m_u = tf.math.floor(bj).numpy().astype(int), tf.math.ceil(bj).numpy().astype(int)
+        #m_prob[:,m_l] += (z_next_targ[:,j]**(1-done)) * (m_u - bj)
+        #m_prob[:,m_u] += (z_next_targ[:,j]**(1-done)) * (bj - m_l)
         m_prob[:,m_l] += (z_next[:,j]**(1-done)) * (m_u - bj)
         m_prob[:,m_u] += (z_next[:,j]**(1-done)) * (bj - m_l)
     critic_loss = model.zloss(m_prob, z_out)
-    #td_error = td_target - critic
-    #critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
 
-    # Actor Loss
-    action_OH = tf.one_hot(action, action_size, dtype=tf.float32)
-    log_prob = tf.reduce_sum(log_logit * action_OH, 1)
-    old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
+    return critic_loss
 
-    # Clipped surrogate function
-    ratio = tf.exp(log_prob - old_log_prob) # precision
-    #ratio = log_prob / old_log_prob
-    surrogate = ratio * advantage
-    clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
-    surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
-    actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
-
-    total_loss = (beta_actor * actor_loss) + (beta_critic * critic_loss) - (beta_entropy * entropy)
-    if return_losses:
-        return total_loss, actor_loss, beta_critic*critic_loss, beta_entropy*entropy
-    else:
-        return total_loss
-
-def train(model, optimizer, inputs, **hyperparameters):
+def train(model, target_model, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
-        loss_val = loss(model, **inputs, **hyperparameters, training=True)
+        loss_val = loss(model, target_model, **inputs, **hyperparameters, training=True)
     grads = tape.gradient(loss_val, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 

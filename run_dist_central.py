@@ -33,14 +33,14 @@ from utility.multiprocessing import SubprocVecEnv
 from utility.logger import record
 from utility.gae import gae
 
-from method.dist import PPO_DistCritic as Network
+from method.dist import DistCriticCentral as Network
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'C51_02'
+TRAIN_NAME = 'C51_CENTRAL_01'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
@@ -91,7 +91,7 @@ print(minimum_batch_size)
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6 * keep_frame
-input_size = [None, vision_dx, vision_dy, nchannel]
+input_size = [None,20,20,6]
 
 ## Logger Initialization 
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -111,7 +111,7 @@ num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
 if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None, unit_name='Dist C51 model : '+TRAIN_NAME)
+    progbar = tf.keras.utils.Progbar(None, unit_name='Dist C51 model (Central) : '+TRAIN_NAME)
 
 network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
 
@@ -131,18 +131,11 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         if len(traj) == 0:
             continue
         buffer_size += len(traj)
-
-        td_target, advantages = gae(traj[2], traj[3], 0,
-                gamma, lambd, normalize=False)
         
         traj_buffer['state'].extend(traj[0])
-        traj_buffer['action'].extend(traj[1])
-        traj_buffer['reward'].extend(traj[2])
-        traj_buffer['td_target'].extend(td_target)
-        traj_buffer['advantage'].extend(advantages)
-        traj_buffer['logit'].extend(traj[4])
-        traj_buffer['done'].extend(traj[5])
-        traj_buffer['next_state'].extend(traj[6])
+        traj_buffer['reward'].extend(traj[1])
+        traj_buffer['done'].extend(traj[2])
+        traj_buffer['next_state'].extend(traj[3])
 
     if buffer_size < 10:
         return
@@ -151,20 +144,12 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             batch_size,
             epoch,
             np.stack(traj_buffer['state']),
-            np.stack(traj_buffer['action']),
-            np.stack(traj_buffer['td_target']),
-            np.stack(traj_buffer['advantage']),
-            np.stack(traj_buffer['logit']),
             np.stack(traj_buffer['reward']),
             np.stack(traj_buffer['done']),
             np.stack(traj_buffer['next_state']))
     for mdp_tuple in it:
         network.update_network(*mdp_tuple, step, writer, log)
 
-def get_action(states):
-    a1, v1, logits1 = network.run_network(states)
-    actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, logits1, actions
 
 batch = []
 num_batch = 0
@@ -173,51 +158,37 @@ while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
-    play_save_on = interval_flag(global_episodes, 50000, 'replay_save')
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
-    was_alive = [True for agent in envs.get_team_blue().flat]
-    was_alive_red = [True for agent in envs.get_team_red().flat]
     was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=7) for _ in range(num_blue*NENV)]
+    trajs = [Trajectory(depth=4) for _ in range(NENV)]
     
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path,
                     policy_red=policy.Roomba,
                     policy_blue=policy.Roomba)
-    a1, v1, logits1, actions = get_action(s1)
+    s1 = envs.get_obs_blue()
 
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep+1):
         s0 = s1
-        a, v0 = a1, v1
-        logits = logits1
         
-        #s1, raw_reward, done, info = envs.step(actions)
         s1, reward, done, info = envs.step()
-        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
-        is_alive_red = [agent.isAlive for agent in envs.get_team_red().flat]
-        if step == max_ep:
-            reward[:] = -1
-            done[:] = True
+        s1 = envs.get_obs_blue()
         episode_rew += reward
 
-        a1, v1, logits1, actions = get_action(s1)
-
         # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // num_blue
-            if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([
-                    s0[idx], a[idx], reward[env_idx], v0[idx], logits[idx], 
-                    was_done[env_idx], s1[idx]
-                    ])
+        for env_idx in range(NENV):
+            if not was_done[env_idx]:
+                trajs[env_idx].append([
+                    s0[env_idx],
+                    reward[env_idx],
+                    was_done[env_idx],
+                    s1[env_idx]])
 
-        was_alive = is_alive
-        was_alive_red = is_alive_red
         was_done = done
 
         if np.all(done):
@@ -236,7 +207,7 @@ while True:
 
     steps = []
     for env_id in range(NENV):
-        steps.append(max([len(traj) for traj in trajs[env_id*num_blue:(env_id+1)*num_blue]]))
+        steps.append(len(trajs[env_id]))
     
     log_episodic_reward.extend(episode_rew.tolist())
     log_length.extend(steps)
