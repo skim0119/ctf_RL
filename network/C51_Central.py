@@ -54,9 +54,6 @@ class V2Dist(tf.keras.Model):
 
         return critic, critic_dist
 
-def _log(val):
-    return tf.math.log(tf.clip_by_value(val, 1e-10, 10.0))
-
 def loss(model, target_model, state, reward, done, next_state,
         gamma=0.98, training=True):
     num_sample = state.shape[0]
@@ -68,16 +65,22 @@ def loss(model, target_model, state, reward, done, next_state,
 
     # Critic Loss
     # Project Next State Value Distribution (of optimal action) to Current State
-    m_prob = np.zeros((num_sample, model.atoms))
+    m_prob = np.zeros((num_sample, model.atoms), dtype=np.float32)
+    Tz = tf.minimum(model.v_max, tf.maximum(model.v_min, reward[:,None] + gamma * model.z * (1-done[:,None])))
+    bj = (Tz - model.v_min) / model.delta_z 
+    m_l, m_u = tf.math.floor(bj+1e-6).numpy().astype(int), tf.math.ceil(bj-1e-6).numpy().astype(int)
+    A = z_next * (m_u - bj)
+    B = z_next * (bj - m_l)
     for j in range(model.atoms):
-        Tz = tf.minimum(model.v_max, tf.maximum(model.v_min, reward + gamma * model.z[0,j] * (1-done)))
-        bj = (Tz - model.v_min) / model.delta_z 
-        m_l, m_u = tf.math.floor(bj).numpy().astype(int), tf.math.ceil(bj).numpy().astype(int)
         #m_prob[:,m_l] += (z_next_targ[:,j]**(1-done)) * (m_u - bj)
         #m_prob[:,m_u] += (z_next_targ[:,j]**(1-done)) * (bj - m_l)
-        m_prob[:,m_l] += (z_next[:,j]**(1-done)) * (m_u - bj)
-        m_prob[:,m_u] += (z_next[:,j]**(1-done)) * (bj - m_l)
-    critic_loss = model.zloss(m_prob, z_out)
+        #m_prob[:,m_l] += (z_next[:,j]**(1-done)) * (m_u - bj)
+        #m_prob[:,m_u] += (z_next[:,j]**(1-done)) * (bj - m_l)
+        m_prob[:,m_l[:,j]] += A[:,j]
+        m_prob[:,m_u[:,j]] += B[:,j]
+
+    #critic_loss = -tf.reduce_sum(m_prob * tf.math.log(z_out), axis=-1)
+    critic_loss = model.zloss(m_prob, z_out) # Same as cross-entropy loss
 
     return critic_loss
 

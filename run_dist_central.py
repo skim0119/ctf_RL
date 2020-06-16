@@ -83,9 +83,9 @@ keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 512
 epoch = 2
-minimum_batch_size = 512
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup
@@ -147,9 +147,15 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['reward']),
             np.stack(traj_buffer['done']),
             np.stack(traj_buffer['next_state']))
+    losses = []
     for mdp_tuple in it:
-        network.update_network(*mdp_tuple, step, writer, log)
-
+        loss = network.update_network(*mdp_tuple, step)
+        losses.append(loss)
+    if log:
+        with writer.as_default():
+            tag = 'summary/'
+            tf.summary.scalar(tag+'main_critic_loss', np.mean(losses), step=step)
+            writer.flush()
 
 batch = []
 num_batch = 0
@@ -186,7 +192,7 @@ while True:
                 trajs[env_idx].append([
                     s0[env_idx],
                     reward[env_idx],
-                    was_done[env_idx],
+                    done[env_idx],
                     s1[env_idx]])
 
         was_done = done
