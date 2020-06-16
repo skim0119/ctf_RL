@@ -90,7 +90,7 @@ class DistCriticCentral:
     ):
         from network.C51_Central import V2Dist
         from network.C51_Central import train 
-        self.model = V2Dist(input_shape[1:], action_size, v_min=-1, v_max=1)
+        self.model = V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5)
         self.target_model = None #V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5)
         self.train = train
 

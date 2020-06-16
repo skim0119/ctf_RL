@@ -40,12 +40,12 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'C51_CENTRAL_01'
+TRAIN_NAME = 'C51_CENTRAL_02'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
 
-NENV = 8 # multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'env_settings_3v3_boot.ini'
@@ -79,13 +79,13 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = 2#config.getint('DEFAULT', 'KEEP_FRAME')
+keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 512
-epoch = 2
-minimum_batch_size = 4096
+epoch = 10
+minimum_batch_size = 2048
 print(minimum_batch_size)
 
 ## Setup
