@@ -55,7 +55,8 @@ class V2Dist(tf.keras.Model):
         return critic, critic_dist
 
 def loss(model, target_model, state, reward, done, next_state,
-        gamma=0.98, training=True):
+         td_target,
+         gamma=0.98, training=True):
     num_sample = state.shape[0]
 
     # Run Model
@@ -72,15 +73,14 @@ def loss(model, target_model, state, reward, done, next_state,
     A = z_next * (m_u - bj)
     B = z_next * (bj - m_l)
     for j in range(model.atoms):
-        #m_prob[:,m_l] += (z_next_targ[:,j]**(1-done)) * (m_u - bj)
-        #m_prob[:,m_u] += (z_next_targ[:,j]**(1-done)) * (bj - m_l)
-        #m_prob[:,m_l] += (z_next[:,j]**(1-done)) * (m_u - bj)
-        #m_prob[:,m_u] += (z_next[:,j]**(1-done)) * (bj - m_l)
         m_prob[:,m_l[:,j]] += A[:,j]
         m_prob[:,m_u[:,j]] += B[:,j]
 
     #critic_loss = -tf.reduce_sum(m_prob * tf.math.log(z_out), axis=-1)
     critic_loss = model.zloss(m_prob, z_out) # Same as cross-entropy loss
+
+    td_error = td_target - v_out
+    critic_loss = critic_loss + tf.reduce_mean(tf.square(td_error))
 
     return critic_loss
 

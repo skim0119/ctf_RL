@@ -40,7 +40,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'C51_CENTRAL_02'
+TRAIN_NAME = 'C51_CENTRAL_wS_02'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
@@ -131,11 +131,19 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         if len(traj) == 0:
             continue
         buffer_size += len(traj)
+
+        states = np.array(traj[0])
+        critic, _ = network.run_network(states)
+        critic = critic.numpy().tolist()
         
+        td_target, advantages = gae(traj[1], critic, 0,
+                gamma, lambd, normalize=False)
+
         traj_buffer['state'].extend(traj[0])
         traj_buffer['reward'].extend(traj[1])
         traj_buffer['done'].extend(traj[2])
         traj_buffer['next_state'].extend(traj[3])
+        traj_buffer['td_target'].extend(td_target)
 
     if buffer_size < 10:
         return
@@ -146,12 +154,13 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['state']),
             np.stack(traj_buffer['reward']),
             np.stack(traj_buffer['done']),
-            np.stack(traj_buffer['next_state']))
+            np.stack(traj_buffer['next_state']),
+            np.stack(traj_buffer['td_target']))
     losses = []
     for mdp_tuple in it:
-        loss = network.update_network(*mdp_tuple, step)
+        loss = network.update_network(*mdp_tuple)
         losses.append(loss)
-    if log:
+    if True: #log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_critic_loss', np.mean(losses), step=step)
@@ -193,7 +202,7 @@ while True:
                     s0[env_idx],
                     reward[env_idx],
                     done[env_idx],
-                    s1[env_idx]])
+                    s1[env_idx],])
 
         was_done = done
 

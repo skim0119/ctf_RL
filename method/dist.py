@@ -90,7 +90,7 @@ class DistCriticCentral:
     ):
         from network.C51_Central import V2Dist
         from network.C51_Central import train 
-        self.model = V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5)
+        self.model = V2Dist(input_shape[1:], action_size, v_min=-1, v_max=1)
         self.target_model = None #V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5)
         self.train = train
 
@@ -112,14 +112,14 @@ class DistCriticCentral:
         v, v_dist = self.model(states)
         return v, v_dist
 
-    def update_network(self, state_input, reward, done, next_state,
-                       step):
+    def update_network(self, state_input, reward, done, next_state, td_target):
         inputs = {'state': state_input,
                   'reward': reward,
                   'done': done,
-                  'next_state': next_state}
+                  'next_state': next_state,
+                  'td_target': td_target}
         closs = self.train(self.model, self.target_model, self.optimizer,
-              inputs)
+                           inputs)
         return closs
 
     def initiate(self):
