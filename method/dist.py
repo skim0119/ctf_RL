@@ -90,12 +90,13 @@ class DistCriticCentral:
     ):
         from network.C51_Central import V2Dist
         from network.C51_Central import train 
-        self.model = V2Dist(input_shape[1:], action_size, v_min=-1, v_max=1)
+        self.model = V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5, atoms=50)
         self.target_model = None #V2Dist(input_shape[1:], action_size, v_min=-5, v_max=5)
         self.train = train
 
         # Build Network
-        self.model.feature_network.summary()
+        self.model.print_summary()
+        #self.model.feature_network.summary()
 
         # Build Trainer
         self.optimizer = tf.keras.optimizers.Adam(lr)

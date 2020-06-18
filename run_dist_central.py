@@ -40,7 +40,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'C51_CENTRAL_wS_02'
+TRAIN_NAME = 'C51_CENTRAL_wS_07'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
@@ -83,8 +83,8 @@ keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 512
-epoch = 10
+minibatch_size = 1024
+epoch = 1
 minimum_batch_size = 2048
 print(minimum_batch_size)
 
@@ -133,17 +133,18 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         buffer_size += len(traj)
 
         states = np.array(traj[0])
-        critic, _ = network.run_network(states)
-        critic = critic.numpy().tolist()
+        #critic, _ = network.run_network(states)
+        #critic = critic.numpy().tolist()
         
-        td_target, advantages = gae(traj[1], critic, 0,
-                gamma, lambd, normalize=False)
+        #td_target, advantages = gae(traj[1], critic, 0,
+        #        gamma, lambd, normalize=False)
 
         traj_buffer['state'].extend(traj[0])
         traj_buffer['reward'].extend(traj[1])
         traj_buffer['done'].extend(traj[2])
         traj_buffer['next_state'].extend(traj[3])
-        traj_buffer['td_target'].extend(td_target)
+        #traj_buffer['td_target'].extend(td_target)
+        traj_buffer['td_target'].extend(np.zeros_like(np.array(traj[1])))
 
     if buffer_size < 10:
         return
@@ -183,7 +184,8 @@ while True:
     # Bootstrap
     s1 = envs.reset(config_path=env_setting_path,
                     policy_red=policy.Roomba,
-                    policy_blue=policy.Roomba)
+                    policy_blue=policy.Roomba,
+                    mode='continue')
     s1 = envs.get_obs_blue()
 
     # Rollout
