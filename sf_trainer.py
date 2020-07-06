@@ -293,7 +293,16 @@ while global_episodes < total_episodes:
                     agent_reward = air_reward[env_team_idx] - pre_air_reward[env_team_idx]
                 else:
                     agent_reward = env_reward[env_team_idx]
-                trajs[idx].append([s0[idx], a[idx], agent_reward, v0[idx], logits[idx], s1[idx], phi[idx], psi0[idx], done[env_idx]])
+                trajs[idx].append([
+                    s0[idx],
+                    a[idx],
+                    agent_reward,
+                    v0[idx],
+                    logits[idx],
+                    s1[idx],
+                    phi[idx],
+                    psi0[idx],
+                    done[env_idx]])
 
         was_alive = is_alive
         was_done = done

@@ -40,7 +40,8 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'C51_CENTRAL_wS_07'
+TRAIN_NAME = 'VI_CENTRAL_19'
+TRAIN_TAG = 'Dist model (Central) : '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 GPU_CAPACITY = 0.95
@@ -48,7 +49,8 @@ GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_settings_3v3_boot.ini'
+#env_setting_path = 'env_settings_3v3_boot.ini'
+env_setting_path = 'env_settings_3v3_partial.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -83,7 +85,7 @@ keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 1024
+minibatch_size = 512
 epoch = 1
 minimum_batch_size = 2048
 print(minimum_batch_size)
@@ -111,7 +113,7 @@ num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
 if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None, unit_name='Dist C51 model (Central) : '+TRAIN_NAME)
+    progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
 network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
 
@@ -133,18 +135,22 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
         buffer_size += len(traj)
 
         states = np.array(traj[0])
-        #critic, _ = network.run_network(states)
-        #critic = critic.numpy().tolist()
+        critic, _, _, _, phi, _, psi = network.run_network(states)
+        critic = critic[:,0].numpy().tolist()
+        phi = phi[:].numpy().tolist()
+        psi = psi[:].numpy().tolist()
         
-        #td_target, advantages = gae(traj[1], critic, 0,
-        #        gamma, lambd, normalize=False)
+        _, advantages = gae(traj[1], critic, 0,
+                gamma, lambd, normalize=False)
+        td_target, _ = gae(phi, psi, np.zeros_like(phi[0]),
+                gamma, lambd, normalize=False)
 
         traj_buffer['state'].extend(traj[0])
         traj_buffer['reward'].extend(traj[1])
         traj_buffer['done'].extend(traj[2])
         traj_buffer['next_state'].extend(traj[3])
-        #traj_buffer['td_target'].extend(td_target)
-        traj_buffer['td_target'].extend(np.zeros_like(np.array(traj[1])))
+        traj_buffer['td_target'].extend(td_target)
+        #traj_buffer['td_target'].extend(np.zeros_like(np.array(traj[1])))
 
     if buffer_size < 10:
         return
@@ -157,14 +163,17 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['done']),
             np.stack(traj_buffer['next_state']),
             np.stack(traj_buffer['td_target']))
-    losses = []
+    mse_losses = []
+    elbo_losses = []
     for mdp_tuple in it:
-        loss = network.update_network(*mdp_tuple)
-        losses.append(loss)
-    if True: #log:
+        mse_loss, elbo_loss = network.update_network(*mdp_tuple)
+        mse_losses.append(mse_loss)
+        elbo_losses.append(elbo_loss)
+    if log:
         with writer.as_default():
             tag = 'summary/'
-            tf.summary.scalar(tag+'main_critic_loss', np.mean(losses), step=step)
+            tf.summary.scalar(tag+'main_critic_loss', np.mean(mse_losses), step=step)
+            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
             writer.flush()
 
 batch = []
@@ -172,7 +181,6 @@ num_batch = 0
 #while global_episodes < total_episodes:
 while True:
     log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
-    log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     
     # initialize parameters 
@@ -204,7 +212,7 @@ while True:
                     s0[env_idx],
                     reward[env_idx],
                     done[env_idx],
-                    s1[env_idx],])
+                    s1[env_idx]])
 
         was_done = done
 
@@ -215,6 +223,7 @@ while True:
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
+        log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
         stime_train = time.time()
         train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()

@@ -118,9 +118,15 @@ class SubprocVecEnv:
         dones = np.stack(dones)
         return obs, rews, dones, infos
 
-    def reset(self, **kwargs):
-        for remote in self.remotes:
-            remote.send(('_reset', kwargs))
+    def reset(self, map_pool=None, **kwargs):
+        if map_pool is not None:
+            custom_boards = random.choices(map_pool, k=self.nenvs)
+            for idx, remote in enumerate(self.remotes):
+                kwargs['custom_board'] = custom_boards[idx]
+                remote.send(('_reset', kwargs))
+        else:
+            for remote in self.remotes:
+                remote.send(('_reset', kwargs))
         return np.concatenate([remote.recv() for remote in self.remotes], axis=0)
 
     def get_static_map(self):
