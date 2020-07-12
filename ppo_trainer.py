@@ -87,7 +87,7 @@ map_size     = 40#config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 2048
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup
@@ -193,8 +193,7 @@ while True:
     s1 = envs.reset(
             map_pool=map_list,
             config_path=env_setting_path,
-            policy_red=policy.Roomba,
-            mode='continue')
+            policy_red=policy.Roomba)
     s1 = s1.astype(np.float32)
     a1, v1, p1, actions = get_action(s1)
 
