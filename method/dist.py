@@ -92,10 +92,16 @@ class DistCriticCentralKalman:
         # Non-categorial distributional feature encoding
         # Central encoding
 
-        from network.DistValue_Central_Kalman import V4DistVar
+        from network.DistValue_Central_Kalman import V4SFK
         from network.DistValue_Central_Kalman import train 
-        self.model = V4DistVar(input_shape[1:], action_size=5, atoms=atoms)
+        from network.DistValue_Central_Kalman import loss_psi
+        from network.DistValue_Central_Kalman import loss_reward, loss_predictor, loss_decoder
+        self.model = V4SFK(input_shape[1:], action_size=5, atoms=atoms)
         self.train = train
+        self.loss_psi = loss_psi
+        self.loss_reward = loss_reward
+        self.loss_predictor = loss_predictor
+        self.loss_decoder = loss_decoder
 
         # Build Network
         self.model.print_summary()
@@ -126,8 +132,16 @@ class DistCriticCentralKalman:
                   'b_log_var': b_log_var,
                   'next_mean': next_mean,
                   'next_log_var': next_log_var}
-        total_loss, mse, elbo, kloss = self.train(self.model, self.optimizer, inputs)
-        return mse, elbo, kloss
+        psi_mse = self.train(self.model, self.loss_psi, self.optimizer, inputs)
+        return psi_mse
+
+    def update_reward_prediction(self, state_input, reward, b_mean, b_log_var):
+        inputs = {'state': state_input,
+                  'reward': reward,
+                  'b_mean': b_mean,
+                  'b_log_var': b_log_var}
+        reward_loss = self.train(self.model, self.loss_reward, self.optimizer, inputs)
+        return reward_loss
 
     def initiate(self):
         return self.manager.restore_or_initialize()

@@ -40,7 +40,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_KALMAN_PASV_01'  # distributional kalman on V passive learning
+TRAIN_NAME = 'DIST_KALMAN_PASV_05'  # distributional kalman on V passive learning
 TRAIN_TAG = 'Dist model w Kalman: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -178,22 +178,44 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             np.stack(traj_buffer['next_mean']),
             np.stack(traj_buffer['next_log_var']),
             )
-    mse_losses = []
-    elbo_losses = []
-    kalman_losses = []
+    psi_losses = []
+    #elbo_losses = []
+    #kalman_losses = []
     for mdp_tuple in it:
-        mse_loss, elbo_loss, kalman_loss = network.update_network(*mdp_tuple)
-        mse_losses.append(mse_loss)
-        elbo_losses.append(elbo_loss)
-        kalman_losses.append(kalman_loss)
+        psi_mse = network.update_network(*mdp_tuple)
+        psi_losses.append(psi_mse)
+        #elbo_losses.append(elbo)
+        #kalman_losses.append(kalman)
     if log:
         with writer.as_default():
             tag = 'summary/'
-            tf.summary.scalar(tag+'main_critic_loss', np.mean(mse_losses), step=step)
-            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
-            tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
+            tf.summary.scalar(tag+'main_critic_loss', np.mean(psi_losses), step=step)
+            #tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
+            #tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
             writer.flush()
 
+def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=False, step=None):
+    buffer_size = len(traj)
+    if buffer_size < 10:
+        return
+    reward_stack = np.stack(traj[1])
+    print(np.unique(reward_stack, return_counts=1))
+    it = batch_sampler(batch_size, epoch,
+                       np.stack(traj[0]),
+                       np.stack(traj[1]),
+                       np.stack(traj[2]),
+                       np.stack(traj[3]))
+    reward_losses = []
+    for mdp_tuple in it:
+        reward_loss = network.update_reward_prediction(*mdp_tuple)
+        reward_losses.append(reward_loss)
+    if log:
+        with writer.as_default():
+            tag = 'summary/'
+            tf.summary.scalar(tag+'main_reward_loss', np.mean(reward_losses), step=step)
+            writer.flush()
+
+reward_training_buffer = Trajectory(depth=4) # Centralized
 batch = []
 num_batch = 0
 #while global_episodes < total_episodes:
@@ -254,6 +276,11 @@ while True:
         '''
         for env_idx in range(NENV):
             if not was_done[env_idx]:
+                reward_training_buffer.append([
+                    cent_s0[env_idx],
+                    reward[env_idx],
+                    cent_bmean0[env_idx],
+                    cent_blogvar0[env_idx]])
                 cent_trajs[env_idx].append([
                     cent_s0[env_idx],
                     reward[env_idx],
@@ -268,6 +295,7 @@ while True:
             break
     etime_roll = time.time()
 
+    # Trajectory Training
     '''
     for idx in range(NENV*num_agent):
         if is_air[idx]:
@@ -280,11 +308,16 @@ while True:
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-        train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        #train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
         batch = []
         num_batch = 0
         log_traintime.append(etime_train - stime_train)
+    # Reward Training
+    if len(reward_training_buffer) > 4096:
+        log_rt_on = interval_flag(global_episodes, save_image_frequency, 'rt_log')
+        train_reward_prediction(cent_network, reward_training_buffer, epoch=2, batch_size=64, writer=writer, log=log_rt_on, step=global_episodes)
+        reward_training_buffer.clear()
     
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())

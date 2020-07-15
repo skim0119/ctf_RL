@@ -23,7 +23,7 @@ class KalmanPredictor(tf.keras.Model):
         self.nn = keras.Sequential([
             layers.Input(shape=[num_input*2]),
             layers.Dense(units=num_hidden, activation='relu'),
-            layers.Dense(units=num_hidden, activation='relu'),
+            #layers.Dense(units=num_hidden, activation='relu'),
             layers.Dense(units=num_input*2)])
 
     def call(self, input):
@@ -54,16 +54,16 @@ def kalman_corrector(mu1, log_var1, mu2, log_var2):
     return mu, tf.math.log(var)
 
 
-class V4DistVar(tf.keras.Model):
+class V4SFK(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, action_size,
                  atoms,
-                 trainable=True, name='DISTVAR'):
-        super(V4DistVar, self).__init__(name=name)
+                 trainable=True, name='SFK'):
+        super(V4SFK, self).__init__(name=name)
 
         # Feature Encoding
         self.feature_layer = V4(input_shape, action_size)
-        self.z_mean = layers.Dense(units=atoms)
+        self.z_mean = layers.Dense(units=atoms, activation='tanh')
         self.z_log_var = layers.Dense(units=atoms)
 
         # Decoding
@@ -98,22 +98,22 @@ class V4DistVar(tf.keras.Model):
         z_log_var = self.z_log_var(net)
 
         # Decoder
-        epsilon1 = tf.random.normal(
+        eps_dec = tf.random.normal(
                 shape=(n_sample, self.atoms),
                 mean=0.,
                 stddev=1.0,
                 name='sampled_epsilon')
-        z1 = z_mean + tf.math.exp(z_log_var)*epsilon1
+        z1 = z_mean + tf.math.exp(z_log_var)*eps_dec
         z_decoded = self.decoder(tf.stop_gradient(z1))
 
         # Kalman Filter
         z_mean, z_log_var = kalman_corrector(z_mean, z_log_var, b_mean, b_log_var)
-        epsilon = tf.random.normal(
+        eps = tf.random.normal(
                 shape=(n_sample, self.atoms),
                 mean=0.,
                 stddev=1.0,
                 name='sampled_epsilon')
-        z = z_mean + tf.math.exp(z_log_var)*epsilon
+        z = z_mean + tf.math.exp(z_log_var)*eps
         pred_mean, pred_log_var = self.kalman_predictor([z_mean, z_log_var])
 
         # Critic
@@ -121,15 +121,41 @@ class V4DistVar(tf.keras.Model):
         #phi = self.phi_dense1(net)
         phi = z
         r_pred = self.successor_weight(phi)
-        psi = self.psi_dense1(tf.stop_gradient(z))
+        #psi = self.psi_dense1(tf.stop_gradient(z))
+        psi = self.psi_dense1(z_mean)
         psi = self.psi_dense2(psi)
-        critic = self.successor_weight(psi)
+        critic = self.successor_weight(psi, training=False)
 
         return critic, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi, pred_mean, pred_log_var
+    
+def loss_reward(model, state, reward, b_mean, b_log_var, training=True):
+    # Critic - Reward Prediction
+    inputs = [state, b_mean, b_log_var]
+    _,_,_,_,_,_, r_pred, _,_,_  = model(inputs, training=training)
+    reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
+    return reward_mse
 
-def loss(model, state, reward, done, next_state,
+def loss_predictor(model, state, b_mean, b_log_var, next_mean, next_log_var, training=True):
+    # Predictor Loss
+    inputs = [state, b_mean, b_log_var]
+    _,_,_,_,_,_, _, _,pred_mean,pred_log_var  = model(inputs, training=training)
+    pred_loss = tf.reduce_mean(tf.square(pred_mean - next_mean)) + tf.reduce_mean(tf.square(pred_log_var - next_log_var))
+    return pred_loss + 1e-1
+
+def loss_decoder(model, state, b_mean, b_log_var, beta_kl=1e-4, training=True):
+    # VAE ELBO Loss
+    num_sample = state.shape[0]
+    inputs = [state, b_mean, b_log_var]
+    _,_,z_mean,z_log_var,z_decoded,_,_,_,_,_= model(inputs, training=training)
+    ce_loss = tf.keras.losses.binary_crossentropy(
+            tf.reshape(state, [num_sample, -1]),
+            tf.reshape(z_decoded, [num_sample, -1]))
+    kl_loss = -beta_kl * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
+    elbo = tf.reduce_mean(ce_loss + kl_loss)
+    return elbo
+
+def loss_psi(model, state, reward, done, next_state,
          td_target, b_mean, b_log_var, next_mean, next_log_var,
-         beta_kl=1e-4,
          gamma=0.98, training=True):
     num_sample = state.shape[0]
 
@@ -137,34 +163,21 @@ def loss(model, state, reward, done, next_state,
     inputs = [state, b_mean, b_log_var]
     v_out, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi, pred_mean, pred_log_var = model(inputs, training=training)
 
-    # VAE ELBO Loss
-    ce_loss = tf.keras.losses.binary_crossentropy(
-            tf.reshape(state, [num_sample, -1]),
-            tf.reshape(z_decoded, [num_sample, -1]))
-    kl_loss = -beta_kl * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-    elbo = tf.reduce_mean(ce_loss + kl_loss)
-
-    # Critic - Reward Prediction
-    reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
-
     # Critic - TD Difference
     #td_error = td_target - v_out
     td_error = td_target - psi
     psi_mse = tf.reduce_mean(tf.square(td_error))
 
-    critic_loss = reward_mse + psi_mse
+    return psi_mse
 
-    # Predictor Loss
-    pred_loss = tf.reduce_mean(tf.square(pred_mean - next_mean)) + tf.reduce_mean(tf.square(pred_log_var - next_log_var))
-
-    return critic_loss, elbo, pred_loss
-
-def train(model, optimizer, inputs, **hyperparameters):
+def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
-        sf_loss, elbo, pred_loss = loss(model, **inputs, **hyperparameters, training=True)
-        loss_val = sf_loss + elbo + pred_loss
+        loss_val = loss(model, **inputs, **hyperparameters, training=True)
     grads = tape.gradient(loss_val, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients([
+        (grad, var)
+        for (grad,var) in zip(grads, model.trainable_variables)
+        if grad is not None])
 
-    return loss_val, sf_loss, elbo, pred_loss
+    return loss_val
 
