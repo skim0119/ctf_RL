@@ -154,11 +154,7 @@ def loss_decoder(model, state, b_mean, b_log_var, beta_kl=1e-4, training=True):
     elbo = tf.reduce_mean(ce_loss + kl_loss)
     return elbo
 
-def loss_psi(model, state, reward, done, next_state,
-         td_target, b_mean, b_log_var, next_mean, next_log_var,
-         gamma=0.98, training=True):
-    num_sample = state.shape[0]
-
+def loss_psi(model, state, td_target, b_mean, b_log_var, gamma=0.98, training=True):
     # Run Model
     inputs = [state, b_mean, b_log_var]
     v_out, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi, pred_mean, pred_log_var = model(inputs, training=training)

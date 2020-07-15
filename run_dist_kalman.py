@@ -6,6 +6,7 @@ import sys
 
 import shutil
 import configparser
+import argparse
 
 import signal
 import threading
@@ -40,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_KALMAN_PASV_05'  # distributional kalman on V passive learning
+TRAIN_NAME = 'DIST_KALMAN_PASV_06'  # distributional kalman on V passive learning
 TRAIN_TAG = 'Dist model w Kalman: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -87,7 +88,7 @@ map_size     = 40#config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 2048
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup

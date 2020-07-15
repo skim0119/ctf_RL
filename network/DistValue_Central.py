@@ -73,10 +73,7 @@ class V4DistVar(tf.keras.Model):
 
         return critic, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi
 
-def loss(model, state, reward, done, next_state,
-         td_target,
-         beta_kl=1e-4,
-         gamma=0.98, training=True):
+def loss_decoder(model, state, beta_kl=1e-4, training=True):
     num_sample = state.shape[0]
 
     # Run Model
@@ -88,25 +85,28 @@ def loss(model, state, reward, done, next_state,
             tf.reshape(z_decoded, [num_sample, -1]))
     kl_loss = -beta_kl * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
     elbo = tf.reduce_mean(ce_loss + kl_loss)
+    return elbo
 
-    # Critic - Reward Prediction
-    reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
-
+def loss_psi(model, state, td_target, gamma=0.98, training=True):
     # Critic - TD Difference
-    #td_error = td_target - v_out
+    v_out, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi = model(state, training=training)
     td_error = td_target - psi
     psi_mse = tf.reduce_mean(tf.square(td_error))
 
-    critic_loss = reward_mse + psi_mse
+    return psi_mse
 
-    return critic_loss, elbo 
+def loss_reward(model, state, reward, training=True):
+    # Critic - Reward Prediction
+    inputs = state
+    _,_,_,_,_,_, r_pred, _ = model(inputs, training=training)
+    reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
+    return reward_mse
 
-def train(model, optimizer, inputs, **hyperparameters):
+def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
-        sf_loss, elbo = loss(model, **inputs, **hyperparameters, training=True)
-        loss_val = sf_loss + elbo
+        loss_val = loss(model, **inputs, **hyperparameters, training=True)
     grads = tape.gradient(loss_val, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    return loss_val, sf_loss, elbo
+    return loss_val
 
