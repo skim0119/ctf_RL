@@ -180,19 +180,18 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             np.stack(traj_buffer['next_log_var']),
             )
     psi_losses = []
-    #elbo_losses = []
-    #kalman_losses = []
+    elbo_losses = []
+    kalman_losses = []
     for mdp_tuple in it:
-        psi_mse = network.update_network(*mdp_tuple)
-        psi_losses.append(psi_mse)
-        #elbo_losses.append(elbo)
-        #kalman_losses.append(kalman)
+        psi_losses.append(network.update_sf(*mdp_tuple))
+        elbo_losses.append(network.update_decoder(*mdp_tuple))
+        kalman_losses.append(network.update_kalman(*mdp_tuple))
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_critic_loss', np.mean(psi_losses), step=step)
-            #tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
-            #tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
+            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
+            tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
             writer.flush()
 
 def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=False, step=None):
@@ -318,7 +317,16 @@ while True:
     if len(reward_training_buffer) > 4096:
         log_rt_on = interval_flag(global_episodes, save_image_frequency, 'rt_log')
         train_reward_prediction(cent_network, reward_training_buffer, epoch=2, batch_size=64, writer=writer, log=log_rt_on, step=global_episodes)
+        #reward_training_buffer.clear()
+        temp_buffer = Trajectory(depth=4)
+        for i in range(len(reward_training_buffer)):
+            r = [col[i] for col in reward_training_buffer.buffer]
+            if r[1] != 0:
+                temp_buffer.append(r)
         reward_training_buffer.clear()
+        reward_training_buffer = temp_buffer
+        if len(reward_training_buffer) > 10000: # Purge
+            reward_training_buffer.clear()
     
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())

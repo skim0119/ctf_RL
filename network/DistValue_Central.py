@@ -60,16 +60,16 @@ class V4DistVar(tf.keras.Model):
         z = z_mean + tf.math.exp(z_log_var)*epsilon
 
         # Decoder
-        z_decoded = self.decoder(tf.stop_gradient(z))
+        z_decoded = self.decoder(z)
 
         # Critic
         #net = tf.concat([z_mean, z_log_var], axis=-1)
         #phi = self.phi_dense1(net)
-        phi = z
-        r_pred = self.successor_weight(z)
-        psi = self.psi_dense1(tf.stop_gradient(z))
+        phi = z_mean
+        r_pred = self.successor_weight(phi)
+        psi = self.psi_dense1(phi)
         psi = self.psi_dense2(psi)
-        critic = self.successor_weight(psi)
+        critic = self.successor_weight(psi, training=False)
 
         return critic, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi
 
@@ -106,7 +106,11 @@ def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
         loss_val = loss(model, **inputs, **hyperparameters, training=True)
     grads = tape.gradient(loss_val, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients([
+        (grad, var)
+        for (grad,var) in zip(grads, model.trainable_variables)
+        if grad is not None])
 
     return loss_val
+
 

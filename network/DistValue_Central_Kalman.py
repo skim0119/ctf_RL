@@ -104,7 +104,7 @@ class V4SFK(tf.keras.Model):
                 stddev=1.0,
                 name='sampled_epsilon')
         z1 = z_mean + tf.math.exp(z_log_var)*eps_dec
-        z_decoded = self.decoder(tf.stop_gradient(z1))
+        z_decoded = self.decoder(z1)
 
         # Kalman Filter
         z_mean, z_log_var = kalman_corrector(z_mean, z_log_var, b_mean, b_log_var)
@@ -113,7 +113,7 @@ class V4SFK(tf.keras.Model):
                 mean=0.,
                 stddev=1.0,
                 name='sampled_epsilon')
-        z = z_mean + tf.math.exp(z_log_var)*eps
+        z = z_mean# + tf.math.exp(z_log_var)*eps
         pred_mean, pred_log_var = self.kalman_predictor([z_mean, z_log_var])
 
         # Critic
@@ -122,7 +122,7 @@ class V4SFK(tf.keras.Model):
         phi = z
         r_pred = self.successor_weight(phi)
         #psi = self.psi_dense1(tf.stop_gradient(z))
-        psi = self.psi_dense1(z_mean)
+        psi = self.psi_dense1(phi)
         psi = self.psi_dense2(psi)
         critic = self.successor_weight(psi, training=False)
 

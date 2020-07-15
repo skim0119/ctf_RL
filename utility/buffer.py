@@ -102,7 +102,7 @@ class Trajectory:
         self.buffer = [[] for _ in range(depth)]
 
     def __repr__(self):
-        return f'Trajectory (depth={self.depth}'
+        return f'Trajectory (depth={self.depth})'
 
     def __len__(self):
         return len(self.buffer[0])

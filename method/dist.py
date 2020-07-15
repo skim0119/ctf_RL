@@ -53,7 +53,7 @@ class DistCriticCentralKalman:
         v, feature, feat_mean, feat_log_var, decoded, phi, r_pred, psi, pred_mean, pred_log_var = self.model(inputs)
         return v, feature, feat_mean, np.exp(feat_log_var), phi, r_pred, psi, pred_mean, pred_log_var
 
-    def update_reward_prediction(self, state_input, reward, b_mean, b_log_var):
+    def update_reward_prediction(self, state_input, reward, b_mean, b_log_var, *args):
         inputs = {'state': state_input,
                   'reward': reward,
                   'b_mean': b_mean,
@@ -61,7 +61,7 @@ class DistCriticCentralKalman:
         reward_loss = self.train(self.model, self.loss_reward, self.optimizer, inputs)
         return reward_loss
 
-    def update_kalman(self, state_input, b_mean, b_log_var, next_mean, next_log_var):
+    def update_kalman(self, state_input, b_mean, b_log_var, next_mean, next_log_var, *args):
         inputs = {'state': state_input,
                   'reward': reward,
                   'b_mean': b_mean,
@@ -71,14 +71,14 @@ class DistCriticCentralKalman:
         kalman_loss = self.train(self.model, self.loss_predictor, self.optimizer, inputs)
         return kalman_loss
 
-    def update_decoder(self, state_input, b_mean, b_log_var):
+    def update_decoder(self, state_input, b_mean, b_log_var, *args):
         inputs = {'state': state_input,
                   'b_mean': b_mean,
                   'b_log_var': b_log_var}
         elbo = self.train(self.model, self.loss_decoder, self.optimizer, inputs)
         return elbo
 
-    def update_sf(self, state_input, td_target, b_mean, b_log_var):
+    def update_sf(self, state_input, td_target, b_mean, b_log_var, *args):
         inputs = {'state': state_input,
                   'td_target': td_target,
                   'b_mean': b_mean,
@@ -138,19 +138,19 @@ class DistCriticCentral:
         v, feature, feat_mean, feat_log_var, decoded, phi, r_pred, psi = self.model(states)
         return v, feature, feat_mean, np.exp(feat_log_var), phi, r_pred, psi
 
-    def update_sf(self, state_input, td_target):
+    def update_sf(self, state_input, td_target, *args):
         inputs = {'state': state_input,
                   'td_target': td_target}
         psi_loss = self.train(self.model, self.loss_psi, self.optimizer, inputs)
         return psi_loss
 
-    def update_reward_prediction(self, state_input, reward):
+    def update_reward_prediction(self, state_input, reward, *args):
         inputs = {'state': state_input,
                   'reward': reward,}
         reward_loss = self.train(self.model, self.loss_reward, self.optimizer, inputs)
         return reward_loss
 
-    def update_decoder(self, state_input):
+    def update_decoder(self, state_input, *args):
         inputs = {'state': state_input}
         decoder_loss = self.train(self.model, self.loss_decoder, self.optimizer, inputs)
         return decoder_loss

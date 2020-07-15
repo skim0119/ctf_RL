@@ -34,14 +34,14 @@ from utility.multiprocessing import SubprocVecEnv
 from utility.logger import record
 from utility.gae import gae
 
-from method.dist import DistCriticCentralKalman as Network
+from method.dist import DistCriticCentral as Network
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_KALMAN_PASV_06'  # distributional kalman on V passive learning
+TRAIN_NAME = 'DIST_SF_PASV_01'  # distributional kalman on V passive learning
 TRAIN_TAG = 'Dist model w Kalman: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -141,12 +141,10 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         states = np.array(traj[0])
         bmeans = np.array(traj[4])
         blogvars = np.array(traj[5])
-        critic, _, _, _, phi, _, psi, pmeans, plogvars = network.run_network(states, bmeans, blogvars)
+        critic, _, _, _, phi, _, psi = network.run_network(states)
         critic = critic[:,0].numpy().tolist()
         phi = phi[:].numpy().tolist()
         psi = psi[:].numpy().tolist()
-        pmeans = pmeans[:].numpy()
-        plogvars = plogvars[:].numpy()
         
         _, advantages = gae(traj[1], critic, 0,
                 gamma, lambd, normalize=False)
@@ -160,8 +158,6 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         traj_buffer['td_target'].extend(td_target)
         traj_buffer['b_mean'].extend(traj[4])
         traj_buffer['b_log_var'].extend(traj[5])
-        traj_buffer['next_mean'].extend(pmeans)
-        traj_buffer['next_log_var'].extend(plogvars)
 
     if buffer_size < 10:
         return
@@ -176,23 +172,17 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             np.stack(traj_buffer['td_target']),
             np.stack(traj_buffer['b_mean']),
             np.stack(traj_buffer['b_log_var']),
-            np.stack(traj_buffer['next_mean']),
-            np.stack(traj_buffer['next_log_var']),
             )
     psi_losses = []
-    #elbo_losses = []
-    #kalman_losses = []
+    elbo_losses = []
     for mdp_tuple in it:
-        psi_mse = network.update_network(*mdp_tuple)
-        psi_losses.append(psi_mse)
-        #elbo_losses.append(elbo)
-        #kalman_losses.append(kalman)
+        psi_losses.append(network.update_sf(*mdp_tuple))
+        elbo_losses.append(network.update_decoder(*mdp_tuple))
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_critic_loss', np.mean(psi_losses), step=step)
-            #tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
-            #tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
+            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
             writer.flush()
 
 def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=False, step=None):
@@ -203,9 +193,7 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
     print(np.unique(reward_stack, return_counts=1))
     it = batch_sampler(batch_size, epoch,
                        np.stack(traj[0]),
-                       np.stack(traj[1]),
-                       np.stack(traj[2]),
-                       np.stack(traj[3]))
+                       np.stack(traj[1]))
     reward_losses = []
     for mdp_tuple in it:
         reward_loss = network.update_reward_prediction(*mdp_tuple)
@@ -216,7 +204,7 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
             tf.summary.scalar(tag+'main_reward_loss', np.mean(reward_losses), step=step)
             writer.flush()
 
-reward_training_buffer = Trajectory(depth=4) # Centralized
+reward_training_buffer = Trajectory(depth=2) # Centralized
 batch = []
 num_batch = 0
 #while global_episodes < total_episodes:
@@ -229,8 +217,6 @@ while True:
     cent_trajs = [Trajectory(depth=6) for _ in range(NENV)]
     bmean1 = np.zeros([NENV*num_agent, atoms], dtype=np.float32)
     blogvar1 = np.zeros([NENV*num_agent, atoms], dtype=np.float32)
-    cent_bmean1 = np.zeros([NENV, atoms], dtype=np.float32)
-    cent_blogvar1 = np.zeros([NENV, atoms], dtype=np.float32)
     
     # Bootstrap
     s1 = envs.reset(
@@ -249,18 +235,14 @@ while True:
         s0 = s1
         bmean0, blogvar0 = bmean1, blogvar1
         cent_s0 = cent_s1
-        cent_bmean0, cent_blogvar0 = cent_bmean1, cent_blogvar1
         
         s1, reward, done, info = envs.step()
         s1.astype(np.float32)
         cent_s1 = envs.get_obs_blue() # Centralized
         episode_rew += reward
 
-        _,_,_,_,_,_,_,cent_bmean1, cent_blogvar1 = cent_network.run_network(cent_s1, cent_bmean0, cent_blogvar0)
         #bmean1 = bmean1[:].numpy()
         #blogvar1 = blogvar1[:].numpy()
-        cent_bmean1 = cent_bmean1[:].numpy()
-        cent_blogvar1 = cent_blogvar1[:].numpy()
 
         # push to buffer
         '''
@@ -279,16 +261,12 @@ while True:
             if not was_done[env_idx]:
                 reward_training_buffer.append([
                     cent_s0[env_idx],
-                    reward[env_idx],
-                    cent_bmean0[env_idx],
-                    cent_blogvar0[env_idx]])
+                    reward[env_idx]])
                 cent_trajs[env_idx].append([
                     cent_s0[env_idx],
                     reward[env_idx],
                     done[env_idx],
-                    cent_s1[env_idx],
-                    cent_bmean0[env_idx],
-                    cent_blogvar0[env_idx]])
+                    cent_s1[env_idx]])
 
         was_done = done
 
@@ -318,7 +296,16 @@ while True:
     if len(reward_training_buffer) > 4096:
         log_rt_on = interval_flag(global_episodes, save_image_frequency, 'rt_log')
         train_reward_prediction(cent_network, reward_training_buffer, epoch=2, batch_size=64, writer=writer, log=log_rt_on, step=global_episodes)
+        #reward_training_buffer.clear()
+        temp_buffer = Trajectory(depth=2)
+        for i in range(len(reward_training_buffer)):
+            r = [col[i] for col in reward_training_buffer.buffer]
+            if r[1] != 0:
+                temp_buffer.append(r)
         reward_training_buffer.clear()
+        reward_training_buffer = temp_buffer
+        if len(reward_training_buffer) > 10000: # Purge
+            reward_training_buffer.clear()
     
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())
