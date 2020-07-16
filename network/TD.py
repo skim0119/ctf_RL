@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
+import tensorflow_probability as tfp
 
 from network.attention import Non_local_nn
 from network.model_V4 import V4, V4INV

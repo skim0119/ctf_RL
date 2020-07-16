@@ -42,17 +42,19 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PSI_trainer_01'
+TRAIN_NAME = sys.argv[1]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_map'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = 8# multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_setting_uav1_ugv1_sp.ini'
+#env_setting_path = 'env_setting_uav1_ugv1_sp.ini'
+#env_setting_path = 'env_setting_uav1_ugv1_sp.ini'
+env_setting_path = sys.argv[2]
 
 ## Data Path
 path_create(LOG_PATH)
@@ -113,7 +115,7 @@ def make_env(map_size):
             config_path=env_setting_path,
             )
 envs_list = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs_list, keep_frame)
+envs = SubprocVecEnv(envs_list, keep_frame, size=vision_dx)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 
@@ -122,7 +124,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_CAPACITY, allow_
 config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=LOG_DEVICE, allow_soft_placement=True)
 
 if PROGBAR:
-    progbar = tf.keras.utils.Progbar(None, unit_name='SF Training')
+    progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_NAME)
 
 sess = tf.Session(config=config)
 
@@ -164,10 +166,8 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
         traj_buffer['td_target'].extend([(np.array(td)*d).tolist() for td, d in zip(td_target,traj[8])])
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['logit'].extend(traj[4])
-        #traj_buffer['reward'].extend(traj[2])
+        traj_buffer['reward'].extend(traj[2])
         traj_buffer['state_next'].extend(traj[5])
-        result = np.ones_like(traj[2])*traj[2][-1] + 1
-        traj_buffer['result'].extend(result)
 
     if buffer_size < 10:
         return
@@ -181,7 +181,7 @@ def train(nn, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writ
             np.stack(traj_buffer['advantage']),
             np.stack(traj_buffer['logit']),
             np.stack(traj_buffer['state_next']),
-            np.stack(traj_buffer['result']),
+            np.stack(traj_buffer['reward']),
         )
     i = 0
     for mdp_tuple in it:
@@ -201,7 +201,7 @@ def get_action(states, N=16):
     blue_ground = np.reshape(blue_ground, [NENV*n_ground]+input_size[1:])
 
     action_ground, value_ground, logit_ground, phi_ground, psi_ground = network.run_network(blue_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(blue_air)
+    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(blue_air, return_action=)
 
     action_rsh = np.concatenate(
             [action_air.reshape([NENV,n_air])*0, action_ground.reshape([NENV,n_ground])]
@@ -216,7 +216,7 @@ def get_action(states, N=16):
     red_ground = np.reshape(red_ground, [NENV*n_ground]+input_size[1:])
 
     action_ground, value_ground, logit_ground, phi_ground, psi_ground = network.run_network(red_ground)
-    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(blue_air)
+    action_air, value_air, logit_air, phi_air, psi_air = network_air.run_network(red_air, return_action=False)
 
     action_rsh = np.concatenate(
             [action_rsh, action_air.reshape([NENV,n_air])*0, action_ground.reshape([NENV,n_ground])]
@@ -326,7 +326,7 @@ while global_episodes < total_episodes:
         progbar.update(global_episodes)
 
     if log_on:
-        tag = 'uav_training/'
+        tag = 'psi_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

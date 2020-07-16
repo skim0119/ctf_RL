@@ -55,7 +55,7 @@ try:
     policy1, policy2 = [], []
 
     resetCount = 0
-    for _ in range(100):
+    for _ in range(10):
         ## Reread Players
         #if episode % 100 == 0:
         #    players = read_player('competition_player.txt')

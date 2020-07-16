@@ -2,6 +2,7 @@ import pickle
 
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+os.environ["CUDA_VISIBLE_DEVICES"]="0"   
 import sys
 
 import shutil
@@ -13,6 +14,7 @@ import multiprocessing
 
 import tensorflow as tf
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
+print(physical_devices)
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 import time
@@ -40,7 +42,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'TD_CENTRAL_PASV_00'
+TRAIN_NAME = 'TD_CENTRAL_PASV_01'
 TRAIN_TAG = 'TD model (Central) w/out Kalman: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -116,7 +118,8 @@ num_agent = num_blue#+num_red
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
-network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
+atoms=8
+network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH, atoms=atoms)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -165,7 +168,7 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
     for mdp_tuple in it:
         mse_loss = network.update_network(*mdp_tuple)
         mse_losses.append(mse_loss)
-        elbo_losses.append(network.update_decoder(mdp[0]))
+        elbo_losses.append(network.update_decoder(mdp_tuple[0]))
     if log:
         with writer.as_default():
             tag = 'summary/'

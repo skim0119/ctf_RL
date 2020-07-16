@@ -14,6 +14,7 @@ class TDCentral:
         action_size,
         scope,
         save_path,
+        atoms,
         lr=1e-4,
         **kwargs
     ):
@@ -21,7 +22,7 @@ class TDCentral:
         from network.TD import V4TD
         from network.TD import train 
         from network.TD import loss, loss_decoder
-        self.model = V4TD(input_shape[1:], action_size=5)
+        self.model = V4TD(input_shape[1:], action_size=5, atoms=atoms)
         self.train = train
         self.loss_td = loss
         self.loss_decoder = loss_decoder
