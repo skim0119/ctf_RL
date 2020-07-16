@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SF_PASV_03'  # distributional kalman on V passive learning
+TRAIN_NAME = 'DIST_SF_PASV_04'  # distributional kalman on V passive learning
 TRAIN_TAG = 'Dist model SF : '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME

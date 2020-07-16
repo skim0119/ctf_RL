@@ -26,7 +26,7 @@ class V4DistVar(tf.keras.Model):
         # Feature Encoding
         self.feature_layer = V4(input_shape, action_size)
         self.z_mean = layers.Dense(units=atoms)
-        self.z_log_var = layers.Dense(units=atoms, activation=tf.nn.softplus)
+        self.z_log_var = layers.Dense(units=atoms)
 
         # Decoding
         self.decoder = V4INV()
