@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_KALMAN_PASV_06'  # distributional kalman on V passive learning
+TRAIN_NAME = 'DIST_KALMAN_PASV_08'  # distributional kalman on V passive learning
 TRAIN_TAG = 'Dist model w Kalman: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -76,7 +76,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 4#config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -182,10 +182,10 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
     psi_losses = []
     elbo_losses = []
     kalman_losses = []
-    for mdp_tuple in it:
-        psi_losses.append(network.update_sf(*mdp_tuple))
-        elbo_losses.append(network.update_decoder(*mdp_tuple))
-        kalman_losses.append(network.update_kalman(*mdp_tuple))
+    for mdp in it:
+        psi_losses.append(network.update_sf(mdp[0], mdp[4], mdp[5], mdp[6]))
+        elbo_losses.append(network.update_decoder(mdp[0], mdp[5], mdp[6]))
+        kalman_losses.append(network.update_kalman(mdp[0], mdp[5], mdp[6], mdp[7], mdp[8]))
     if log:
         with writer.as_default():
             tag = 'summary/'
@@ -308,7 +308,7 @@ while True:
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-        #train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
         batch = []
         num_batch = 0
@@ -325,7 +325,7 @@ while True:
                 temp_buffer.append(r)
         reward_training_buffer.clear()
         reward_training_buffer = temp_buffer
-        if len(reward_training_buffer) > 10000: # Purge
+        if len(reward_training_buffer) > 8000: # Purge
             reward_training_buffer.clear()
     
     log_episodic_reward.extend(episode_rew.tolist())

@@ -63,7 +63,6 @@ class DistCriticCentralKalman:
 
     def update_kalman(self, state_input, b_mean, b_log_var, next_mean, next_log_var, *args):
         inputs = {'state': state_input,
-                  'reward': reward,
                   'b_mean': b_mean,
                   'b_log_var': b_log_var,
                   'next_mean': next_mean,

@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
+import tensorflow_probability as tfp
 
 from network.attention import Non_local_nn
 from network.model_V4 import V4, V4INV
@@ -25,7 +26,7 @@ class V4DistVar(tf.keras.Model):
         # Feature Encoding
         self.feature_layer = V4(input_shape, action_size)
         self.z_mean = layers.Dense(units=atoms)
-        self.z_log_var = layers.Dense(units=atoms)
+        self.z_log_var = layers.Dense(units=atoms, activation=tf.nn.softplus)
 
         # Decoding
         self.decoder = V4INV()
@@ -37,12 +38,30 @@ class V4DistVar(tf.keras.Model):
 
         # Psi
         self.psi_dense1 = layers.Dense(units=32, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='elu', name='psi',
+        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi',
                 kernel_regularizer=tf.keras.regularizers.l2(0.01))
 
     def print_summary(self):
         self.feature_layer.print_summary()
         #self.summary()
+
+    def inference_network(self, inputs):
+        # Encoder
+        n_sample = inputs.shape[0]
+        net = self.feature_layer(inputs)
+        q_mu = self.z_mean(net)
+        q_log_var = self.z_log_var(net)
+        q_var = tf.math.exp(q_log_var)
+        q_sigma = tf.math.sqrt(q_var)
+        q_z = tfp.distributions.Normal(loc=q_mu, scale=q_sigma)
+        
+        return q_z
+
+    def generative_network(self, q_z):
+        z = q_z.sample()
+        p_x_given_z_logits = self.decoder(z)
+        p_x_given_z = tfp.distributions.Bernoulli(logits=p_x_given_z_logits)
+        return p_x_given_z
 
     def call(self, inputs):
         # Encoder
@@ -75,7 +94,14 @@ class V4DistVar(tf.keras.Model):
 
 def loss_decoder(model, state, beta_kl=1e-4, training=True):
     num_sample = state.shape[0]
-
+    p_z = tfp.distributions.Normal(loc=np.zeros(model.atoms, dtype=np.float32),
+                                   scale=np.ones(model.atoms, dtype=np.float32))
+    q_z = model.inference_network(state)
+    p_x_given_z = model.generative_network(q_z)
+    e_log_likelihood = tf.reduce_sum(p_x_given_z.log_prob(state), [1,2,3])
+    kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(q_z, p_z), 1)
+    elbo = tf.reduce_mean(e_log_likelihood - kl_loss, axis=0)
+    return -elbo
     # Run Model
     v_out, z, z_mean, z_log_var, z_decoded, phi, r_pred, psi = model(state, training=training)
 
@@ -83,9 +109,9 @@ def loss_decoder(model, state, beta_kl=1e-4, training=True):
     ce_loss = tf.keras.losses.binary_crossentropy(
             tf.reshape(state, [num_sample, -1]),
             tf.reshape(z_decoded, [num_sample, -1]))
-    kl_loss = -beta_kl * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-    elbo = tf.reduce_mean(ce_loss + kl_loss)
-    return elbo
+    kl_loss = beta_kl * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
+    elbo = tf.reduce_mean(ce_loss - kl_loss)
+    return -elbo
 
 def loss_psi(model, state, td_target, gamma=0.98, training=True):
     # Critic - TD Difference

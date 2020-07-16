@@ -161,13 +161,16 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             np.stack(traj_buffer['td_target']),
             )
     mse_losses = []
+    elbo_losses = []
     for mdp_tuple in it:
         mse_loss = network.update_network(*mdp_tuple)
         mse_losses.append(mse_loss)
+        elbo_losses.append(network.update_decoder(mdp[0]))
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_critic_loss', np.mean(mse_losses), step=step)
+            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
             writer.flush()
 
 batch = []

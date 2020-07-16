@@ -41,8 +41,8 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SF_PASV_01'  # distributional kalman on V passive learning
-TRAIN_TAG = 'Dist model w Kalman: '+TRAIN_NAME
+TRAIN_NAME = 'DIST_SF_PASV_03'  # distributional kalman on V passive learning
+TRAIN_TAG = 'Dist model SF : '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 MAP_PATH = './fair_3g_40'
@@ -76,7 +76,7 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
 save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 4#config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -139,8 +139,6 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         buffer_size += len(traj)
 
         states = np.array(traj[0])
-        bmeans = np.array(traj[4])
-        blogvars = np.array(traj[5])
         critic, _, _, _, phi, _, psi = network.run_network(states)
         critic = critic[:,0].numpy().tolist()
         phi = phi[:].numpy().tolist()
@@ -156,8 +154,6 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         traj_buffer['done'].extend(traj[2])
         traj_buffer['next_state'].extend(traj[3])
         traj_buffer['td_target'].extend(td_target)
-        traj_buffer['b_mean'].extend(traj[4])
-        traj_buffer['b_log_var'].extend(traj[5])
 
     if buffer_size < 10:
         return
@@ -170,14 +166,12 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             np.stack(traj_buffer['done']),
             np.stack(traj_buffer['next_state']),
             np.stack(traj_buffer['td_target']),
-            np.stack(traj_buffer['b_mean']),
-            np.stack(traj_buffer['b_log_var']),
             )
     psi_losses = []
     elbo_losses = []
-    for mdp_tuple in it:
-        psi_losses.append(network.update_sf(*mdp_tuple))
-        elbo_losses.append(network.update_decoder(*mdp_tuple))
+    for mdp in it:
+        psi_losses.append(network.update_sf(mdp[0], mdp[4]))
+        elbo_losses.append(network.update_decoder(mdp[0]))
     if log:
         with writer.as_default():
             tag = 'summary/'
@@ -213,10 +207,8 @@ while True:
     episode_rew = np.zeros(NENV)
     was_done = [False for env in range(NENV*num_agent)]
 
-    #trajs = [Trajectory(depth=6) for _ in range(NENV*num_agent)]
-    cent_trajs = [Trajectory(depth=6) for _ in range(NENV)]
-    bmean1 = np.zeros([NENV*num_agent, atoms], dtype=np.float32)
-    blogvar1 = np.zeros([NENV*num_agent, atoms], dtype=np.float32)
+    #trajs = [Trajectory(depth=4) for _ in range(NENV*num_agent)]
+    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]
     
     # Bootstrap
     s1 = envs.reset(
@@ -233,16 +225,12 @@ while True:
     stime_roll = time.time()
     for step in range(max_ep):
         s0 = s1
-        bmean0, blogvar0 = bmean1, blogvar1
         cent_s0 = cent_s1
         
         s1, reward, done, info = envs.step()
         s1.astype(np.float32)
         cent_s1 = envs.get_obs_blue() # Centralized
         episode_rew += reward
-
-        #bmean1 = bmean1[:].numpy()
-        #blogvar1 = blogvar1[:].numpy()
 
         # push to buffer
         '''
@@ -253,9 +241,7 @@ while True:
                     s0[idx],
                     reward[env_idx],
                     done[env_idx],
-                    s1[idx],
-                    bmean0[idx],
-                    blogvar0[idx]])
+                    s1[idx]])
         '''
         for env_idx in range(NENV):
             if not was_done[env_idx]:
@@ -287,7 +273,7 @@ while True:
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-        #train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        train(cent_network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
         batch = []
         num_batch = 0
@@ -304,7 +290,7 @@ while True:
                 temp_buffer.append(r)
         reward_training_buffer.clear()
         reward_training_buffer = temp_buffer
-        if len(reward_training_buffer) > 10000: # Purge
+        if len(reward_training_buffer) > 8000: # Purge
             reward_training_buffer.clear()
     
     log_episodic_reward.extend(episode_rew.tolist())

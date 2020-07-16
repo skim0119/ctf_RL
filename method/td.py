@@ -20,8 +20,11 @@ class TDCentral:
         # Central encoding
         from network.TD import V4TD
         from network.TD import train 
+        from network.TD import loss, loss_decoder
         self.model = V4TD(input_shape[1:], action_size=5)
         self.train = train
+        self.loss_td = loss
+        self.loss_decoder = loss_decoder
 
         # Build Network
         self.model.print_summary()
@@ -48,8 +51,13 @@ class TDCentral:
                   'done': done,
                   'next_state': next_state,
                   'td_target': td_target}
-        total_loss = self.train(self.model, self.optimizer, inputs)
+        total_loss = self.train(self.model, self.loss_td, self.optimizer, inputs)
         return total_loss
+
+    def update_decoder(self, state_input):
+        inputs = {'state': state_input}
+        loss = self.train(self.model, self.loss_decoder, self.optimizer, inputs)
+        return loss
 
     def initiate(self):
         return self.manager.restore_or_initialize()
