@@ -1,8 +1,8 @@
-path=fair_3g_40
+path=g40
 num_board=1000
 seed=None
 dim=40
-density=0.15
+density=0.1
 num_flag=1
 num_agent=3
 num_uav=0
