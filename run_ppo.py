@@ -40,8 +40,8 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_00' 
-TRAIN_TAG = 'PPO model w Stacked Frames: '+TRAIN_NAME
+TRAIN_NAME = 'PPO_STACK_01' 
+TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 MAP_PATH = './fair_3g_40'
@@ -63,7 +63,7 @@ config.read(config_path)
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
-max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
+max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')

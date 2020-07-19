@@ -31,7 +31,8 @@ class V4PPO(tf.keras.Model):
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Critic
-        self.critic_dense1 = layers.Dense(1)
+        self.critic_dense1 = layers.Dense(64)
+        self.critic_dense2 = layers.Dense(1)
 
     def print_summary(self):
         self.feature_layer.summary()
@@ -48,6 +49,7 @@ class V4PPO(tf.keras.Model):
 
         # Critic
         critic = self.critic_dense1(net)
+        critic = self.critic_dense2(critic)
         critic = tf.reshape(critic, [-1])
 
         return actor, critic, log_logits
