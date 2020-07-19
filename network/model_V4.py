@@ -42,7 +42,7 @@ class V4(tf.keras.Model):
             layers.Input(shape=dynamic_input_shape),
             layers.Conv2D(filters=16, kernel_size=2, strides=2, activation='elu'),
             layers.MaxPool2D(),
-            Non_local_nn(4),
+            #Non_local_nn(4),
             layers.Flatten(),
             layers.Dense(units=64, activation='elu'),
             layers.Dense(units=64, activation='elu'),])
@@ -125,9 +125,9 @@ class V4Discentralized(tf.keras.Model):
             layers.Dense(units=64, activation='elu'),])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=dynamic_input_shape),
-            layers.Conv2D(filters=16, kernel_size=2, strides=2, activation='elu'),
+            layers.Conv2D(filters=16, kernel_size=4, strides=2, activation='elu'),
             layers.MaxPool2D(),
-            Non_local_nn(4),
+            #Non_local_nn(4),
             layers.Flatten(),
             layers.Dense(units=64, activation='elu'),
             layers.Dense(units=64, activation='elu'),])

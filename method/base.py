@@ -1,7 +1,5 @@
 import tensorflow as tf
-#import tensorflow.keras.layers as layers
-import tensorflow.contrib.layers as layers
-import tensorflow.keras as keras
+import tensorflow.keras.layers as layers
 import numpy as np
 
 from math import sqrt

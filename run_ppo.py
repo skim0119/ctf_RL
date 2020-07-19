@@ -33,24 +33,24 @@ from utility.multiprocessing import SubprocVecEnv
 from utility.logger import record
 from utility.gae import gae
 
-from method.dist import DistCriticCentralKalman as Network
+from method.ActorCritic import PPO_Module as Network
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'VI_CENTRAL_KALMAN_01'
-TRAIN_TAG = 'Dist model (Central) w Kalman: '+TRAIN_NAME
+TRAIN_NAME = 'PPO_STACK_00' 
+TRAIN_TAG = 'PPO model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
+MAP_PATH = './fair_3g_40'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count()
+NENV = 8 # multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-#env_setting_path = 'env_settings_3v3_boot.ini'
-env_setting_path = 'env_settings_3v3_partial.ini'
+env_setting_path = 'env_setting_3v3_3g_partial.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -63,7 +63,7 @@ config.read(config_path)
 
 # Training
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
-max_ep         = config.getint('TRAINING', 'MAX_STEP')
+max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
@@ -80,43 +80,43 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
-vision_range = config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
-map_size     = config.getint('DEFAULT', 'MAP_SIZE')
+vision_range = 39#config.getint('DEFAULT', 'VISION_RANGE')
+keep_frame   = 4#config.getint('DEFAULT', 'KEEP_FRAME')
+map_size     = 40#config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
-minibatch_size = 512
-epoch = 1
-minimum_batch_size = 2048
+minibatch_size = 256
+epoch = 2
+minimum_batch_size = 4096
 print(minimum_batch_size)
 
 ## Setup
 vision_dx, vision_dy = 2*vision_range+1, 2*vision_range+1
 nchannel = 6 * keep_frame
-input_size = [None,20,20,6]
+input_size = [None, vision_dx, vision_dy, nchannel]
 
 ## Logger Initialization 
 log_episodic_reward = MovingAverage(moving_average_step)
-log_length = MovingAverage(moving_average_step)
 log_winrate = MovingAverage(moving_average_step)
 log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
+map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-                            config_path=env_setting_path)
+            config_path=env_setting_path)
 envs = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs, keep_frame=keep_frame)
+envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
+num_agent = num_blue# + num_red
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
-atoms = 4
-network = Network(input_shape=input_size, action_size=action_space, atoms=atoms, scope='main', save_path=MODEL_PATH)
+network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
 
 # Resotre / Initialize
 global_episodes = 0
@@ -127,7 +127,7 @@ network.save(global_episodes)
 
 
 ### TRAINING ###
-def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
     traj_buffer = defaultdict(list)
     buffer_size = 0
     for idx, traj in enumerate(trajs):
@@ -135,31 +135,14 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             continue
         buffer_size += len(traj)
 
-        states = np.array(traj[0])
-        bmeans = np.array(traj[4])
-        blogvars = np.array(traj[5])
-        critic, _, _, _, phi, _, psi, pmeans, plogvars = network.run_network(states, bmeans, blogvars)
-        critic = critic[:,0].numpy().tolist()
-        phi = phi[:].numpy().tolist()
-        psi = psi[:].numpy().tolist()
-        pmeans = pmeans[:].numpy()
-        plogvars = plogvars[:].numpy()
+        td_target, advantages = gae(traj[2], traj[3], 0,
+                gamma, lambd, normalize=False)
         
-        _, advantages = gae(traj[1], critic, 0,
-                gamma, lambd, normalize=False)
-        td_target, _ = gae(phi, psi, np.zeros_like(phi[0]),
-                gamma, lambd, normalize=False)
-
         traj_buffer['state'].extend(traj[0])
-        traj_buffer['reward'].extend(traj[1])
-        traj_buffer['done'].extend(traj[2])
-        traj_buffer['next_state'].extend(traj[3])
+        traj_buffer['action'].extend(traj[1])
         traj_buffer['td_target'].extend(td_target)
-        traj_buffer['b_mean'].extend(traj[4])
-        traj_buffer['b_log_var'].extend(traj[5])
-        traj_buffer['next_mean'].extend(pmeans)
-        traj_buffer['next_log_var'].extend(plogvars)
-        #traj_buffer['td_target'].extend(np.zeros_like(np.array(traj[1])))
+        traj_buffer['advantage'].extend(advantages)
+        traj_buffer['old_log_logit'].extend(traj[4])
 
     if buffer_size < 10:
         return
@@ -168,78 +151,73 @@ def train(trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=N
             batch_size,
             epoch,
             np.stack(traj_buffer['state']),
-            np.stack(traj_buffer['reward']),
-            np.stack(traj_buffer['done']),
-            np.stack(traj_buffer['next_state']),
+            np.stack(traj_buffer['old_log_logit']),
+            np.stack(traj_buffer['action']),
+            np.stack(traj_buffer['advantage']),
             np.stack(traj_buffer['td_target']),
-            np.stack(traj_buffer['b_mean']),
-            np.stack(traj_buffer['b_log_var']),
-            np.stack(traj_buffer['next_mean']),
-            np.stack(traj_buffer['next_log_var']),
-            )
-    mse_losses = []
-    elbo_losses = []
-    kalman_losses = []
+        )
+    total_losses, actor_losses, critic_losses, entropies = [], [], [], []
     for mdp_tuple in it:
-        mse_loss, elbo_loss, kalman_loss = network.update_network(*mdp_tuple)
-        mse_losses.append(mse_loss)
-        elbo_losses.append(elbo_loss)
-        kalman_losses.append(kalman_loss)
+        total_loss, actor_loss, critic_loss, entropy = network.update_network(*mdp_tuple)
+        total_losses.append(total_loss)
+        actor_losses.append(actor_loss)
+        critic_losses.append(critic_loss)
+        entropies.append(entropy)
     if log:
         with writer.as_default():
             tag = 'summary/'
-            tf.summary.scalar(tag+'main_critic_loss', np.mean(mse_losses), step=step)
-            tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
-            tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
+            tf.summary.scalar(tag+'main_critic_loss', np.mean(critic_losses), step=step)
+            tf.summary.scalar(tag+'main_actor_loss', np.mean(actor_losses), step=step)
+            tf.summary.scalar(tag+'main_total_loss', np.mean(total_losses), step=step)
+            tf.summary.scalar(tag+'entropy', np.mean(entropies), step=step)
             writer.flush()
+
+def get_action(states):
+    a1, v1, p1 = network.run_network(states)
+    actions = np.reshape(a1, [NENV, num_blue])
+    return a1, v1, p1, actions
 
 batch = []
 num_batch = 0
 #while global_episodes < total_episodes:
 while True:
-    log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
-    save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)
+    was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
-    bmean1 = np.zeros([NENV, atoms], dtype=np.float32)
-    blogvar1 = np.zeros([NENV, atoms], dtype=np.float32)
 
-    trajs = [Trajectory(depth=6) for _ in range(NENV)]
+    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
     
     # Bootstrap
-    s1 = envs.reset(config_path=env_setting_path,
-                    policy_red=policy.Roomba,
-                    policy_blue=policy.Roomba,
-                    mode='continue')
-    s1 = envs.get_obs_blue()
+    s1 = envs.reset(
+            map_pool=map_list,
+            config_path=env_setting_path,
+            policy_red=policy.Roomba)
+    s1 = s1.astype(np.float32)
+    a1, v1, p1, actions = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
-    for step in range(max_ep+1):
+    for step in range(max_ep):
         s0 = s1
-        bmean0, blogvar0 = bmean1, blogvar1
+        a0, v0 = a1, v1
+        p0 = p1 
         
-        s1, reward, done, info = envs.step()
-        s1 = envs.get_obs_blue()
+        s1, reward, done, info = envs.step(actions)
+        s1 = s1.astype(np.float32)
+        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         episode_rew += reward
 
-        _,_,_,_,_,_,_,bmean1, blogvar1 = network.run_network(s1, bmean0, blogvar0)
-        bmean1 = bmean1[:].numpy()
-        blogvar1 = blogvar1[:].numpy()
+        a1, v1, p1, actions = get_action(s1)
 
         # push to buffer
-        for env_idx in range(NENV):
-            if not was_done[env_idx]:
-                trajs[env_idx].append([
-                    s0[env_idx],
-                    reward[env_idx],
-                    done[env_idx],
-                    s1[env_idx],
-                    bmean0[env_idx],
-                    blogvar0[env_idx]])
+        for idx, agent in enumerate(envs.get_team_blue().flat):
+            env_idx = idx // num_blue
+            if was_alive[idx] and not was_done[env_idx]:
+                trajs[idx].append([s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx]])
 
+        was_alive = is_alive
         was_done = done
 
         if np.all(done):
@@ -249,20 +227,15 @@ while True:
     batch.extend(trajs)
     num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
-        log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
         stime_train = time.time()
-        train(batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
+        train(network, batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
         etime_train = time.time()
         batch = []
         num_batch = 0
         log_traintime.append(etime_train - stime_train)
-
-    steps = []
-    for env_id in range(NENV):
-        steps.append(len(trajs[env_id]))
     
     log_episodic_reward.extend(episode_rew.tolist())
-    log_length.extend(steps)
     log_winrate.extend(envs.blue_win())
     log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
@@ -271,10 +244,10 @@ while True:
     if PROGBAR:
         progbar.update(global_episodes)
 
+    log_on = interval_flag(global_episodes, save_stat_frequency, 'log')
     if log_on:
         with writer.as_default():
             tag = 'baseline_training/'
-            tf.summary.scalar(tag+'length', log_length(), step=global_episodes)
             tf.summary.scalar(tag+'win-rate', log_winrate(), step=global_episodes)
             tf.summary.scalar(tag+'redwin-rate', log_redwinrate(), step=global_episodes)
             tf.summary.scalar(tag+'env_reward', log_episodic_reward(), step=global_episodes)
@@ -282,5 +255,6 @@ while True:
             tf.summary.scalar(tag+'train_time', log_traintime(), step=global_episodes)
             writer.flush()
         
+    save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     if save_on:
         network.save(global_episodes)
