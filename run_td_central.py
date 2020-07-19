@@ -194,8 +194,7 @@ while True:
             map_pool=map_list,
             config_path=env_setting_path,
             policy_red=policy.Roomba,
-            policy_blue=policy.Roomba,
-            mode='continue')
+            policy_blue=policy.Roomba)
     s1 = envs.get_obs_blue()
 
     # Rollout
