@@ -71,7 +71,7 @@ class V4SFK_DECENTRAL(tf.keras.Model):
         self.feature_layer = V4Decentral(input_shape, action_size)
 
         # Actor
-        self.actor_dense1 = layers.Dense(128)
+        self.actor_dense1 = layers.Dense(128, activation='elu')
         self.actor_dense2 = layers.Dense(action_size)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)

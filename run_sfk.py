@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SFK_00'
+TRAIN_NAME = 'DIST_SFK_01'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -88,7 +88,7 @@ map_size     = 40#config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 #* 4
+minimum_batch_size = 1024 * 4
 print(minimum_batch_size)
 
 ## Setup
