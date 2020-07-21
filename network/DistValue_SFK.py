@@ -237,9 +237,9 @@ def loss_reward_central(model, state, reward, b_mean, b_log_var, training=True):
     reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
     return reward_mse, {'reward_mse': reward_mse}
 
-@tf.function
+#@tf.function
 def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, next_log_var,
-        psi_beta=1.0, kalman_pred_beta=0.5, beta_kl=1e-4, elbo_beta=0.3,
+        psi_beta=1.0, kalman_pred_beta=0.5, beta_kl=1e-2, elbo_beta=1e-5,
         gamma=0.98, training=True):
     inputs = [state, b_mean, b_log_var]
     SF, feature, pred_feature = model(inputs, training=training)
@@ -260,7 +260,7 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, n
                                    scale=np.ones(model.atoms, dtype=np.float32))
     q_z = feature['q_z']
     p_x_given_z = feature['p_x_given_z']
-    e_log_likelihood = tf.reduce_sum(p_x_given_z.log_prob(model.flat(state))) # Reconstruction term
+    e_log_likelihood = p_x_given_z.log_prob(model.flat(state)) # Reconstruction term
     kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(q_z, p_z), 1)
     elbo = tf.reduce_mean(e_log_likelihood - kl_loss, axis=0)
 
@@ -269,7 +269,7 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, n
     info = {
         'psi_mse': psi_mse,
         'pred_loss': pred_loss,
-        'elbo': elbo,
+        'elbo': -elbo,
         }
 
     return total_loss, info
