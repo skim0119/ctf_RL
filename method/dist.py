@@ -6,6 +6,128 @@ import numpy as np
 
 from utility.utils import store_args
 
+class SFK:
+    # Full architecture for centralized value training and
+    # decentralized control.
+    @store_args
+    def __init__(
+        self,
+        central_obs_shape,
+        decentral_obs_shape,
+        action_size,
+        save_path,
+        atoms=4,
+        lr=1e-4,
+        **kwargs
+    ):
+        # Non-categorial distributional feature encoding
+        # Central encoding
+        from network.DistValue_SFK import V4SFK_CENTRAL, V4SFK_DECENTRAL
+        from network.DistValue_SFK import train 
+        from network.DistValue_SFK import loss_central_critic, loss_reward_central
+        from network.DistValue_SFK import loss_ppo, loss_multiagent_critic
+        self.train = train
+        self.loss_central_critic = loss_central_critic
+        self.loss_reward = loss_reward_central
+        self.loss_ppo = loss_ppo
+        self.loss_multiagent_critic = loss_multiagent_critic
+
+        # Set Model
+        self.model_central = V4SFK_CENTRAL(central_obs_shape[1:], atoms=atoms)
+        self.model_decentral = V4SFK_DECENTRAL(decentral_obs_shape[1:], action_size=5)
+
+        # Build Network
+        self.model_central.print_summary()
+
+        # Build Trainer
+        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+        self.checkpoint_central = tf.train.Checkpoint(
+                optimizer=self.optimizer_central, model=self.model_central)
+        self.manager_central = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_central,
+                directory=os.path.join(save_path, 'central'),
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+        self.optimizer_decentral = tf.keras.optimizers.Adam(lr)
+        self.checkpoint_decentral = tf.train.Checkpoint(
+                optimizer=self.optimizer_decentral, model=self.model_decentral)
+        self.manager_decentral = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_decentral,
+                directory=os.path.join(save_path, 'decentral'),
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+
+        # Initiate Model
+        self.initiate()
+
+    def run_network_central(self, states, bmean, blogvar):
+        # states: environment state
+        # bmean, blogvar: belief-state
+        # observations: individual (centered) observation
+        env_critic, env_feature, env_pred_feature = self.model_central([states, bmean, blogvar])
+        return env_critic, env_feature, env_pred_feature
+
+    def run_network_decentral(self, observations, beliefs):
+        actor, dec_SF = self.model_decentral([observations, beliefs])
+        return actor, dec_SF
+
+    # Centralize updater
+    def update_reward_prediction(self, state_input, reward, b_mean, b_log_var, *args):
+        inputs = {'state': state_input,
+                  'reward': reward,
+                  'b_mean': b_mean,
+                  'b_log_var': b_log_var}
+        reward_loss = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
+        return reward_loss
+
+    def update_central_critic(self, state_input, b_mean, b_log_var, td_target, next_mean, next_log_var, *args):
+        inputs = {'state': state_input,
+                  'td_target': td_target,
+                  'b_mean': b_mean,
+                  'b_log_var': b_log_var,
+                  'next_mean': next_mean,
+                  'next_log_var': next_log_var}
+        _, info = self.train(self.model_central, self.loss_central_critic, self.optimizer_central, inputs)
+        return info
+    
+    # Decentralize updater
+    def update_ppo(self, state_input, belief, old_log_logit, action, td_target, advantage):
+        inputs = {'state': state_input,
+                  'belief': belief,
+                  'old_log_logit': old_log_logit,
+                  'action': action,
+                  'td_target': td_target,
+                  'advantage': advantage,}
+        _, info = self.train(self.model_decentral, self.loss_ppo, self.optimizer_decentral, inputs)
+        return info
+
+    def update_multiagent_critic(self, states_list, belief, value_central, mask):
+        #(TODO)
+        states_list = np.reshape(states_list, [600,79,79,6])
+        belief = np.reshape(belief, [600,8])
+        inputs = {'states_list': states_list,
+                  'belief': belief,
+                  'value_central': value_central,
+                  'mask': mask}
+        _, info = self.train(self.model_decentral, self.loss_multiagent_critic, self.optimizer_decentral, inputs)
+        return info
+
+    # Misc
+    def initiate(self, verbose=1):
+        cent_path = self.manager_central.restore_or_initialize()
+        decent_path = self.manager_decentral.restore_or_initialize()
+        if verbose:
+            print('Centralized initialization: {}'.format(cent_path))
+            print('Decentralized initialization: {}'.format(decent_path))
+
+    def restore(self):
+        status = self.checkpoint_central.restore(self.manager_central.latest_checkpoint)
+        status = self.checkpoint_decentral.restore(self.manager_decentral.latest_checkpoint)
+
+    def save(self, checkpoint_number):
+        self.manager_central.save(checkpoint_number)
+        self.manager_decentral.save(checkpoint_number)
+
 class DistCriticCentralKalman:
     # Centralized training with distributional feature encoding.
     # Critic training focus with kalman filter

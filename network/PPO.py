@@ -12,6 +12,7 @@ import tensorflow.keras.backend as K
 from network.attention import Non_local_nn
 from network.model_V4 import V4
 from utility.utils import store_args
+from utility.tf_utils import tf_clipped_log as tf_log
 
 import numpy as np
 
@@ -53,9 +54,6 @@ class V4PPO(tf.keras.Model):
         critic = tf.reshape(critic, [-1])
 
         return actor, critic, log_logits
-
-def tf_log(val):
-    return tf.math.log(tf.clip_by_value(val, 1e-10, 10.0))
 
 def loss(model, state, old_log_logit, action, advantage, td_target,
          eps=0.2, entropy_beta=0.05, critic_beta=0.5, 
@@ -99,7 +97,10 @@ def train(model, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
         total_loss, info = loss(model, **inputs, **hyperparameters, training=True, return_losses=True)
     grads = tape.gradient(total_loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients([
+        (grad, var)
+        for (grad,var) in zip(grads, model.trainable_variables)
+        if grad is not None])
 
     return total_loss, info
 

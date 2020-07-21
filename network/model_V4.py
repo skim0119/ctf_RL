@@ -100,7 +100,7 @@ class V4INV(tf.keras.Model):
 
         return net
 
-class V4Discentralized(tf.keras.Model):
+class V4Decentral(tf.keras.Model):
     STATIC_CHANNEL = [0,1,3]
     DYNAMIC_CHANNEL = [2,4,5]
     LATENT_DIM = 128
@@ -108,7 +108,7 @@ class V4Discentralized(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, action_size=5,
                  trainable=True, name='FeatureNN'):
-        super(V4, self).__init__(name=name)
+        super(V4Decentral, self).__init__(name=name)
 
         static_input_shape = [input_shape[0], input_shape[1], len(V4.STATIC_CHANNEL)]
         dynamic_input_shape = [input_shape[0], input_shape[1], len(V4.DYNAMIC_CHANNEL)]
@@ -151,10 +151,10 @@ class V4Discentralized(tf.keras.Model):
 
         return net
 
-class V4INVDiscentralized(tf.keras.Model):
+class V4INVDecentral(tf.keras.Model):
     @store_args
     def __init__(self, trainable=True, name='FeatureNN_Inverse'):
-        super(V4INV, self).__init__(name=name)
+        super(V4INVDecentral, self).__init__(name=name)
 
         # Feature Encoder
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
