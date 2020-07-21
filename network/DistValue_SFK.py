@@ -130,7 +130,7 @@ class V4SFK_CENTRAL(tf.keras.Model):
 
         # Feature Encoding
         self.feature_layer = V4(input_shape)
-        self.z_mean = layers.Dense(units=atoms)
+        self.z_mean = layers.Dense(units=atoms, activation='softmax')
         self.z_log_var = layers.Dense(units=atoms)
 
         # Decoding
@@ -199,8 +199,10 @@ class V4SFK_CENTRAL(tf.keras.Model):
                 mean=0.,
                 stddev=1.0,
                 name='sampled_epsilon')
-        z = z_mean# + tf.math.exp(z_log_var)*eps
-        pred_mean, pred_log_var = self.kalman_predictor([z_mean, z_log_var])
+        #z = z_mean# + tf.math.exp(z_log_var)*eps
+        z = q_z.sample()
+        pred_mean, pred_log_var = self.kalman_predictor([
+            tf.stop_gradient(z_mean), tf.stop_gradient(z_log_var)])
 
         # Critic
         #net = tf.concat([z_mean, z_log_var], axis=-1)
@@ -239,7 +241,7 @@ def loss_reward_central(model, state, reward, b_mean, b_log_var, training=True):
 
 #@tf.function
 def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, next_log_var,
-        psi_beta=1.0, kalman_pred_beta=0.5, beta_kl=1e-2, elbo_beta=1e-5,
+        psi_beta=1.0, kalman_pred_beta=0.5, beta_kl=1e-2, elbo_beta=1e-4,
         gamma=0.98, training=True):
     inputs = [state, b_mean, b_log_var]
     SF, feature, pred_feature = model(inputs, training=training)
@@ -247,8 +249,7 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, n
     # Critic - TD Difference
     psi = SF['psi']
     td_target = tf.cast(td_target, tf.float32)
-    td_error = td_target - psi
-    psi_mse = tf.reduce_mean(tf.square(td_error))
+    psi_mse = tf.reduce_mean(tf.square(td_target - psi))
 
     # Kalman - predictor training
     pred_mean = pred_feature['pred_z_mean']

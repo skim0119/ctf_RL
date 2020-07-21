@@ -325,7 +325,7 @@ while True:
             map_pool=map_list,
             config_path=env_setting_path,
             policy_red=policy.Roomba,
-            policy_blue=policy.Roomba,
+            #policy_blue=policy.Roomba,
             mode='continue')
     s1 = s1.astype(np.float32)
     cent_s1 = envs.get_obs_blue().astype(np.float32) # Centralized
@@ -433,7 +433,7 @@ while True:
     batch.extend(cent_trajs)
     dec_batch.extend(trajs)
     ma_batch.extend(ma_trajs)
-    num_batch += sum([len(traj) for traj in cent_trajs])
+    num_batch += sum([len(traj) for traj in trajs])
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
