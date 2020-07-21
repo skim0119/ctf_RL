@@ -231,9 +231,11 @@ class V4SFK_CENTRAL(tf.keras.Model):
 def loss_reward_central(model, state, reward, b_mean, b_log_var, training=True):
     # Critic - Reward Prediction
     inputs = [state, b_mean, b_log_var]
-    _,_,_,_,_,_, r_pred, _,_,_  = model(inputs, training=training)
+    SF, feature, pred_feature = model(inputs, training=training)
+    r_pred = SF['reward_predict']
+    reward = tf.cast(reward, tf.float32)
     reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
-    return reward_mse
+    return reward_mse, {'reward_mse': reward_mse}
 
 @tf.function
 def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, next_log_var,
@@ -272,9 +274,9 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, n
 
     return total_loss, info
 
-@tf.function
+#@tf.function
 def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
-        eps=0.2, entropy_beta=0.05, psi_beta=0.5,
+         eps=0.2, entropy_beta=0.05, psi_beta=0.5,
          gamma=0.98, training=True):
     num_sample = state.shape[0]
 
@@ -313,13 +315,13 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
 
     return total_loss, info
 
-@tf.function
+#@tf.function
 def loss_multiagent_critic(model, states_list, belief, value_central, mask, training=True):
     # states_list and belief should be given in flat format
     num_env = mask.shape[0]
     num_agent = mask.shape[1]
     pi, v = model([states_list, belief], training=training)
-    critics = tf.reshape(v['critic'], mask.shape) * mask
+    critics = tf.reshape(v['critic'], mask.shape) * tf.cast(mask, tf.float32)
     group_critic = tf.reduce_sum(critics, axis=1)
     mse = tf.reduce_mean(tf.square(value_central - group_critic))
     return mse, {'ma_critic': mse}

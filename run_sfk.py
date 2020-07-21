@@ -250,7 +250,6 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
     if buffer_size < 10:
         return
     reward_stack = np.stack(traj[1])
-    print(np.unique(reward_stack, return_counts=1))
     it = batch_sampler(batch_size, epoch,
                        np.stack(traj[0]),
                        np.stack(traj[1]),
@@ -258,8 +257,8 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
                        np.stack(traj[3]))
     reward_losses = []
     for mdp_tuple in it:
-        reward_loss = network.update_reward_prediction(*mdp_tuple)
-        reward_losses.append(reward_loss)
+        info = network.update_reward_prediction(*mdp_tuple)
+        reward_losses.append(info['reward_mse'])
     if log:
         with writer.as_default():
             tag = 'summary/'

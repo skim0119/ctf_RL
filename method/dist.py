@@ -77,8 +77,8 @@ class SFK:
                   'reward': reward,
                   'b_mean': b_mean,
                   'b_log_var': b_log_var}
-        reward_loss = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
-        return reward_loss
+        _, info = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
+        return info
 
     def update_central_critic(self, state_input, b_mean, b_log_var, td_target, next_mean, next_log_var, *args):
         inputs = {'state': state_input,
