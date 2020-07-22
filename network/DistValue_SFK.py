@@ -72,12 +72,12 @@ class V4SFK_DECENTRAL(tf.keras.Model):
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='elu')
-        self.actor_dense2 = layers.Dense(action_size)
+        self.actor_dense2 = layers.Dense(action_size, activation='elu')
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Phi
-        self.phi_dense1 = layers.Dense(units=64, activation='elu', name='phi')
+        self.phi_dense1 = layers.Dense(units=64, activation='softmax', name='phi')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_regularizer=tf.keras.regularizers.l2(0.01))
 
@@ -131,7 +131,7 @@ class V4SFK_CENTRAL(tf.keras.Model):
         # Feature Encoding
         self.feature_layer = V4(input_shape)
         self.z_mean = layers.Dense(units=atoms, activation='softmax')
-        self.z_log_var = layers.Dense(units=atoms)
+        self.z_log_var = layers.Dense(units=atoms, activation=tf.math.softplus)
 
         # Decoding
         self.decoder = V4INV()
@@ -277,8 +277,8 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target, next_mean, n
 
 #@tf.function
 def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
-         eps=0.2, entropy_beta=0.05, psi_beta=0.5,
-         gamma=0.98, training=True):
+         eps=0.2, entropy_beta=0.2, psi_beta=0.5, gamma=0.98,
+         training=True):
     num_sample = state.shape[0]
 
     # Run Model
@@ -292,8 +292,7 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
 
     # Psi Loss
     td_target = tf.cast(td_target, tf.float32)
-    td_error = td_target - psi
-    psi_mse = tf.reduce_mean(tf.square(td_error), name='critic_loss')
+    psi_mse = tf.reduce_mean(tf.square(td_target - psi))
 
     # Actor Loss
     action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
@@ -309,7 +308,8 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy
+    #total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy
+    total_loss = actor_loss# + psi_beta*psi_mse# - entropy_beta*entropy
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
             'entropy': entropy}
