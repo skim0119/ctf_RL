@@ -34,14 +34,14 @@ from utility.multiprocessing import SubprocVecEnv
 from utility.logger import record
 from utility.gae import gae
 
-from method.dist import SFK as Network
+from method.dist import SF_CVDC as Network
 
 PROGBAR = True
 LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SFK_03'
+TRAIN_NAME = 'DIST_SF_CVDC_00'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -51,7 +51,7 @@ GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count()
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_setting_3v3_3g_partial.ini'
+env_setting_path = 'env_setting_3v3_3g_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -128,7 +128,6 @@ network = Network(
 
 # Resotre / Initialize
 global_episodes = 0
-network.initiate()
 
 writer = tf.summary.create_file_writer(LOG_PATH)
 network.save(global_episodes)
@@ -160,8 +159,6 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
         traj_buffer['td_target'].extend(td_target)
         traj_buffer['b_mean'].extend(traj[4])
         traj_buffer['b_log_var'].extend(traj[5])
-        traj_buffer['next_mean'].extend(traj[9])
-        traj_buffer['next_log_var'].extend(traj[10])
 
     if buffer_size < 10:
         return
@@ -173,24 +170,19 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             np.stack(traj_buffer['b_mean']),
             np.stack(traj_buffer['b_log_var']),
             np.stack(traj_buffer['td_target']),
-            np.stack(traj_buffer['next_mean']),
-            np.stack(traj_buffer['next_log_var']),
             )
     psi_losses = []
     elbo_losses = []
-    kalman_losses = []
     for mdp in it:
         info = network.update_central_critic(*mdp)
         if log:
             psi_losses.append(info['psi_mse'])
             elbo_losses.append(info['elbo'])
-            kalman_losses.append(info['pred_loss'])
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_psi_loss', np.mean(psi_losses), step=step)
             tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
-            tf.summary.scalar(tag+'main_Kalman_loss', np.mean(kalman_losses), step=step)
             writer.flush()
 
 def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
@@ -316,7 +308,7 @@ while True:
 
     trajs = [Trajectory(depth=10) for _ in range(NENV*num_agent)]
     ma_trajs = [Trajectory(depth=4) for _ in range(NENV)]
-    cent_trajs = [Trajectory(depth=11) for _ in range(NENV)]
+    cent_trajs = [Trajectory(depth=9) for _ in range(NENV)]
     bmean1 = np.zeros([NENV, atoms], dtype=np.float32)
     blogvar1 = np.zeros([NENV, atoms], dtype=np.float32)
     
@@ -330,7 +322,7 @@ while True:
     s1 = s1.astype(np.float32)
     cent_s1 = envs.get_obs_blue().astype(np.float32) # Centralized
 
-    env_critic, env_feature, env_pred_feature = network.run_network_central(cent_s1, bmean1, blogvar1) 
+    env_critic, env_feature = network.run_network_central(cent_s1, bmean1, blogvar1) 
     belief = env_feature['latent'].numpy()
     belief = np.repeat(belief, num_agent, axis=0)
     actor, critic = network.run_network_decentral(s1, belief)
@@ -348,8 +340,6 @@ while True:
         bmean0, blogvar0 = bmean1, blogvar1
         cent_v0 = env_critic['critic'].numpy()[:,0]
         cent_psi = env_critic['psi'].numpy()
-        cent_pmean = env_pred_feature['pred_z_mean'].numpy()
-        cent_plogvar = env_pred_feature['pred_z_log_var'].numpy()
         was_alive = is_alive
         was_done = is_done
         
@@ -361,7 +351,7 @@ while True:
         episode_rew += reward
 
         # Run central network
-        env_critic, env_feature, env_pred_feature = network.run_network_central(cent_s1, bmean0, blogvar0) 
+        env_critic, env_feature = network.run_network_central(cent_s1, bmean0, blogvar0) 
         cent_phi1 = env_critic['phi'].numpy()
         bmean1 = env_feature['z_mean'].numpy() # stop gradient
         blogvar1 = env_feature['z_log_var'].numpy()
@@ -408,9 +398,7 @@ while True:
                     blogvar0[env_idx],
                     cent_v0[env_idx],
                     cent_phi1[env_idx],
-                    cent_psi[env_idx],
-                    cent_pmean[env_idx],
-                    cent_plogvar[env_idx],])
+                    cent_psi[env_idx], ])
                 # MA trajectory
                 ma_trajs[env_idx].append([
                     s0[env_idx*num_agent:(env_idx+1)*num_agent],
