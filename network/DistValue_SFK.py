@@ -308,8 +308,7 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    #total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy
-    total_loss = actor_loss# + psi_beta*psi_mse# - entropy_beta*entropy
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
             'entropy': entropy}
