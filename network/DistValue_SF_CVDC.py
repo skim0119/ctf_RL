@@ -20,12 +20,15 @@ import numpy as np
 
 class V4SF_CVDC_DECENTRAL(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_size=5,
+    def __init__(self, input_shape, action_size=5, atoms=8,
             trainable=True, name='DecPPO'):
         super(V4SF_CVDC_DECENTRAL, self).__init__(name=name)
 
         # Feature Encoding
         self.feature_layer = V4Decentral(input_shape, action_size)
+
+        # Decoder
+        self.decoder = V4INVDecentral()
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='elu')
@@ -34,13 +37,13 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Phi
-        self.phi_dense1 = layers.Dense(units=64, activation='softmax', name='phi')
+        self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid', name='phi')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_regularizer=tf.keras.regularizers.l2(0.01))
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
-        self.psi_dense2 = layers.Dense(units=64, activation='linear', name='psi',
+        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi',
                 kernel_regularizer=tf.keras.regularizers.l2(0.01))
 
     def print_summary(self):
@@ -54,6 +57,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Feature Encoding
         net = self.feature_layer(obs)
         net = tf.concat([net, h], axis=1)
+
+        decoded_state = self.decoder(net)
 
         # Actor
         actor_net = self.actor_dense1(net)
@@ -72,7 +77,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         SF = {'reward_predict': r_pred,
               'phi': phi,
               'psi': psi,
-              'critic': critic}
+              'critic': critic,
+              'decoded_state': decoded_state}
         actor = {'softmax': softmax_logits,
                  'log_softmax': log_logits}
 
@@ -214,7 +220,7 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target,
 
 #@tf.function
 def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
-         eps=0.2, entropy_beta=0.2, psi_beta=0.5, gamma=0.98,
+         eps=0.2, entropy_beta=0.3, psi_beta=0.5, decoder_beta=1e-4, gamma=0.98,
          training=True):
     num_sample = state.shape[0]
 
@@ -223,6 +229,9 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
+
+    # Decoder loss
+    generator_loss = tf.reduce_mean(tf.square(state - v['decoded_state']))
 
     # Entropy
     entropy = -tf.reduce_mean(actor * tf_log(actor), name='entropy')
@@ -245,10 +254,11 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
-            'entropy': entropy}
+            'entropy': entropy,
+            'generator_loss': generator_loss}
 
     return total_loss, info
 

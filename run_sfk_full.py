@@ -41,7 +41,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SF_CVDC_00'
+TRAIN_NAME = 'DIST_SF_CVDC_01'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -223,18 +223,21 @@ def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minib
     actor_losses = []
     dec_psi_losses = []
     entropy = []
+    decoder_losses = []
     for mdp in it:
         info = network.update_ppo(*mdp)
         if log:
             actor_losses.append(info['actor_loss'])
             dec_psi_losses.append(info['psi_loss'])
             entropy.append(info['entropy'])
+            decoder_losses.append(info['generator_loss'])
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'dec_actor_loss', np.mean(actor_losses), step=step)
             tf.summary.scalar(tag+'dec_psi_loss', np.mean(dec_psi_losses), step=step)
             tf.summary.scalar(tag+'dec_entropy', np.mean(entropy), step=step)
+            tf.summary.scalar(tag+'dec_generator_loss', np.mean(decoder_losses), step=step)
             writer.flush()
 
 def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=False, step=None):
@@ -372,7 +375,7 @@ while True:
                     s0[idx],
                     belief[idx],
                     a0[idx],
-                    reward_pred1[idx], # Advantage
+                    reward[env_idx] + reward_pred1[idx], # Advantage
                     done[env_idx],
                     s1[idx],
                     v0[idx], # Advantage
