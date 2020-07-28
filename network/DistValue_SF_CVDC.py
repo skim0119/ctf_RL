@@ -104,8 +104,6 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         #self.phi_dense1 = layers.Dense(units=atoms, activation='elu', name='phi')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_regularizer=tf.keras.regularizers.l2(0.0001))
-        self.reward_loss = tf.keras.losses.MeanSquaredError(
-                reduction=tf.keras.losses.Reduction.SUM)
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
@@ -115,10 +113,15 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         output_bias = tf.keras.initializers.Constant([-2.302585, -0.223143, -2.302585])
         self.rp_dense = layers.Dense(units=3, activation='softmax',
                 bias_initializer=output_bias)
-        self.rp_loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
-        # Layers
+        # Misc Layers
         self.flat = layers.Flatten()
+
+        # Loss
+        self.rp_loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
+        self.reward_loss = tf.keras.losses.MeanSquaredError(
+                reduction=tf.keras.losses.Reduction.SUM)
+        self.critic_loss = tf.keras.losses.MeanSquaredError()
 
     def print_summary(self):
         self.feature_layer.print_summary()
@@ -214,14 +217,14 @@ def loss_reward_central(model, state, reward, training=True):
     reward_label = tf.one_hot(tf.cast(reward_label, tf.int32), depth=3)
     rp_loss = model.rp_loss(reward_label, rp)
 
-    total = reward_mse + rp_loss
+    total = 0.1*rp_loss#reward_mse + rp_loss
 
     info = {'reward_mse': reward_mse, 'rp_loss': rp_loss} 
     return total, info
 
 #@tf.function
-def loss_central_critic(model, state, td_target, 
-        psi_beta=1.0, beta_kl=1e-2, elbo_beta=1e-4,
+def loss_central_critic(model, state, td_target, td_target_c,
+        psi_beta=1.0, beta_kl=1e-2, elbo_beta=1e-4, critic_beta=0.5,
         gamma=0.98, training=True):
     inputs = state
     SF, feature = model(inputs, training=training)
@@ -230,6 +233,9 @@ def loss_central_critic(model, state, td_target,
     psi = SF['psi']
     td_target = tf.cast(td_target, tf.float32)
     psi_mse = tf.reduce_mean(tf.square(td_target - psi))
+
+    td_target_c = tf.cast(td_target_c, tf.float32)
+    critic_mse = model.critic_loss(td_target_c, SF['critic'])
 
     # VAE ELBO loss
     p_z = tfp.distributions.Normal(loc=np.zeros(model.atoms, dtype=np.float32),
@@ -240,13 +246,14 @@ def loss_central_critic(model, state, td_target,
     kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(q_z, p_z), 1)
     elbo = tf.reduce_mean(e_log_likelihood - kl_loss, axis=0)
 
-    total_loss = psi_beta*psi_mse - elbo_beta*elbo
+    total_loss = psi_beta*psi_mse - elbo_beta*elbo + critic_beta*critic_mse
 
     _, sample_generated_image = model.sample_generate()
 
     info = {
         'psi_mse': psi_mse,
         'elbo': -elbo,
+        'critic_mse': critic_mse,
         'sample_generated_image': sample_generated_image[0],
         'sample_decoded_image': feature['z_decoded'].numpy()[0]
         }

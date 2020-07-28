@@ -148,13 +148,13 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             continue
         buffer_size += len(traj)
 
-        #reward = traj[1]
-        #critic = traj[6].tolist()
+        reward = traj[1]
+        critic = traj[6].tolist()
         phi = np.array(traj[7]).tolist()
         psi = np.array(traj[8]).tolist()
         
-        #_, advantages = gae(reward, critic, 0,
-        #        gamma, lambd, normalize=False)
+        td_target_c, advantages = gae(reward, critic, 0,
+                gamma, lambd, normalize=False)
         td_target, _ = gae(phi, psi, np.zeros_like(phi[0]),
                 gamma, lambd, normalize=False)
 
@@ -163,6 +163,7 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
         traj_buffer['done'].extend(traj[2])
         traj_buffer['next_state'].extend(traj[3])
         traj_buffer['td_target'].extend(td_target)
+        traj_buffer['td_target_c'].extend(td_target_c)
 
     if buffer_size < 10:
         return
@@ -172,19 +173,23 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             epoch,
             np.stack(traj_buffer['state']),
             np.stack(traj_buffer['td_target']),
+            np.stack(traj_buffer['td_target_c']),
             )
     psi_losses = []
     elbo_losses = []
+    critic_losses = []
     for mdp in it:
         info = network.update_central_critic(*mdp)
         if log:
             psi_losses.append(info['psi_mse'])
             elbo_losses.append(info['elbo'])
+            critic_losses.append(info['critic_mse'])
     if log:
         with writer.as_default():
             tag = 'summary/'
             tf.summary.scalar(tag+'main_psi_loss', np.mean(psi_losses), step=step)
             tf.summary.scalar(tag+'main_ELBO_loss', np.mean(elbo_losses), step=step)
+            tf.summary.scalar(tag+'main_critic_loss', np.mean(critic_losses), step=step)
             tb_log_ctf_frame(info['sample_generated_image'], 'sample generated image', step)
             tb_log_ctf_frame(info['sample_decoded_image'], 'sample decoded image', step)
             writer.flush()
@@ -202,6 +207,7 @@ def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minib
         phi = np.array(traj[8]).tolist()
         psi = np.array(traj[9]).tolist()
         
+        # Zero bootstrap because all trajectory terminates
         td_target_c, advantages = gae(reward, critic, 0,
                 gamma, lambd, normalize=False)
         td_target, _ = gae(phi, psi, np.zeros_like(phi[0]),
@@ -272,17 +278,20 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
     train_dataset = tf.data.experimental.sample_from_datasets([pos_ds, neg_ds, zero_ds], weights=[0.1, 0.1, 0.8]).batch(128)
 
     reward_losses = []
+    rp_losses = []
     counter = 0; max_count = 256
     for state, reward in train_dataset:
         info = network.update_reward_prediction(state, reward)
         reward_losses.append(info['reward_mse'])
+        rp_losses.append(info['rp_loss'])
         counter += 1
         if counter > max_count:
             break
     if log:
         with writer.as_default():
             tag = 'summary/'
-            tf.summary.scalar(tag+'main_reward_loss', np.mean(reward_losses), step=step)
+            #tf.summary.scalar(tag+'main_reward_loss', np.mean(reward_losses), step=step)
+            tf.summary.scalar(tag+'main_rp_loss', np.mean(rp_losses), step=step)
             writer.flush()
 
 def train_ma_value(network, trajs, bootstrap=0.0, writer=None, log=False, step=None):
@@ -334,9 +343,9 @@ while True:
     is_alive = [True for agent in envs.get_team_blue().flat]
     is_done = [False for env in range(NENV*num_agent)]
 
-    trajs = [Trajectory(depth=10) for _ in range(NENV*num_agent)]
+    trajs = [Trajectory(depth=12) for _ in range(NENV*num_agent)]
     ma_trajs = [Trajectory(depth=4) for _ in range(NENV)]
-    cent_trajs = [Trajectory(depth=9) for _ in range(NENV)]
+    cent_trajs = [Trajectory(depth=11) for _ in range(NENV)]
     
     # Bootstrap
     s1 = envs.reset(
@@ -353,18 +362,25 @@ while True:
     belief = np.repeat(belief, num_agent, axis=0)
     actor, critic = network.run_network_decentral(s1, belief)
     a1, action = get_action(actor['log_softmax'].numpy())
-
+    v1 = critic['critic'].numpy()[:,0]
+    cent_v1 = env_critic['critic'].numpy()[:,0]
+    psi1 = critic['psi'].numpy()
+    cent_psi1 = env_critic['psi'].numpy()
+    phi1 = critic['phi'].numpy()
+    
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep):
         s0 = s1
         a0 = a1
-        v0 = critic['critic'].numpy()[:,0]
-        psi0 = critic['psi'].numpy()
+        v0 = v1
+        psi0 = psi1
+        phi0 = phi1
         log_logits0 = actor['log_softmax'].numpy()
         cent_s0 = cent_s1
-        cent_v0 = env_critic['critic'].numpy()[:,0]
-        cent_psi = env_critic['psi'].numpy()
+        cent_v0 = cent_v1
+        cent_psi0 = cent_psi1
+        cent_phi0 = env_critic['phi'].numpy()
         was_alive = is_alive
         was_done = is_done
         
@@ -385,6 +401,10 @@ while True:
         a1, action = get_action(actor['log_softmax'])
         phi1 = critic['phi'].numpy()
         reward_pred1 = critic['reward_predict'].numpy()[:,0]
+        v1 = critic['critic'].numpy()[:,0]
+        cent_v1 = env_critic['critic'].numpy()[:,0]
+        psi1 = critic['psi'].numpy()
+        cent_psi1 = env_critic['psi'].numpy()
 
         # Buffer
         for idx in range(NENV*num_agent):
@@ -395,13 +415,15 @@ while True:
                     s0[idx],
                     belief[idx],
                     a0[idx],
-                    reward[env_idx] + reward_pred1[idx], # Advantage
+                    reward[env_idx],# + reward_pred1[idx], # Advantage
                     done[env_idx],
                     s1[idx],
                     v0[idx], # Advantage
                     log_logits0[idx], # PPO
-                    phi1[idx], # phi: one-step ahead
+                    phi0[idx], # phi: one-step ahead
                     psi0[idx],
+                    v1[idx],
+                    psi1[idx],
                     ])
         for env_idx in range(NENV):
             if not was_done[env_idx]:
@@ -418,8 +440,11 @@ while True:
                     None,
                     None,
                     cent_v0[env_idx],
-                    cent_phi1[env_idx],
-                    cent_psi[env_idx], ])
+                    cent_phi0[env_idx],
+                    cent_psi0[env_idx], 
+                    cent_v1[env_idx],
+                    cent_psi1[env_idx], 
+                    ])
                 # MA trajectory
                 ma_trajs[env_idx].append([
                     s0[env_idx*num_agent:(env_idx+1)*num_agent],

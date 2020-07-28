@@ -199,9 +199,10 @@ class SF_CVDC:
         _, info = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
         return info
 
-    def update_central_critic(self, state_input, td_target, *args):
+    def update_central_critic(self, state_input, td_target, td_target_c, *args):
         inputs = {'state': state_input,
-                  'td_target': td_target}
+                  'td_target': td_target,
+                  'td_target_c': td_target_c,}
         _, info = self.train(self.model_central, self.loss_central_critic, self.optimizer_central, inputs)
         return info
     
