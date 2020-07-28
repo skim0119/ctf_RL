@@ -127,8 +127,7 @@ network = Network(
         save_path=MODEL_PATH)
 
 # Resotre / Initialize
-global_episodes = 0
-network.initiate()
+global_episodes = network.initiate()
 
 writer = tf.summary.create_file_writer(LOG_PATH)
 network.save(global_episodes)

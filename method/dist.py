@@ -58,9 +58,6 @@ class SFK:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
 
-        # Initiate Model
-        self.initiate()
-
     def run_network_central(self, states, bmean, blogvar):
         # states: environment state
         # bmean, blogvar: belief-state
@@ -105,7 +102,7 @@ class SFK:
     def update_multiagent_critic(self, states_list, belief, value_central, mask):
         #(TODO)
         states_list = np.reshape(states_list, [600,79,79,6])
-        belief = np.reshape(belief, [600,8])
+        belief = np.reshape(belief, [600,self.atoms])
         inputs = {'states_list': states_list,
                   'belief': belief,
                   'value_central': value_central,
@@ -120,6 +117,10 @@ class SFK:
         if verbose:
             print('Centralized initialization: {}'.format(cent_path))
             print('Decentralized initialization: {}'.format(decent_path))
+        if cent_path == None:
+            return 0
+        else:
+            return int(cent_path.split('/')[-1].split('-')[-1])
 
     def restore(self):
         status = self.checkpoint_central.restore(self.manager_central.latest_checkpoint)
@@ -157,7 +158,7 @@ class SF_CVDC:
 
         # Set Model
         self.model_central = V4SF_CVDC_CENTRAL(central_obs_shape[1:], atoms=atoms)
-        self.model_decentral = V4SF_CVDC_DECENTRAL(decentral_obs_shape[1:], action_size=5)
+        self.model_decentral = V4SF_CVDC_DECENTRAL(decentral_obs_shape[1:], action_size=5, atoms=atoms)
 
         # Build Network
         self.model_central.print_summary()
@@ -180,14 +181,11 @@ class SF_CVDC:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
 
-        # Initiate Model
-        self.initiate()
-
-    def run_network_central(self, states, bmean, blogvar):
+    def run_network_central(self, states):
         # states: environment state
         # bmean, blogvar: belief-state
         # observations: individual (centered) observation
-        env_critic, env_feature = self.model_central([states, bmean, blogvar])
+        env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature 
 
     def run_network_decentral(self, observations, beliefs):
@@ -195,37 +193,34 @@ class SF_CVDC:
         return actor, dec_SF
 
     # Centralize updater
-    def update_reward_prediction(self, state_input, reward, b_mean, b_log_var, *args):
+    def update_reward_prediction(self, state_input, reward, *args):
         inputs = {'state': state_input,
-                  'reward': reward,
-                  'b_mean': b_mean,
-                  'b_log_var': b_log_var}
+                  'reward': reward}
         _, info = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
         return info
 
-    def update_central_critic(self, state_input, b_mean, b_log_var, td_target, *args):
+    def update_central_critic(self, state_input, td_target, *args):
         inputs = {'state': state_input,
-                  'td_target': td_target,
-                  'b_mean': b_mean,
-                  'b_log_var': b_log_var}
+                  'td_target': td_target}
         _, info = self.train(self.model_central, self.loss_central_critic, self.optimizer_central, inputs)
         return info
     
     # Decentralize updater
-    def update_ppo(self, state_input, belief, old_log_logit, action, td_target, advantage):
+    def update_ppo(self, state_input, belief, old_log_logit, action, td_target, advantage, td_target_c):
         inputs = {'state': state_input,
                   'belief': belief,
                   'old_log_logit': old_log_logit,
                   'action': action,
                   'td_target': td_target,
-                  'advantage': advantage,}
+                  'advantage': advantage,
+                  'td_target_c': td_target_c, }
         _, info = self.train(self.model_decentral, self.loss_ppo, self.optimizer_decentral, inputs)
         return info
 
     def update_multiagent_critic(self, states_list, belief, value_central, mask):
         #(TODO)
         states_list = np.reshape(states_list, [600,79,79,6])
-        belief = np.reshape(belief, [600,8])
+        belief = np.reshape(belief, [600,self.atoms])
         inputs = {'states_list': states_list,
                   'belief': belief,
                   'value_central': value_central,
@@ -240,6 +235,10 @@ class SF_CVDC:
         if verbose:
             print('Centralized initialization: {}'.format(cent_path))
             print('Decentralized initialization: {}'.format(decent_path))
+        if cent_path == None:
+            return 0
+        else:
+            return int(cent_path.split('/')[-1].split('-')[-1])
 
     def restore(self):
         status = self.checkpoint_central.restore(self.manager_central.latest_checkpoint)

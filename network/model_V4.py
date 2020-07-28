@@ -35,13 +35,15 @@ class V4(tf.keras.Model):
                 filters=16, kernel_size=4, strides=2,
                 padding='valid', depth_multiplier=8, activation='elu'),
             layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.MaxPool2D(),
+            layers.Conv2D(filters=32, kernel_size=2, strides=2, activation='elu'),
+            #layers.MaxPool2D(),
             layers.Flatten(),
             layers.Dense(units=64, activation='elu'),])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=dynamic_input_shape),
+            layers.Conv2D(filters=16, kernel_size=3, strides=2, activation='elu'),
             layers.Conv2D(filters=16, kernel_size=2, strides=2, activation='elu'),
-            layers.MaxPool2D(),
+            #layers.MaxPool2D(),
             #Non_local_nn(4),
             layers.Flatten(),
             layers.Dense(units=64, activation='elu'),
@@ -73,17 +75,18 @@ class V4INV(tf.keras.Model):
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
         self.static_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=512, activation='elu'),
-            layers.Reshape([4,4,32]),
-            layers.UpSampling2D(),
+            layers.Dense(units=512*4, activation='elu'),
+            layers.Reshape([8,8,32]),
+            #layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, activation='elu'),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, output_padding=1, activation='elu'),
             layers.Conv2DTranspose(filters=3, kernel_size=5, strides=2, output_padding=1, activation='tanh')])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
             layers.Dense(units=1600, activation='elu'),
             layers.Reshape([10,10,16]),
-            layers.UpSampling2D(),
-            layers.Conv2DTranspose(filters=3, kernel_size=2, strides=2, activation='tanh')])
+            layers.Conv2DTranspose(filters=3, kernel_size=2, strides=2, activation='elu'),
+            layers.Conv2DTranspose(filters=3, kernel_size=2, strides=2, activation='tanh'),
+            ])
 
     def print_summary(self):
         self.static_network.summary()

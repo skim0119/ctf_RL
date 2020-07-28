@@ -38,13 +38,14 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # Phi
         self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid', name='phi')
-        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
-                kernel_regularizer=tf.keras.regularizers.l2(0.01))
+        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi',
+        self.psi_dense2 = layers.Dense(units=atoms, activation='elu', name='psi',
                 kernel_regularizer=tf.keras.regularizers.l2(0.01))
+        self.psi_loss_func = tf.keras.losses.MeanSquaredError()
+        self.critic_loss_func = tf.keras.losses.MeanSquaredError()
 
     def print_summary(self):
         self.feature_layer.summary()
@@ -102,12 +103,19 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         # Phi
         #self.phi_dense1 = layers.Dense(units=atoms, activation='elu', name='phi')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
-                kernel_regularizer=tf.keras.regularizers.l2(0.01))
+                kernel_regularizer=tf.keras.regularizers.l2(0.0001))
+        self.reward_loss = tf.keras.losses.MeanSquaredError(
+                reduction=tf.keras.losses.Reduction.SUM)
 
         # Psi
-        self.psi_dense1 = layers.Dense(units=32, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi',
-                kernel_regularizer=tf.keras.regularizers.l2(0.01))
+        self.psi_dense1 = layers.Dense(units=64, activation='elu')
+        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi')
+
+        # UNREAL-RP
+        output_bias = tf.keras.initializers.Constant([-2.302585, -0.223143, -2.302585])
+        self.rp_dense = layers.Dense(units=3, activation='softmax',
+                bias_initializer=output_bias)
+        self.rp_loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
         # Layers
         self.flat = layers.Flatten()
@@ -117,9 +125,7 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         #self.summary()
 
     def inference_network(self, inputs):
-        state = inputs[0]
-        #b_mean = inputs[1]
-        #b_log_var = inputs[2]
+        state = inputs
 
         # Encoder
         net = self.feature_layer(state)
@@ -140,10 +146,19 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
                 self.flat(p_x_given_z_logits), scale_identity_multiplier=0.05)
         return p_x_given_z, p_x_given_z_logits
 
+    def sample_generate(self):
+        q_z = tfp.distributions.Normal(loc=np.zeros(self.atoms, dtype=np.float32),
+                                       scale=np.ones(self.atoms, dtype=np.float32))
+        z = q_z.sample([1])
+        p_x_given_z_logits = self.decoder(z)
+        # p_x_given_z = tfp.distributions.Bernoulli(logits=p_x_given_z_logits) # Bernoulli for binary image
+        p_x_given_z = tfp.distributions.MultivariateNormalDiag(
+                #tf.reshape(p_x_given_z_logits,[-1]), scale_identity_multiplier=0.05)
+                self.flat(p_x_given_z_logits), scale_identity_multiplier=0.05)
+        return p_x_given_z, p_x_given_z_logits
+
     def call(self, inputs):
-        state = inputs[0]
-        b_mean = inputs[1]
-        b_log_var = inputs[2]
+        state = inputs
 
         # Encoder
         n_sample = state.shape[0]
@@ -165,6 +180,9 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         psi = self.psi_dense2(psi)
         critic = self.successor_weight(psi, training=False)
 
+        # UNREAL-RP
+        rp = self.rp_dense(z)
+
         feature = {'latent': z,
                    'z_mean': z_mean,
                    'z_log_var': z_log_var,
@@ -174,25 +192,38 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         SF = {'reward_predict': r_pred,
               'phi': phi,
               'psi': psi,
-              'critic': critic}
+              'critic': critic,
+              'UNREAL_rp': rp}
 
         return SF, feature 
     
 @tf.function
-def loss_reward_central(model, state, reward, b_mean, b_log_var, training=True):
+def loss_reward_central(model, state, reward, training=True):
     # Critic - Reward Prediction
-    inputs = [state, b_mean, b_log_var]
+    inputs = state
     SF, feature = model(inputs, training=training)
     r_pred = SF['reward_predict']
-    reward = tf.cast(reward, tf.float32)
-    reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
-    return reward_mse, {'reward_mse': reward_mse}
+    reward_mse = model.reward_loss(tf.cast(reward, tf.float32), r_pred)
+    #reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
+
+    # UNREAL - RP
+    rp = SF['UNREAL_rp']
+    reward_label = reward + 1
+    reward_label = tf.math.maximum(reward+1,0)
+    reward_label = tf.math.minimum(reward+1,2)
+    reward_label = tf.one_hot(tf.cast(reward_label, tf.int32), depth=3)
+    rp_loss = model.rp_loss(reward_label, rp)
+
+    total = reward_mse + rp_loss
+
+    info = {'reward_mse': reward_mse, 'rp_loss': rp_loss} 
+    return total, info
 
 #@tf.function
-def loss_central_critic(model, state, b_mean, b_log_var, td_target, 
+def loss_central_critic(model, state, td_target, 
         psi_beta=1.0, beta_kl=1e-2, elbo_beta=1e-4,
         gamma=0.98, training=True):
-    inputs = [state, b_mean, b_log_var]
+    inputs = state
     SF, feature = model(inputs, training=training)
 
     # Critic - TD Difference
@@ -211,16 +242,20 @@ def loss_central_critic(model, state, b_mean, b_log_var, td_target,
 
     total_loss = psi_beta*psi_mse - elbo_beta*elbo
 
+    _, sample_generated_image = model.sample_generate()
+
     info = {
         'psi_mse': psi_mse,
         'elbo': -elbo,
+        'sample_generated_image': sample_generated_image[0],
+        'sample_decoded_image': feature['z_decoded'].numpy()[0]
         }
 
     return total_loss, info
 
 #@tf.function
-def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
-         eps=0.2, entropy_beta=0.3, psi_beta=0.5, decoder_beta=1e-4, gamma=0.98,
+def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage, td_target_c,
+         eps=0.2, entropy_beta=0.3, psi_beta=0.1, decoder_beta=1e-4, gamma=0.98,
          training=True):
     num_sample = state.shape[0]
 
@@ -238,7 +273,10 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
 
     # Psi Loss
     td_target = tf.cast(td_target, tf.float32)
-    psi_mse = tf.reduce_mean(tf.square(td_target - psi))
+    #psi_mse = tf.reduce_mean(tf.square(td_target - psi))
+    psi_mse = model.psi_loss_func(td_target, psi)
+
+    critic_mse = model.psi_loss_func(td_target_c, v['critic'])
 
     # Actor Loss
     action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
@@ -254,9 +292,10 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage,
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + 0.5*critic_mse
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
+            'critic_mse': critic_mse,
             'entropy': entropy,
             'generator_loss': generator_loss}
 
@@ -270,7 +309,8 @@ def loss_multiagent_critic(model, states_list, belief, value_central, mask, trai
     pi, v = model([states_list, belief], training=training)
     critics = tf.reshape(v['critic'], mask.shape) * tf.cast(mask, tf.float32)
     group_critic = tf.reduce_sum(critics, axis=1)
-    mse = tf.reduce_mean(tf.square(value_central - group_critic))
+    #mse = tf.reduce_mean(tf.square(value_central - group_critic))
+    mse = model.critic_loss_func(value_central, group_critic)
     return mse, {'ma_critic': mse}
 
 def train(model, loss, optimizer, inputs, **hyperparameters):
