@@ -71,7 +71,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         phi = self.phi_dense1(net)
         r_pred = self.successor_weight(phi)
 
-        psi = self.psi_dense1(phi)
+        psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
         critic = self.successor_weight(psi, training=False)
 
@@ -176,7 +176,7 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         phi = z
         r_pred = self.successor_weight(phi)
         #psi = self.psi_dense1(tf.stop_gradient(z))
-        psi = self.psi_dense1(phi)
+        psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
         critic = self.successor_weight(psi, training=False)
 
