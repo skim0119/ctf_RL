@@ -34,17 +34,20 @@ class V4(tf.keras.Model):
             layers.SeparableConv2D(
                 filters=16, kernel_size=4, strides=2,
                 padding='valid', depth_multiplier=8, activation='elu'),
-            layers.Conv2D(filters=32, kernel_size=3, strides=1, activation='elu'),
-            layers.Conv2D(filters=32, kernel_size=2, strides=1, activation='elu'),
+            layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='elu'),
+            layers.Conv2D(filters=32, kernel_size=2, strides=2, activation='elu'),
+            #layers.MaxPool2D(),
             layers.Flatten(),
-            layers.Dense(units=128, activation='elu'),])
+            layers.Dense(units=64, activation='elu'),])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=dynamic_input_shape),
             layers.Conv2D(filters=16, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2D(filters=16, kernel_size=2, strides=1, activation='elu'),
+            layers.Conv2D(filters=16, kernel_size=2, strides=2, activation='elu'),
+            #layers.MaxPool2D(),
             #Non_local_nn(4),
             layers.Flatten(),
-            layers.Dense(units=128, activation='elu'),])
+            layers.Dense(units=64, activation='elu'),
+            layers.Dense(units=64, activation='elu'),])
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
 
     def print_summary(self):
@@ -72,16 +75,17 @@ class V4INV(tf.keras.Model):
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
         self.static_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=512, activation='elu'),
-            layers.Reshape([4,4,32]),
-            layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')])
+            layers.Dense(units=512*4, activation='elu'),
+            layers.Reshape([8,8,32]),
+            #layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, activation='elu'),
+            layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, output_padding=1, activation='elu'),
+            layers.Conv2DTranspose(filters=3, kernel_size=5, strides=2, output_padding=1, activation='tanh')])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=512, activation='elu'),
-            layers.Reshape([4,4,32]),
-            layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh'),
+            layers.Dense(units=1600, activation='elu'),
+            layers.Reshape([10,10,16]),
+            layers.Conv2DTranspose(filters=3, kernel_size=2, strides=2, activation='elu'),
+            layers.Conv2DTranspose(filters=3, kernel_size=2, strides=2, activation='tanh'),
             ])
 
     def print_summary(self):
@@ -118,15 +122,17 @@ class V4Decentral(tf.keras.Model):
             layers.SeparableConv2D(
                 filters=16, kernel_size=4, strides=2,
                 padding='valid', depth_multiplier=8, activation='elu'),
-            layers.Conv2D(filters=16, kernel_size=3, strides=2, activation='elu'),
+            layers.Conv2D(filters=32, kernel_size=3, strides=2, activation='elu'),
+            layers.MaxPool2D(),
             layers.Flatten(),
             layers.Dense(units=64, activation='elu'),])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=dynamic_input_shape),
             layers.Conv2D(filters=16, kernel_size=4, strides=2, activation='elu'),
-            layers.Conv2D(filters=16, kernel_size=3, strides=2, activation='elu'),
+            layers.MaxPool2D(),
             #Non_local_nn(4),
             layers.Flatten(),
+            layers.Dense(units=64, activation='elu'),
             layers.Dense(units=64, activation='elu'),])
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
         #self.dout1 = layers.Dropout(rate=0.2)
@@ -157,17 +163,17 @@ class V4INVDecentral(tf.keras.Model):
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
         self.static_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=1296, activation='elu'),
-            layers.Reshape([9,9,16]),
-            layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')])
+            layers.Dense(units=2592, activation='elu'),
+            layers.Reshape([9,9,32]),
+            layers.UpSampling2D(),
+            layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, output_padding=1, activation='elu'),
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, output_padding=1, activation='tanh')])
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=1296, activation='elu'),
-            layers.Reshape([9,9,16]),
-            layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh'),
-            ])
+            layers.Dense(units=5776, activation='elu'),
+            layers.Reshape([19,19,16]),
+            layers.UpSampling2D(),
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, output_padding=1, activation='tanh')])
 
     def print_summary(self):
         self.static_network.summary()
@@ -189,10 +195,8 @@ if __name__=='__main__':
     assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
     config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-    print('centralized network:')
     sample_size = 32
-    map_size = 20
-    image_shape = [map_size,map_size,6]
+    image_shape = [40,40,6]
     sample_shape = [sample_size]+image_shape
     latent_size = 128
     latent_shape = [sample_size]+[latent_size]
@@ -208,32 +212,6 @@ if __name__=='__main__':
 
     # Decoder Shape Summary
     model = V4INV()
-    model.print_summary()
-
-    sample = np.random.random(latent_shape).astype(np.float32)
-    output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
-
-    print('decentralized network:')
-    sample_size = 32
-    map_size = map_size*2-1
-    image_shape = [map_size,map_size,6]
-    sample_shape = [sample_size]+image_shape
-    latent_size = 128
-    latent_shape = [sample_size]+[latent_size]
-
-    # Encoder Shape Summary
-    model = V4Decentral(image_shape, 5)
-    model.print_summary()
-
-    sample = np.random.random(sample_shape).astype(np.float32)
-    output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
-
-    # Decoder Shape Summary
-    model = V4INVDecentral()
     model.print_summary()
 
     sample = np.random.random(latent_shape).astype(np.float32)

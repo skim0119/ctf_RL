@@ -21,8 +21,8 @@ import numpy as np
 class V4SF_CVDC_DECENTRAL(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, action_size=5, atoms=8,
-            trainable=True, name='DecPPO'):
-        super(V4SF_CVDC_DECENTRAL, self).__init__(name=name)
+            trainable=True):
+        super(V4SF_CVDC_DECENTRAL, self).__init__()
 
         # Feature Encoding
         self.feature_layer = V4Decentral(input_shape, action_size)
@@ -37,13 +37,13 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Phi
-        self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid', name='phi')
+        self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='elu', name='psi',
-                kernel_regularizer=tf.keras.regularizers.l2(0.01))
+        self.psi_dense2 = layers.Dense(units=atoms, activation='elu')
+        self.psi_dropout = layers.Dropout(0.3)
         self.psi_loss_func = tf.keras.losses.MeanSquaredError()
         self.critic_loss_func = tf.keras.losses.MeanSquaredError()
 
@@ -52,14 +52,12 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
     def call(self, inputs):
         # Run full network
-        obs = inputs[0]
-        h = inputs[1]
+        obs = inputs
 
         # Feature Encoding
         net = self.feature_layer(obs)
-        net = tf.concat([net, h], axis=1)
 
-        decoded_state = self.decoder(net)
+        decoded_state = self.decoder(tf.stop_gradient(net))
 
         # Actor
         actor_net = self.actor_dense1(net)
@@ -73,7 +71,11 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
-        critic = self.successor_weight(psi, training=False)
+
+        critic = self.psi_dense1(phi)
+        critic = self.psi_dense2(critic)
+        critic = self.psi_dropout(critic)
+        critic = self.successor_weight(critic, training=False)
 
         SF = {'reward_predict': r_pred,
               'phi': phi,
@@ -89,25 +91,26 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 class V4SF_CVDC_CENTRAL(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, atoms,
-                 trainable=True, name='SF_CVDC'):
-        super(V4SF_CVDC_CENTRAL, self).__init__(name=name)
+                 trainable=True):
+        super(V4SF_CVDC_CENTRAL, self).__init__()
 
         # Feature Encoding
         self.feature_layer = V4(input_shape)
-        self.z_mean = layers.Dense(units=atoms, activation='softmax')
+        self.z_mean = layers.Dense(units=atoms, activation='sigmoid')
         self.z_log_var = layers.Dense(units=atoms, activation=tf.math.softplus)
 
         # Decoding
         self.decoder = V4INV()
 
         # Phi
-        #self.phi_dense1 = layers.Dense(units=atoms, activation='elu', name='phi')
+        #self.phi_dense1 = layers.Dense(units=atoms, activation='elu')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='linear', name='psi')
+        self.psi_dense2 = layers.Dense(units=atoms, activation='elu')
+        self.psi_dropout = layers.Dropout(0.3)
 
         # UNREAL-RP
         output_bias = tf.keras.initializers.Constant([-2.302585, -0.223143, -2.302585])
@@ -181,6 +184,7 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         #psi = self.psi_dense1(tf.stop_gradient(z))
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
+        psi = self.psi_dropout(psi)
         critic = self.successor_weight(psi, training=False)
 
         # UNREAL-RP
@@ -207,9 +211,8 @@ def loss_reward_central(model, state, reward, training=True):
     SF, feature = model(inputs, training=training)
     r_pred = SF['reward_predict']
     reward_mse = model.reward_loss(tf.cast(reward, tf.float32), r_pred)
-    #reward_mse = tf.reduce_mean(tf.square(reward - r_pred))
 
-    # UNREAL - RP
+    # UNREAL - Reward Prediction
     rp = SF['UNREAL_rp']
     reward_label = reward + 1
     reward_label = tf.math.maximum(reward+1,0)
@@ -224,7 +227,7 @@ def loss_reward_central(model, state, reward, training=True):
 
 #@tf.function
 def loss_central_critic(model, state, td_target, td_target_c,
-        psi_beta=1.0, beta_kl=1e-2, elbo_beta=1e-4, critic_beta=0.5,
+        psi_beta=0.55, beta_kl=1e-2, elbo_beta=1e-4, critic_beta=1.0,
         gamma=0.98, training=True):
     inputs = state
     SF, feature = model(inputs, training=training)
@@ -261,13 +264,13 @@ def loss_central_critic(model, state, td_target, td_target_c,
     return total_loss, info
 
 #@tf.function
-def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage, td_target_c,
-         eps=0.2, entropy_beta=0.3, psi_beta=0.1, decoder_beta=1e-4, gamma=0.98,
+def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_target_c,
+         eps=0.2, entropy_beta=0.3, psi_beta=0.10, decoder_beta=1e-4, gamma=0.98,
          training=True):
     num_sample = state.shape[0]
 
     # Run Model
-    pi, v = model([state, belief])
+    pi, v = model(state)
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
@@ -309,16 +312,17 @@ def loss_ppo(model, state, belief, old_log_logit, action, td_target, advantage, 
     return total_loss, info
 
 #@tf.function
-def loss_multiagent_critic(model, states_list, belief, value_central, mask, training=True):
-    # states_list and belief should be given in flat format
+def loss_multiagent_critic(model, states_list, value_central, mask, training=True):
+    # states_list should be given in flat format
     num_env = mask.shape[0]
     num_agent = mask.shape[1]
-    pi, v = model([states_list, belief], training=training)
+    pi, v = model(states_list, training=training)
     critics = tf.reshape(v['critic'], mask.shape) * tf.cast(mask, tf.float32)
     group_critic = tf.reduce_sum(critics, axis=1)
-    #mse = tf.reduce_mean(tf.square(value_central - group_critic))
     mse = model.critic_loss_func(value_central, group_critic)
-    return mse, {'ma_critic': mse}
+    total_loss = 0.001*mse
+    info = {'ma_critic': mse}
+    return total_loss, info
 
 def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:

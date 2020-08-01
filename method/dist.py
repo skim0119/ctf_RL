@@ -101,7 +101,7 @@ class SFK:
 
     def update_multiagent_critic(self, states_list, belief, value_central, mask):
         #(TODO)
-        states_list = np.reshape(states_list, [600,79,79,6])
+        states_list = np.reshape(states_list, [600,39,39,6])
         belief = np.reshape(belief, [600,self.atoms])
         inputs = {'states_list': states_list,
                   'belief': belief,
@@ -164,73 +164,72 @@ class SF_CVDC:
         self.model_central.print_summary()
 
         # Build Trainer
+        self.save_directory_central = os.path.join(save_path, 'central')
         self.optimizer_central = tf.keras.optimizers.Adam(lr)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
                 checkpoint=self.checkpoint_central,
-                directory=os.path.join(save_path, 'central'),
+                directory=self.save_directory_central,
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
+        self.save_directory_decentral = os.path.join(save_path, 'decentral')
         self.optimizer_decentral = tf.keras.optimizers.Adam(lr)
         self.checkpoint_decentral = tf.train.Checkpoint(
                 optimizer=self.optimizer_decentral, model=self.model_decentral)
         self.manager_decentral = tf.train.CheckpointManager(
                 checkpoint=self.checkpoint_decentral,
-                directory=os.path.join(save_path, 'decentral'),
+                directory=self.save_directory_decentral,
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
 
     def run_network_central(self, states):
         # states: environment state
-        # bmean, blogvar: belief-state
         # observations: individual (centered) observation
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature 
 
-    def run_network_decentral(self, observations, beliefs):
-        actor, dec_SF = self.model_decentral([observations, beliefs])
+    def run_network_decentral(self, observations):
+        actor, dec_SF = self.model_decentral(observations)
         return actor, dec_SF
 
     # Centralize updater
-    def update_reward_prediction(self, state_input, reward, *args):
-        inputs = {'state': state_input,
-                  'reward': reward}
+    def update_reward_prediction(self, inputs, *args):
         _, info = self.train(self.model_central, self.loss_reward, self.optimizer_central, inputs)
         return info
 
-    def update_central_critic(self, state_input, td_target, td_target_c, *args):
-        inputs = {'state': state_input,
-                  'td_target': td_target,
-                  'td_target_c': td_target_c,}
+    def update_central_critic(self, inputs, *args):
         _, info = self.train(self.model_central, self.loss_central_critic, self.optimizer_central, inputs)
         return info
     
     # Decentralize updater
-    def update_ppo(self, state_input, belief, old_log_logit, action, td_target, advantage, td_target_c):
-        inputs = {'state': state_input,
-                  'belief': belief,
-                  'old_log_logit': old_log_logit,
-                  'action': action,
-                  'td_target': td_target,
-                  'advantage': advantage,
-                  'td_target_c': td_target_c, }
+    def update_ppo(self, inputs):
         _, info = self.train(self.model_decentral, self.loss_ppo, self.optimizer_decentral, inputs)
         return info
 
-    def update_multiagent_critic(self, states_list, belief, value_central, mask):
-        #(TODO)
-        states_list = np.reshape(states_list, [600,79,79,6])
-        belief = np.reshape(belief, [600,self.atoms])
-        inputs = {'states_list': states_list,
-                  'belief': belief,
-                  'value_central': value_central,
-                  'mask': mask}
+    def update_multiagent_critic(self, states_list, value_central, mask):
+        states_list = np.reshape(states_list, [600,39,39,6])
+        inputs = {
+                'states_list': states_list,
+                'value_central': value_central,
+                'mask': mask,
+                }
         _, info = self.train(self.model_decentral, self.loss_multiagent_critic, self.optimizer_decentral, inputs)
         return info
 
-    # Misc
+    # Save and Load
     def initiate(self, verbose=1):
+        last_checkpoint = tf.train.latest_checkpoint(self.save_directory_central)
+        if last_checkpoint is None:
+            return 0
+        else:
+            status = self.checkpoint_central.restore(last_checkpoint)
+            status.assert_consumed()
+            last_checkpoint = tf.train.latest_checkpoint(self.save_directory_decentral)
+            status = self.checkpoint_decentral.restore(last_checkpoint)
+            status.assert_consumed()
+            return int(last_checkpoint.split('/')[-1].split('-')[-1])
+
         cent_path = self.manager_central.restore_or_initialize()
         decent_path = self.manager_decentral.restore_or_initialize()
         if verbose:
