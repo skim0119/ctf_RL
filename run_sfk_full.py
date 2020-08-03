@@ -23,6 +23,10 @@ import numpy as np
 import random
 import math
 from collections import defaultdict
+from functools import partial
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 import gym_cap.heuristic as policy
 
@@ -43,10 +47,11 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SF_CVDC_15'
+TRAIN_NAME = 'DIST_SF_CVDC_20'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
+SAVE_PATH = './save/' + TRAIN_NAME
 MAP_PATH = './fair_3g_20'
 GPU_CAPACITY = 0.95
 
@@ -60,6 +65,7 @@ env_setting_path = 'env_setting_3v3_3g_full.ini'
 ## Data Path
 path_create(LOG_PATH)
 path_create(MODEL_PATH)
+path_create(SAVE_PATH)
 
 ## Import Shared Training Hyperparameters
 config_path = 'config.ini'
@@ -92,7 +98,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 8
+minimum_batch_size = 1024 * 4
 print(minimum_batch_size)
 
 ## Setup
@@ -110,6 +116,7 @@ log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
+_qenv = gym.make('cap-v0', map_size=map_size, config_path=env_setting_path)
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
                             config_path=env_setting_path)
@@ -122,7 +129,7 @@ num_agent = num_blue#+num_red
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
-atoms = 32
+atoms = 64
 network = Network(
         central_obs_shape=cent_input_size,
         decentral_obs_shape=input_size,
@@ -205,9 +212,10 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             tb_log_ctf_frame(info['sample_decoded_image'], 'sample decoded image', step)
             writer.flush()
 
-def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+    # Agent trajectory processing
     traj_buffer = defaultdict(list)
-    for idx, traj in enumerate(trajs):
+    for idx, traj in enumerate(agent_trajs):
         if len(traj) == 0:
             continue
 
@@ -219,7 +227,7 @@ def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minib
         _psi = np.array(traj[10][-1])
         
         # Zero bootstrap because all trajectory terminates
-        td_target_c, advantages = gae(reward, critic, _critic,#0,
+        td_target_c, advantages = gae(reward, critic, _critic,
                 gamma, lambd, normalize=False)
         td_target, _ = gae(phi, psi, _psi,#np.zeros_like(phi[0]),
                 gamma, lambd, normalize=False)
@@ -230,8 +238,7 @@ def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minib
         traj_buffer['td_target'].extend(td_target)
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['td_target_c'].extend(td_target_c)
-
-    train_dataset = tf.data.Dataset.from_tensor_slices({
+    agent_dataset = tf.data.Dataset.from_tensor_slices({
             'state': np.stack(traj_buffer['state']),
             'old_log_logit': np.stack(traj_buffer['log_logit']),
             'action': np.stack(traj_buffer['action']),
@@ -240,27 +247,32 @@ def train_decentral(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minib
             'td_target_c': np.stack(traj_buffer['td_target_c']),
         }).shuffle(64).repeat(epoch).batch(batch_size)
 
-    actor_losses = []
-    dec_psi_losses = []
-    entropy = []
-    decoder_losses = []
-    critic_mse = []
-    for inputs in train_dataset:
-        info = network.update_ppo(inputs)
-        if log:
-            actor_losses.append(info['actor_loss'])
-            dec_psi_losses.append(info['psi_loss'])
-            entropy.append(info['entropy'])
-            decoder_losses.append(info['generator_loss'])
-            critic_mse.append(info['critic_mse'])
+    # Team trajectory preproessing
+    traj_buffer = defaultdict(list)
+    for idx, traj in enumerate(team_trajs):
+        if len(traj) == 0:
+            continue
+        reward = traj[2]
+        critic = traj[3]
+        _critic = traj[4][-1]
+        td_target_c, _= gae(reward, critic, _critic,
+                gamma, lambd, normalize=False)
+        traj_buffer['team_state'].extend(traj[0])
+        traj_buffer['value_central'].extend(td_target_c)
+        traj_buffer['mask'].extend(traj[1])
+    team_dataset = tf.data.Dataset.from_tensor_slices({
+            'team_state': np.stack(traj_buffer['team_state']),
+            'value_central': np.stack(traj_buffer['value_central']),
+            'mask': np.stack(traj_buffer['mask']),
+            }).shuffle(64).repeat(epoch).batch(batch_size)
+
+    logs =  network.update_decentral(agent_dataset, team_dataset, log=log)
+
     if log:
         with writer.as_default():
             tag = 'summary/'
-            tf.summary.scalar(tag+'dec_actor_loss', np.mean(actor_losses), step=step)
-            tf.summary.scalar(tag+'dec_psi_loss', np.mean(dec_psi_losses), step=step)
-            tf.summary.scalar(tag+'dec_entropy', np.mean(entropy), step=step)
-            tf.summary.scalar(tag+'dec_generator_loss', np.mean(decoder_losses), step=step)
-            tf.summary.scalar(tag+'dec_critic_loss', np.mean(critic_mse), step=step)
+            for name, val in logs.items():
+                tf.summary.scalar(tag+name, val, step=step)
             writer.flush()
 
 def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=False, step=None):
@@ -298,35 +310,6 @@ def train_reward_prediction(network, traj, epoch, batch_size, writer=None, log=F
             tf.summary.scalar(tag+'main_rp_loss', np.mean(rp_losses), step=step)
             writer.flush()
 
-def train_ma_value(network, trajs, bootstrap=0.0, epoch=1, batch_size=128, writer=None, log=False, step=None):
-    traj_buffer = defaultdict(list)
-    for idx, traj in enumerate(trajs):
-        if len(traj) == 0:
-            continue
-
-        reward = traj[2]
-        critic = traj[3]
-        td_target_c, _= gae(reward, critic, 0,
-                gamma, lambd, normalize=False)
-        
-        traj_buffer['state'].extend(traj[0])
-        traj_buffer['value_central'].extend(td_target_c)
-        traj_buffer['mask'].extend(traj[1])
-
-    it = batch_sampler(200, 1,
-                       np.stack(traj_buffer['state']),
-                       np.stack(traj_buffer['value_central']),
-                       np.stack(traj_buffer['mask']),)
-    losses = []
-    for mdp in it:
-        info = network.update_multiagent_critic(*mdp)
-        if log:
-            losses.append(info['ma_critic'])
-    if log:
-        with writer.as_default():
-            tag = 'summary/'
-            tf.summary.scalar(tag+'dec_ma_critic', np.mean(losses), step=step)
-            writer.flush()
 
 def get_action(log_logits):
     a = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
@@ -338,24 +321,36 @@ batch = []
 dec_batch = []
 ma_batch = []
 num_batch = 0
+dec_batch_size = 0
 #while global_episodes < total_episodes:
 while True:
+    # Flags
+    log_save_analysis = interval_flag(global_episodes, 1024, 'save_log')
+
     # initialize parameters 
     episode_rew = np.zeros(NENV)
     is_alive = [True for agent in envs.get_team_blue().flat]
     is_done = [False for env in range(NENV*num_agent)]
 
     trajs = [Trajectory(depth=11) for _ in range(NENV*num_agent)]
-    ma_trajs = [Trajectory(depth=4) for _ in range(NENV)]
+    ma_trajs = [Trajectory(depth=5) for _ in range(NENV)]
     cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]
     
     # Bootstrap
-    s1 = envs.reset(
-            map_pool=map_list,
-            config_path=env_setting_path,
-            policy_red=policy.Roomba,
-            #policy_blue=policy.Roomba,
-            )
+    if log_save_analysis:
+        s1 = envs.reset(
+                map_pool=map_list,
+                config_path='env_setting_3v3_3g_full_rgb.ini',
+                policy_red=policy.Roomba,
+                #policy_blue=policy.Roomba,
+                )
+    else:
+        s1 = envs.reset(
+                map_pool=map_list,
+                config_path=env_setting_path,
+                policy_red=policy.Roomba,
+                #policy_blue=policy.Roomba,
+                )
     s1 = s1.astype(np.float32)
     cent_s1 = envs.get_obs_blue().astype(np.float32) # Centralized
 
@@ -368,6 +363,14 @@ while True:
     
     # Rollout
     stime_roll = time.time()
+    _states = [[] for _ in range(NENV)]
+    _agent1_r = [[] for _ in range(NENV)]
+    _agent2_r = [[] for _ in range(NENV)]
+    _agent3_r = [[] for _ in range(NENV)]
+    _agent1_o = [[] for _ in range(NENV)]
+    _agent2_o = [[] for _ in range(NENV)]
+    _agent3_o = [[] for _ in range(NENV)]
+
     for step in range(max_ep):
         s0 = s1
         a0 = a1
@@ -380,7 +383,7 @@ while True:
         cent_s0 = cent_s1
         
         # Run environment
-        s1, reward, done, info = envs.step(action)
+        s1, reward, done, history = envs.step(action)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         s1 = s1.astype(np.float32) # Decentralize observation
         cent_s1 = envs.get_obs_blue().astype(np.float32) # Centralized
@@ -431,35 +434,47 @@ while True:
                     is_alive[env_idx*num_agent:(env_idx+1)*num_agent],
                     reward[env_idx],
                     np.sum(v0[env_idx*num_agent:(env_idx+1)*num_agent]),
+                    np.sum(v1[env_idx*num_agent:(env_idx+1)*num_agent]),
                     ])
+
+        if log_save_analysis:
+            for env_idx in range(NENV):
+                _states[env_idx].append(cent_s0[env_idx])
+                _agent1_r[env_idx].append(reward_pred1[env_idx*3])
+                _agent2_r[env_idx].append(reward_pred1[env_idx*3+1])
+                _agent3_r[env_idx].append(reward_pred1[env_idx*3+2])
+                _agent1_o[env_idx].append(_qenv._env2rgb(s0[env_idx*3]))
+                _agent2_o[env_idx].append(_qenv._env2rgb(s0[env_idx*3+1]))
+                _agent3_o[env_idx].append(_qenv._env2rgb(s0[env_idx*3+2]))
 
         if np.all(done):
             break
     etime_roll = time.time()
 
-    # Trajectory Training
+    # decentralize training
     dec_batch.extend(trajs)
-    if num_batch >= 0:
+    ma_batch.extend(ma_trajs)
+    dec_batch_size += sum([len(traj) for traj in trajs])
+    if dec_batch_size > minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-        train_decentral(network, dec_batch, 0, epoch, minibatch_size, writer, log_image_on, global_episodes)
+        train_decentral(dec_batch, ma_batch, 
+                epoch=epoch, batch_size=minibatch_size,
+                writer=writer, log=log_image_on, step=global_episodes)
         etime_train = time.time()
         dec_batch = []
+        ma_batch = []
+        dec_batch_size = 0
         log_traintime.append(etime_train - stime_train)
-    # MA training
-    ma_batch.extend(ma_trajs)
+    # centralize training
     batch.extend(cent_trajs)
     num_batch += sum([len(traj) for traj in cent_trajs])
     if num_batch >= minimum_batch_size:
-        log_ma_on = interval_flag(global_episodes, save_image_frequency, 'ma_log')
-        train_central(network, batch, 0, epoch, minibatch_size, writer, log_ma_on, global_episodes)
-        train_ma_value(network, ma_batch, 0, writer=writer, log=log_ma_on, step=global_episodes)
+        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
+        train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
         num_batch = 0
-        ma_batch = []
         batch = []
-
-    # Reward Training
-    if len(reward_training_buffer) > 50000:
+    elif len(reward_training_buffer) > 50000:
         log_rt_on = interval_flag(global_episodes, save_image_frequency, 'rt_log')
         train_reward_prediction(network, reward_training_buffer, epoch=2, batch_size=64, writer=writer, log=log_rt_on, step=global_episodes)
         reward_training_buffer.clear()
@@ -487,3 +502,98 @@ while True:
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
     if save_on:
         network.save(global_episodes)
+
+    # Save Gameplay
+    if log_save_analysis:
+        fig = plt.figure(figsize=(8,9))
+        widths = [1.2,0.5,1.5,1.5]
+        heights = [2,2,4,4,4]
+        gs = fig.add_gridspec(nrows=5, ncols=4,
+                width_ratios=widths, height_ratios=heights)
+        ax_env = fig.add_subplot(gs[:2,:2])
+        ax_env.set_title('State')
+        ax_env.set_xticks([])
+        ax_env.set_yticks([])
+        ax_value = fig.add_subplot(gs[:2, 2:])
+        ax_value.set_title('Global Value/Reward')
+        ax_value.autoscale(True)
+        ax_agent1 = fig.add_subplot(gs[2,0])
+        ax_agent1.set_ylabel('Agent 1')
+        ax_agent1.set_xticks([])
+        ax_agent1.set_yticks([])
+        ax_agent2 = fig.add_subplot(gs[3,0])
+        ax_agent2.set_ylabel('Agent 2')
+        ax_agent2.set_xticks([])
+        ax_agent2.set_yticks([])
+        ax_agent3 = fig.add_subplot(gs[4,0])
+        ax_agent3.set_ylabel('Agent 3')
+        ax_agent3.set_xticks([])
+        ax_agent3.set_yticks([])
+        ax_reward3 = fig.add_subplot(gs[4,1:])
+        ax_reward3.autoscale(True)
+        ax_reward2 = fig.add_subplot(gs[3,1:], sharex=ax_reward3)
+        ax_reward2.set_xticks([])
+        ax_reward2.autoscale(True)
+        ax_reward1 = fig.add_subplot(gs[2,1:], sharex=ax_reward3)
+        ax_reward1.set_xticks([])
+        ax_reward1.autoscale(True)
+
+        env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)
+        agent_obs1 = ax_agent1.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
+        agent_obs2 = ax_agent2.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
+        agent_obs3 = ax_agent3.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
+        env_reward_plot, env_value_plot = ax_value.plot([],[], [],[])
+        reward_plot1, = ax_reward1.plot([],[]) 
+        reward_plot2, = ax_reward2.plot([],[]) 
+        reward_plot3, = ax_reward3.plot([],[]) 
+
+        plt.subplots_adjust(wspace=0.33, hspace=0.33)
+
+        fig.canvas.draw()
+        
+        def animate(i, info, critic, env_idx):
+            # Environment image
+            env_image.set_data(info['saved_board_rgb'][i])
+            agent_obs1.set_data(_agent1_o[env_idx][i])
+            agent_obs2.set_data(_agent2_o[env_idx][i])
+            agent_obs3.set_data(_agent3_o[env_idx][i])
+
+            env_reward_plot.set_data(np.arange(i), info['rewards'][:i])
+            env_value_plot.set_data(np.arange(i), critic[:i])
+            ax_value.relim()
+            ax_value.autoscale_view()
+
+            reward_plot1.set_data(np.arange(i), _agent1_r[env_idx][:i])
+            ax_reward1.relim()
+            ax_reward1.autoscale_view()
+            reward_plot2.set_data(np.arange(i), _agent2_r[env_idx][:i])
+            ax_reward2.relim()
+            ax_reward2.autoscale_view()
+            reward_plot3.set_data(np.arange(i), _agent3_r[env_idx][:i])
+            ax_reward3.relim()
+            ax_reward3.autoscale_view()
+
+            return ax_env, ax_value, ax_reward1, ax_reward2, ax_reward3, ax_agent1, ax_agent2, ax_agent3
+
+        for idx, game_info in enumerate(history):
+            states = np.array(_states[idx])
+            env_critic, _ = network.run_network_central(states) 
+            critic = env_critic['critic'].numpy()[:,0]
+
+            path = os.path.join(SAVE_PATH, str(global_episodes), str(idx)+'.mp4')
+            path_create(os.path.join(SAVE_PATH, str(global_episodes)))
+            fg = plt.gcf()
+            anim = FuncAnimation(fig, partial(animate, info=game_info, critic=critic, env_idx=idx),
+                    frames=len(game_info['rewards']), interval=500)
+            anim.save(path)
+            if idx > 5:
+                break
+        print('save animation done')
+        _states = None
+        _agent1_r = None
+        _agent2_r = None
+        _agent3_r = None
+        _agent1_o = None
+        _agent2_o = None
+        _agent3_o = None
+

@@ -30,20 +30,22 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Decoder
         self.decoder = V4INVDecentral()
 
-        # Actor
-        self.actor_dense1 = layers.Dense(128, activation='elu')
-        self.actor_dense2 = layers.Dense(action_size, activation='elu')
-        self.softmax = layers.Activation('softmax')
-        self.log_softmax = layers.Activation(tf.nn.log_softmax)
-
         # Phi
         self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
+        self.dense1 = layers.Dense(128, activation='relu')
+        self.dense2 = layers.Dense(128, activation='relu')
+
+        # Actor
+        self.actor_dense1 = layers.Dense(128, activation='relu')
+        self.actor_dense2 = layers.Dense(action_size, activation='relu')
+        self.softmax = layers.Activation('softmax')
+        self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Psi
-        self.psi_dense1 = layers.Dense(units=64, activation='elu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='elu')
-        self.psi_dropout = layers.Dropout(0.3)
+        self.psi_dense1 = layers.Dense(units=128, activation='relu')
+        self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
+        self.psi_dropout = layers.Dropout(0.2)
         self.psi_loss_func = tf.keras.losses.MeanSquaredError()
         self.critic_loss_func = tf.keras.losses.MeanSquaredError()
 
@@ -57,7 +59,14 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Feature Encoding
         net = self.feature_layer(obs)
 
-        decoded_state = self.decoder(tf.stop_gradient(net))
+        # SF - Phi
+        phi = self.phi_dense1(net)
+        r_pred = self.successor_weight(phi, training=True)
+        net = self.dense1(phi)
+        net = self.dense2(net)
+
+        # Decoder
+        decoded_state = self.decoder(phi)
 
         # Actor
         actor_net = self.actor_dense1(net)
@@ -65,17 +74,13 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         softmax_logits = self.softmax(actor_net)
         log_logits = self.log_softmax(actor_net)
 
-        # SF
-        phi = self.phi_dense1(net)
-        r_pred = self.successor_weight(phi)
-
-        psi = self.psi_dense1(tf.stop_gradient(phi))
+        psi = self.psi_dense1(tf.stop_gradient(net))
         psi = self.psi_dense2(psi)
 
-        critic = self.psi_dense1(phi)
+        critic = self.psi_dense1(net)
         critic = self.psi_dense2(critic)
         critic = self.psi_dropout(critic)
-        critic = self.successor_weight(critic, training=False)
+        critic = self.successor_weight(critic)
 
         SF = {'reward_predict': r_pred,
               'phi': phi,
@@ -312,10 +317,11 @@ def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_targe
     return total_loss, info
 
 #@tf.function
-def loss_multiagent_critic(model, states_list, value_central, mask, training=True):
+def loss_multiagent_critic(model, team_state, value_central, mask, training=True):
     # states_list should be given in flat format
-    num_env = mask.shape[0]
-    num_agent = mask.shape[1]
+    num_batch, num_agent, lx, ly, lc = team_state.shape
+
+    states_list = tf.reshape(team_state, [num_batch*num_agent, lx, ly, lc])
     pi, v = model(states_list, training=training)
     critics = tf.reshape(v['critic'], mask.shape) * tf.cast(mask, tf.float32)
     group_critic = tf.reduce_sum(critics, axis=1)
@@ -324,14 +330,18 @@ def loss_multiagent_critic(model, states_list, value_central, mask, training=Tru
     info = {'ma_critic': mse}
     return total_loss, info
 
+def get_gradient(model, loss, inputs, **hyperparameters):
+    with tf.GradientTape() as tape:
+        loss_val, info = loss(model, **inputs, **hyperparameters, training=True)
+    grads = tape.gradient(loss_val, model.trainable_variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+    return grads, info
+
 def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
         loss_val, info = loss(model, **inputs, **hyperparameters, training=True)
-    grads = tape.gradient(loss_val, model.trainable_variables)
-    optimizer.apply_gradients([
-        (grad, var)
-        for (grad,var) in zip(grads, model.trainable_variables)
-        if grad is not None])
-
+    grads = tape.gradient(loss_val, model.trainable_variables,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss_val, info
 

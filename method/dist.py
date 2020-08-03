@@ -147,10 +147,11 @@ class SF_CVDC:
         # Non-categorial distributional feature encoding
         # Central encoding
         from network.DistValue_SF_CVDC import V4SF_CVDC_CENTRAL, V4SF_CVDC_DECENTRAL
-        from network.DistValue_SF_CVDC import train 
+        from network.DistValue_SF_CVDC import get_gradient, train
         from network.DistValue_SF_CVDC import loss_central_critic, loss_reward_central
         from network.DistValue_SF_CVDC import loss_ppo, loss_multiagent_critic
         self.train = train
+        self.get_gradient = get_gradient
         self.loss_central_critic = loss_central_critic
         self.loss_reward = loss_reward_central
         self.loss_ppo = loss_ppo
@@ -165,7 +166,7 @@ class SF_CVDC:
 
         # Build Trainer
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+        self.optimizer_central = tf.keras.optimizers.Adam(lr, clipnorm=1.0)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -174,7 +175,7 @@ class SF_CVDC:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
         self.save_directory_decentral = os.path.join(save_path, 'decentral')
-        self.optimizer_decentral = tf.keras.optimizers.Adam(lr)
+        self.optimizer_decentral = tf.keras.optimizers.Adam(lr, clipnorm=1.0)
         self.checkpoint_decentral = tf.train.Checkpoint(
                 optimizer=self.optimizer_decentral, model=self.model_decentral)
         self.manager_decentral = tf.train.CheckpointManager(
@@ -203,19 +204,51 @@ class SF_CVDC:
         return info
     
     # Decentralize updater
-    def update_ppo(self, inputs):
-        _, info = self.train(self.model_decentral, self.loss_ppo, self.optimizer_decentral, inputs)
-        return info
+    def update_decentral(self, agent_dataset, team_dataset, log):
+        actor_losses = []
+        dec_psi_losses = []
+        entropy = []
+        decoder_losses = []
+        critic_mse = []
+        multiagent_value_loss = []
 
-    def update_multiagent_critic(self, states_list, value_central, mask):
-        states_list = np.reshape(states_list, [600,39,39,6])
-        inputs = {
-                'states_list': states_list,
-                'value_central': value_central,
-                'mask': mask,
-                }
-        _, info = self.train(self.model_decentral, self.loss_multiagent_critic, self.optimizer_decentral, inputs)
-        return info
+        # Get gradients
+        grads = []
+        for inputs in agent_dataset:
+            grad, info = self.get_gradient(self.model_decentral, self.loss_ppo, inputs)
+            grads.append(grad)
+            if log:
+                actor_losses.append(info['actor_loss'])
+                dec_psi_losses.append(info['psi_loss'])
+                entropy.append(info['entropy'])
+                decoder_losses.append(info['generator_loss'])
+                critic_mse.append(info['critic_mse'])
+        for inputs in team_dataset:
+            grad, info = self.get_gradient(self.model_decentral, self.loss_multiagent_critic, inputs)
+            grads.append(grad)
+            if log:
+                multiagent_value_loss.append(info['ma_critic'])
+
+        # Accumulate gradients
+        num_grads = len(grads)
+        total_grad = grads.pop(0)
+        while grads:
+            grad = grads.pop(0)
+            for i, val in enumerate(grad):
+                total_grad[i] += val
+        #for val in total_grad:
+        #    val /= num_grads
+
+        # Update network
+        self.optimizer_decentral.apply_gradients(zip(total_grad, self.model_decentral.trainable_variables))
+                
+        logs = {'dec_actor_loss': np.mean(actor_losses),
+                'dec_psi_loss': np.mean(dec_psi_losses),
+                'dec_entropy': np.mean(entropy),
+                'dec_generator_loss': np.mean(decoder_losses),
+                'dec_critic_loss': np.mean(critic_mse),
+                'dec_ma_critic': np.mean(multiagent_value_loss)}
+        return logs
 
     # Save and Load
     def initiate(self, verbose=1):
