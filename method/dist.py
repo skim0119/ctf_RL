@@ -223,11 +223,13 @@ class SF_CVDC:
                 entropy.append(info['entropy'])
                 decoder_losses.append(info['generator_loss'])
                 critic_mse.append(info['critic_mse'])
+        '''
         for inputs in team_dataset:
             grad, info = self.get_gradient(self.model_decentral, self.loss_multiagent_critic, inputs)
             grads.append(grad)
             if log:
                 multiagent_value_loss.append(info['ma_critic'])
+        '''
 
         # Accumulate gradients
         num_grads = len(grads)
