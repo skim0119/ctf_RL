@@ -166,7 +166,7 @@ class SF_CVDC:
 
         # Build Trainer
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr, clipnorm=1.0)
+        self.optimizer_central = tf.keras.optimizers.Adam(lr)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -175,7 +175,7 @@ class SF_CVDC:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
         self.save_directory_decentral = os.path.join(save_path, 'decentral')
-        self.optimizer_decentral = tf.keras.optimizers.Adam(lr, clipnorm=1.0)
+        self.optimizer_decentral = tf.keras.optimizers.Adam(lr)
         self.checkpoint_decentral = tf.train.Checkpoint(
                 optimizer=self.optimizer_decentral, model=self.model_decentral)
         self.manager_decentral = tf.train.CheckpointManager(
@@ -211,6 +211,7 @@ class SF_CVDC:
         decoder_losses = []
         critic_mse = []
         multiagent_value_loss = []
+        multiagent_reward_loss = []
 
         # Get gradients
         grads = []
@@ -223,13 +224,12 @@ class SF_CVDC:
                 entropy.append(info['entropy'])
                 decoder_losses.append(info['generator_loss'])
                 critic_mse.append(info['critic_mse'])
-        '''
         for inputs in team_dataset:
             grad, info = self.get_gradient(self.model_decentral, self.loss_multiagent_critic, inputs)
             grads.append(grad)
             if log:
                 multiagent_value_loss.append(info['ma_critic'])
-        '''
+                multiagent_reward_loss.append(info['reward_loss'])
 
         # Accumulate gradients
         num_grads = len(grads)
@@ -238,8 +238,6 @@ class SF_CVDC:
             grad = grads.pop(0)
             for i, val in enumerate(grad):
                 total_grad[i] += val
-        #for val in total_grad:
-        #    val /= num_grads
 
         # Update network
         self.optimizer_decentral.apply_gradients(zip(total_grad, self.model_decentral.trainable_variables))
@@ -249,7 +247,8 @@ class SF_CVDC:
                 'dec_entropy': np.mean(entropy),
                 'dec_generator_loss': np.mean(decoder_losses),
                 'dec_critic_loss': np.mean(critic_mse),
-                'dec_ma_critic': np.mean(multiagent_value_loss)}
+                'dec_ma_critic': np.mean(multiagent_value_loss),
+                'dec_ma_reward': np.mean(multiagent_reward_loss),}
         return logs
 
     # Save and Load
@@ -259,10 +258,12 @@ class SF_CVDC:
             return 0
         else:
             status = self.checkpoint_central.restore(last_checkpoint)
-            status.assert_consumed()
+            status.assert_existing_objects_matched()
+            #status.assert_consumed()
             last_checkpoint = tf.train.latest_checkpoint(self.save_directory_decentral)
             status = self.checkpoint_decentral.restore(last_checkpoint)
-            status.assert_consumed()
+            status.assert_existing_objects_matched() 
+            #status.assert_consumed()
             return int(last_checkpoint.split('/')[-1].split('-')[-1])
 
         cent_path = self.manager_central.restore_or_initialize()

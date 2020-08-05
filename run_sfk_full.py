@@ -47,7 +47,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'DIST_SF_CVDC_20'
+TRAIN_NAME = 'DIST_SF_CVDC_21'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -98,7 +98,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 4
+minimum_batch_size = 1024 * 8
 print(minimum_batch_size)
 
 ## Setup
@@ -143,7 +143,7 @@ print(global_episodes)
 input('start?')
 
 writer = tf.summary.create_file_writer(LOG_PATH)
-network.save(global_episodes)
+#network.save(global_episodes)
 
 ### TRAINING ###
 def make_ds(features, labels, shuffle_buffer_size=64, repeat=False):
@@ -260,10 +260,12 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
         traj_buffer['team_state'].extend(traj[0])
         traj_buffer['value_central'].extend(td_target_c)
         traj_buffer['mask'].extend(traj[1])
+        traj_buffer['rewards'].extend(traj[2])
     team_dataset = tf.data.Dataset.from_tensor_slices({
             'team_state': np.stack(traj_buffer['team_state']),
             'value_central': np.stack(traj_buffer['value_central']),
             'mask': np.stack(traj_buffer['mask']),
+            'rewards': np.stack(traj_buffer['rewards']),
             }).shuffle(64).repeat(epoch).batch(batch_size)
 
     logs =  network.update_decentral(agent_dataset, team_dataset, log=log)
@@ -325,7 +327,7 @@ dec_batch_size = 0
 #while global_episodes < total_episodes:
 while True:
     # Flags
-    log_save_analysis = interval_flag(global_episodes, 1024, 'save_log')
+    log_save_analysis = interval_flag(global_episodes, 1024*4, 'save_log')
 
     # initialize parameters 
     episode_rew = np.zeros(NENV)
@@ -405,7 +407,7 @@ while True:
                 trajs[idx].append([
                     s0[idx],
                     a0[idx],
-                    reward[env_idx],# + 0.01*reward_pred1[idx], # Advantage
+                    reward[env_idx] + 0.01*reward_pred1[idx], # Advantage
                     done[env_idx],
                     s1[idx],
                     v0[idx], # Advantage

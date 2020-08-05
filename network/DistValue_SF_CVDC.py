@@ -32,7 +32,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # Phi
         self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid')
-        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
+        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
+                kernel_constraint=tf.keras.constraints.MaxNorm(2))
         self.dense1 = layers.Dense(128, activation='relu')
         self.dense2 = layers.Dense(128, activation='relu')
 
@@ -46,8 +47,11 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.psi_dense1 = layers.Dense(units=128, activation='relu')
         self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
         self.psi_dropout = layers.Dropout(0.2)
-        self.psi_loss_func = tf.keras.losses.MeanSquaredError()
-        self.critic_loss_func = tf.keras.losses.MeanSquaredError()
+
+        # Loss
+        self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
+        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
+                reduction=tf.keras.losses.Reduction.SUM)
 
     def print_summary(self):
         self.feature_layer.summary()
@@ -61,7 +65,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # SF - Phi
         phi = self.phi_dense1(net)
-        r_pred = self.successor_weight(phi, training=True)
+        r_pred = self.successor_weight(phi, training=False)
         net = self.dense1(phi)
         net = self.dense2(net)
 
@@ -82,13 +86,13 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         critic = self.psi_dropout(critic)
         critic = self.successor_weight(critic)
 
+        actor = {'softmax': softmax_logits,
+                 'log_softmax': log_logits}
         SF = {'reward_predict': r_pred,
               'phi': phi,
               'psi': psi,
               'critic': critic,
               'decoded_state': decoded_state}
-        actor = {'softmax': softmax_logits,
-                 'log_softmax': log_logits}
 
         return actor, SF
 
@@ -289,9 +293,9 @@ def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_targe
     # Psi Loss
     td_target = tf.cast(td_target, tf.float32)
     #psi_mse = tf.reduce_mean(tf.square(td_target - psi))
-    psi_mse = model.psi_loss_func(td_target, psi)
+    psi_mse = model.mse_loss_mean(td_target, psi)
 
-    critic_mse = model.psi_loss_func(td_target_c, v['critic'])
+    critic_mse = model.mse_loss_mean(td_target_c, v['critic'])
 
     # Actor Loss
     action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
@@ -316,30 +320,35 @@ def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_targe
 
     return total_loss, info
 
-#@tf.function
-def loss_multiagent_critic(model, team_state, value_central, mask, training=True):
+@tf.function
+def loss_multiagent_critic(model, team_state, value_central, rewards, mask):
     # states_list should be given in flat format
     num_batch, num_agent, lx, ly, lc = team_state.shape
+    mask = tf.cast(mask, tf.float32)
 
     states_list = tf.reshape(team_state, [num_batch*num_agent, lx, ly, lc])
-    pi, v = model(states_list, training=training)
-    critics = tf.reshape(v['critic'], mask.shape) * tf.cast(mask, tf.float32)
+    _, v = model(states_list)
+    critics = tf.reshape(v['critic'], mask.shape) * mask
     group_critic = tf.reduce_sum(critics, axis=1)
-    mse = model.critic_loss_func(value_central, group_critic)
+    mse = model.mse_loss_mean(value_central, group_critic)
+
+    rewards_prediction = tf.reshape(v['reward_predict'], mask.shape) * mask
+    reward_loss = model.mse_loss_sum(rewards, rewards_prediction)
+
     total_loss = 0.001*mse
-    info = {'ma_critic': mse}
+    info = {'ma_critic': mse, 'reward_loss': reward_loss}
     return total_loss, info
 
 def get_gradient(model, loss, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
-        loss_val, info = loss(model, **inputs, **hyperparameters, training=True)
+        loss_val, info = loss(model, **inputs, **hyperparameters)
     grads = tape.gradient(loss_val, model.trainable_variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
     return grads, info
 
 def train(model, loss, optimizer, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
-        loss_val, info = loss(model, **inputs, **hyperparameters, training=True)
+        loss_val, info = loss(model, **inputs, **hyperparameters)
     grads = tape.gradient(loss_val, model.trainable_variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
