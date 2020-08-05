@@ -114,7 +114,8 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         # Phi
         #self.phi_dense1 = layers.Dense(units=atoms, activation='elu')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
-                kernel_regularizer=tf.keras.regularizers.l2(0.0001))
+                kernel_constraint=tf.keras.constraints.MaxNorm(2))
+                #kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 
         # Psi
         self.psi_dense1 = layers.Dense(units=64, activation='elu')
@@ -311,7 +312,8 @@ def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_targe
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + 0.5*critic_mse
+    #total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + 0.5*critic_mse
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss #+ 0.5*critic_mse
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
             'critic_mse': critic_mse,

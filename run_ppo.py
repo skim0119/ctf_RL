@@ -135,7 +135,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             continue
         buffer_size += len(traj)
 
-        td_target, advantages = gae(traj[2], traj[3], 0,
+        td_target, advantages = gae(traj[2], traj[3], traj[5][-1],
                 gamma, lambd, normalize=False)
         
         traj_buffer['state'].extend(traj[0])
@@ -187,7 +187,7 @@ while True:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=5) for _ in range(num_blue*NENV)]
+    trajs = [Trajectory(depth=6) for _ in range(num_blue*NENV)]
     
     # Bootstrap
     s1 = envs.reset(
@@ -214,8 +214,9 @@ while True:
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):
             env_idx = idx // num_blue
-            if was_alive[idx] and not was_done[env_idx]:
-                trajs[idx].append([s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx]])
+            #if was_alive[idx] and not was_done[env_idx]:
+            if not was_done[env_idx]:
+                trajs[idx].append([s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx], v1[idx]])
 
         was_alive = is_alive
         was_done = done
