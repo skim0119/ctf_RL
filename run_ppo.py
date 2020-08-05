@@ -30,7 +30,7 @@ from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
-from utility.logger import record
+from utility.logger import *
 from utility.gae import gae
 
 from method.ActorCritic import PPO_Module as Network
@@ -40,7 +40,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_Full_05' 
+TRAIN_NAME = 'PPO_STACK_Full_07' 
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -74,8 +74,8 @@ lr_c           = config.getfloat('TRAINING', 'LR_CRITIC')
 
 # Log Setting
 save_network_frequency = config.getint('LOG', 'SAVE_NETWORK_FREQ')
-save_stat_frequency    = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
-save_image_frequency   = config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_stat_frequency    = 128#config.getint('LOG', 'SAVE_STATISTICS_FREQ')
+save_image_frequency   = 128#config.getint('LOG', 'SAVE_STATISTICS_FREQ')
 moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
@@ -128,6 +128,7 @@ network.save(global_episodes)
 
 ### TRAINING ###
 def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+    advantage_list = []
     traj_buffer = defaultdict(list)
     buffer_size = 0
     for idx, traj in enumerate(trajs):
@@ -137,6 +138,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
 
         td_target, advantages = gae(traj[2], traj[3], traj[5][-1],
                 gamma, lambd, normalize=False)
+        advantage_list.append(advantages)
         
         traj_buffer['state'].extend(traj[0])
         traj_buffer['action'].extend(traj[1])
@@ -166,6 +168,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
     if log:
         with writer.as_default():
             tag = 'summary/'
+            tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
             tf.summary.scalar(tag+'main_critic_loss', np.mean(critic_losses), step=step)
             tf.summary.scalar(tag+'main_actor_loss', np.mean(actor_losses), step=step)
             tf.summary.scalar(tag+'main_total_loss', np.mean(total_losses), step=step)
