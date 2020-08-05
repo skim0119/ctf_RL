@@ -146,33 +146,21 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         traj_buffer['advantage'].extend(advantages)
         traj_buffer['old_log_logit'].extend(traj[4])
 
-    if buffer_size < 10:
-        return
+    train_dataset = tf.data.Dataset.from_tensor_slices({
+        'state': np.stack(traj_buffer['state']),
+        'old_log_logit': np.stack(traj_buffer['old_log_logit']),
+        'action': np.stack(traj_buffer['action']),
+        'advantage': np.stack(traj_buffer['advantage']),
+        'td_target': np.stack(traj_buffer['td_target']),
+        }).shuffle(64).repeat(epoch).batch(batch_size)
 
-    it = batch_sampler(
-            batch_size,
-            epoch,
-            np.stack(traj_buffer['state']),
-            np.stack(traj_buffer['old_log_logit']),
-            np.stack(traj_buffer['action']),
-            np.stack(traj_buffer['advantage']),
-            np.stack(traj_buffer['td_target']),
-        )
-    total_losses, actor_losses, critic_losses, entropies = [], [], [], []
-    for mdp_tuple in it:
-        total_loss, actor_loss, critic_loss, entropy = network.update_network(*mdp_tuple)
-        total_losses.append(total_loss)
-        actor_losses.append(actor_loss)
-        critic_losses.append(critic_loss)
-        entropies.append(entropy)
+    logs = network.update_network(train_dataset, log=log)
     if log:
         with writer.as_default():
             tag = 'summary/'
             tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
-            tf.summary.scalar(tag+'main_critic_loss', np.mean(critic_losses), step=step)
-            tf.summary.scalar(tag+'main_actor_loss', np.mean(actor_losses), step=step)
-            tf.summary.scalar(tag+'main_total_loss', np.mean(total_losses), step=step)
-            tf.summary.scalar(tag+'entropy', np.mean(entropies), step=step)
+            for name, val in logs.items():
+                tf.summary.scalar(tag+name, val, step=step)
             writer.flush()
 
 def get_action(states):

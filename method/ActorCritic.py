@@ -41,15 +41,34 @@ class PPO_Module:
         actions = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
         return actions, critics, log_logits
 
-    def update_network(self, state_input, old_log_logit, action, advantage, td_target):
-        inputs = {'state': state_input,
-                  'old_log_logit': old_log_logit,
-                  'action': action,
-                  'advantage': advantage,
-                  'td_target': td_target}
-        total_loss, info = self.train(self.model, self.optimizer, inputs)
+    def update_network(self, train_dataset, log=False):
+        actor_losses, critic_losses, entropies = [], [], []
+        grads = []
+        for inputs in train_dataset:
+            grad, info = self.get_gradient(self.model, inputs)
+            grads.append(grad)
+            if log:
+                actor_losses.append(info['actor_loss'])
+                critic_losses.append(info['critic_loss'])
+                entropies.append(info['entropy'])
 
-        return total_loss, info['actor_loss'], info['critic_loss'], info['entropy']
+        # Accumulate gradients
+        num_grads = len(grads)
+        total_grad = grads.pop(0)
+        while grads:
+            grad = grads.pop(0)
+            for i, val in enumerate(grad):
+                total_grad[i] += val
+
+        # Update network
+        self.optimizer.apply_gradients(zip(total_grad, self.model.trainable_variables))
+
+        #total_loss, info = self.train(self.model, self.optimizer, inputs)
+
+        logs = {'actor_loss': np.mean(actor_losses),
+                'critic_loss': np.mean(critic_losses),
+                'entropy': np.mean(entropies)}
+        return logs
 
     def initiate(self, verbose=1):
         path = self.manager.restore_or_initialize()

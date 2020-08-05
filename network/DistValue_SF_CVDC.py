@@ -26,6 +26,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # Feature Encoding
         self.feature_layer = V4Decentral(input_shape, action_size)
+        self.pi_layer = V4Decentral(input_shape, action_size)
 
         # Decoder
         self.decoder = V4INVDecentral()
@@ -34,8 +35,6 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_constraint=tf.keras.constraints.MaxNorm(2))
-        self.dense1 = layers.Dense(128, activation='relu')
-        self.dense2 = layers.Dense(128, activation='relu')
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
@@ -60,21 +59,20 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Run full network
         obs = inputs
 
-        # Feature Encoding
-        net = self.feature_layer(obs)
+        # Actor
+        net = self.pi_layer(obs)
+        net = self.actor_dense1(net)
+        net = self.actor_dense2(net)
+        softmax_logits = self.softmax(net)
+        log_logits = self.log_softmax(net)
 
-        # SF - Phi
+        # Feature Encoding SF-phi
+        net = self.feature_layer(obs)
         phi = self.phi_dense1(net)
         r_pred = self.successor_weight(phi, training=False)
 
         # Decoder
         decoded_state = self.decoder(phi)
-
-        # Actor
-        actor_net = self.actor_dense1(net)
-        actor_net = self.actor_dense2(actor_net)
-        softmax_logits = self.softmax(actor_net)
-        log_logits = self.log_softmax(actor_net)
 
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
@@ -82,7 +80,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         critic = self.psi_dense1(phi)
         critic = self.psi_dense2(critic)
         critic = self.psi_dropout(critic)
-        critic = self.successor_weight(critic)
+        critic = self.successor_weight(critic, training=True)
 
         actor = {'softmax': softmax_logits,
                  'log_softmax': log_logits}
