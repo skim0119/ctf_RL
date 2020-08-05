@@ -66,8 +66,6 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # SF - Phi
         phi = self.phi_dense1(net)
         r_pred = self.successor_weight(phi, training=False)
-        net = self.dense1(phi)
-        net = self.dense2(net)
 
         # Decoder
         decoded_state = self.decoder(phi)
@@ -78,10 +76,10 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         softmax_logits = self.softmax(actor_net)
         log_logits = self.log_softmax(actor_net)
 
-        psi = self.psi_dense1(tf.stop_gradient(net))
+        psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
 
-        critic = self.psi_dense1(net)
+        critic = self.psi_dense1(phi)
         critic = self.psi_dense2(critic)
         critic = self.psi_dropout(critic)
         critic = self.successor_weight(critic)
@@ -275,7 +273,7 @@ def loss_central_critic(model, state, td_target, td_target_c,
 
 #@tf.function
 def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_target_c,
-         eps=0.2, entropy_beta=0.3, psi_beta=0.10, decoder_beta=1e-4, gamma=0.98,
+         eps=0.2, entropy_beta=0.4, psi_beta=0.02, decoder_beta=1e-4, gamma=0.98,
          training=True):
     num_sample = state.shape[0]
 
@@ -312,8 +310,8 @@ def loss_ppo(model, state, old_log_logit, action, td_target, advantage, td_targe
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    #total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + 0.5*critic_mse
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss #+ 0.5*critic_mse
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + 0.5*critic_mse
+    #total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss #+ 0.5*critic_mse
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
             'critic_mse': critic_mse,

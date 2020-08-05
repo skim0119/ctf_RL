@@ -35,8 +35,7 @@ from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
-from utility.logger import record
-from utility.logger import tb_log_ctf_frame
+from utility.logger import *
 from utility.gae import gae
 #from utility.slack import SlackAssist
 
@@ -98,7 +97,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 8
+minimum_batch_size = 1024 * 4
 print(minimum_batch_size)
 
 ## Setup
@@ -213,6 +212,7 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             writer.flush()
 
 def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+    advantage_list = []
     # Agent trajectory processing
     traj_buffer = defaultdict(list)
     for idx, traj in enumerate(agent_trajs):
@@ -231,6 +231,7 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
                 gamma, lambd, normalize=False)
         td_target, _ = gae(phi, psi, _psi,#np.zeros_like(phi[0]),
                 gamma, lambd, normalize=False)
+        advantage_list.append(advantages)
 
         traj_buffer['state'].extend(traj[0])
         traj_buffer['log_logit'].extend(traj[6])
@@ -273,6 +274,7 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
     if log:
         with writer.as_default():
             tag = 'summary/'
+            tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
             for name, val in logs.items():
                 tf.summary.scalar(tag+name, val, step=step)
             writer.flush()
@@ -362,6 +364,7 @@ while True:
     psi1 = critic['psi'].numpy()
     phi1 = critic['phi'].numpy()
 
+    reward_pred_list = []
     
     # Rollout
     stime_roll = time.time()
@@ -399,10 +402,13 @@ while True:
         v1 = critic['critic'].numpy()[:,0]
         psi1 = critic['psi'].numpy()
 
+        reward_pred_list.append(reward_pred1.reshape(-1))
+
         # Buffer
         for idx in range(NENV*num_agent):
             env_idx = idx // num_agent
-            if not was_done[env_idx] and was_alive[idx]:
+            #if not was_done[env_idx] and was_alive[idx]:
+            if not was_done[env_idx]:
                 # Decentral trajectory
                 trajs[idx].append([
                     s0[idx],
@@ -499,6 +505,7 @@ while True:
             tf.summary.scalar(tag+'env_reward', log_episodic_reward(), step=global_episodes)
             tf.summary.scalar(tag+'rollout_time', log_looptime(), step=global_episodes)
             tf.summary.scalar(tag+'train_time', log_traintime(), step=global_episodes)
+            tb_log_histogram(np.array(reward_pred_list), tag+'predicted_rewards', step=global_episodes)
             writer.flush()
         
     save_on = interval_flag(global_episodes, save_network_frequency, 'save')
@@ -598,4 +605,7 @@ while True:
         _agent1_o = None
         _agent2_o = None
         _agent3_o = None
+        anim = None
+
+        plt.close('all')
 

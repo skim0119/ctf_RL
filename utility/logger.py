@@ -14,6 +14,9 @@ def record(item, writer, step):
     writer.add_summary(summary, step)
     writer.flush()
 
+def tb_log_histogram(data, tag, step, **kargs):
+    tf.summary.histogram(name=tag, data=data, step=step, **kargs)
+
 def tb_log_ctf_frame(frame, tag, step):
     num_images = frame.shape[2]
     fig = plt.figure(1)
