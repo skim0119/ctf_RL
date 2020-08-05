@@ -40,17 +40,17 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_01' 
+TRAIN_NAME = 'PPO_STACK_Full_05' 
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
-MAP_PATH = './fair_3g_40'
+MAP_PATH = './fair_3g_20'
 GPU_CAPACITY = 0.95
 
-NENV = 8 # multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_setting_3v3_3g_partial.ini'
+env_setting_path = 'env_setting_3v3_3g_full.ini'
 
 ## Data Path
 path_create(LOG_PATH)
@@ -80,9 +80,9 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
-vision_range = 39#config.getint('DEFAULT', 'VISION_RANGE')
-keep_frame   = 4#config.getint('DEFAULT', 'KEEP_FRAME')
-map_size     = 40#config.getint('DEFAULT', 'MAP_SIZE')
+vision_range = config.getint('DEFAULT', 'VISION_RANGE')
+keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
+map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -119,8 +119,8 @@ if PROGBAR:
 network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
 
 # Resotre / Initialize
-global_episodes = 0
-network.initiate()
+global_episodes = network.initiate()
+print(global_episodes)
 
 writer = tf.summary.create_file_writer(LOG_PATH)
 network.save(global_episodes)

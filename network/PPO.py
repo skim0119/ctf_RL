@@ -26,13 +26,13 @@ class V4PPO(tf.keras.Model):
         self.feature_layer = V4(input_shape, action_size)
 
         # Actor
-        self.actor_dense1 = layers.Dense(128)
+        self.actor_dense1 = layers.Dense(128, activation='relu')
         self.actor_dense2 = layers.Dense(action_size)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Critic
-        self.critic_dense1 = layers.Dense(64)
+        self.critic_dense1 = layers.Dense(64, activation='relu')
         self.critic_dense2 = layers.Dense(1)
 
     def print_summary(self):

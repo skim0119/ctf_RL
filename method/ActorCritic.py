@@ -35,7 +35,6 @@ class PPO_Module:
                 directory=os.path.join(save_path, scope),
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
-        self.initiate()
 
     def run_network(self, states):
         actor, critics, log_logits = self.model(states)
@@ -52,8 +51,14 @@ class PPO_Module:
 
         return total_loss, info['actor_loss'], info['critic_loss'], info['entropy']
 
-    def initiate(self):
-        return self.manager.restore_or_initialize()
+    def initiate(self, verbose=1):
+        path = self.manager.restore_or_initialize()
+        if verbose:
+            print('Initialization: {}'.format(path))
+        if path == None:
+            return 0
+        else:
+            return int(path.split('/')[-1].split('-')[-1])
 
     def restore(self):
         status = self.checkpoint.restore(self.manager.latest_checkpoint)
