@@ -333,6 +333,7 @@ def loss_multiagent_critic(model, team_state, value_central, rewards, mask):
     mse = model.mse_loss_mean(value_central, group_critic)
 
     rewards_prediction = tf.reshape(v['reward_predict'], mask.shape) * mask
+    rewards_prediction = tf.reduce_sum(rewards_prediction, axis=1)
     reward_loss = model.mse_loss_sum(rewards, rewards_prediction)
 
     total_loss = 0.001*mse
