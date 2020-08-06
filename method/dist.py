@@ -217,7 +217,8 @@ class SF_CVDC:
         grads = []
         for inputs in agent_dataset:
             grad, info = self.get_gradient(self.model_decentral, self.loss_ppo, inputs)
-            grads.append(grad)
+            self.optimizer_decentral.apply_gradients(zip(grad, self.model_decentral.trainable_variables))
+            #grads.append(grad)
             if log:
                 actor_losses.append(info['actor_loss'])
                 dec_psi_losses.append(info['psi_loss'])
@@ -226,11 +227,12 @@ class SF_CVDC:
                 critic_mse.append(info['critic_mse'])
         for inputs in team_dataset:
             grad, info = self.get_gradient(self.model_decentral, self.loss_multiagent_critic, inputs)
-            grads.append(grad)
+            self.optimizer_decentral.apply_gradients(zip(grad, self.model_decentral.trainable_variables))
+            #grads.append(grad)
             if log:
                 multiagent_value_loss.append(info['ma_critic'])
                 multiagent_reward_loss.append(info['reward_loss'])
-
+        '''
         # Accumulate gradients
         num_grads = len(grads)
         total_grad = grads.pop(0)
@@ -241,6 +243,7 @@ class SF_CVDC:
 
         # Update network
         self.optimizer_decentral.apply_gradients(zip(total_grad, self.model_decentral.trainable_variables))
+        '''
                 
         logs = {'dec_actor_loss': np.mean(actor_losses),
                 'dec_psi_loss': np.mean(dec_psi_losses),

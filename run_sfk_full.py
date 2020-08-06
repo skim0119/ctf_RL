@@ -97,7 +97,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 4
+minimum_batch_size = 1024 * 2
 print(minimum_batch_size)
 
 ## Setup
@@ -413,7 +413,7 @@ while True:
                 trajs[idx].append([
                     s0[idx],
                     a0[idx],
-                    reward[env_idx] + 0.01*reward_pred1[idx], # Advantage
+                    reward[env_idx],# + 0.01*reward_pred1[idx], # Advantage
                     done[env_idx],
                     s1[idx],
                     v0[idx], # Advantage
