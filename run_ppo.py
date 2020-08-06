@@ -40,7 +40,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_Full_07' 
+TRAIN_NAME = 'PPO_STACK_Full_08' 
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -150,8 +150,8 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         'state': np.stack(traj_buffer['state']),
         'old_log_logit': np.stack(traj_buffer['old_log_logit']),
         'action': np.stack(traj_buffer['action']),
-        'advantage': np.stack(traj_buffer['advantage']),
-        'td_target': np.stack(traj_buffer['td_target']),
+        'advantage': np.stack(traj_buffer['advantage']).astype(np.float32),
+        'td_target': np.stack(traj_buffer['td_target']).astype(np.float32),
         }).shuffle(64).repeat(epoch).batch(batch_size)
 
     logs = network.update_network(train_dataset, log=log)

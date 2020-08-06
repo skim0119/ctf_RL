@@ -93,7 +93,7 @@ def loss(model, state, old_log_logit, action, advantage, td_target,
 
     return total_loss, info
 
-def get_gradient(model, inputs):
+def get_gradient(model, inputs, **hyperparameters):
     with tf.GradientTape() as tape:
         total_loss, info = loss(model, **inputs, **hyperparameters, training=True, return_losses=True)
     grads = tape.gradient(total_loss, model.trainable_variables,

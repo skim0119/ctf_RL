@@ -18,8 +18,9 @@ class PPO_Module:
         lr=1e-4,
         **kwargs
     ):
-        from network.PPO import V4PPO, train
+        from network.PPO import V4PPO, train, get_gradient
         self.train = train
+        self.get_gradient = get_gradient
 
         self.model = V4PPO(input_shape[1:], action_size=action_size)
 
