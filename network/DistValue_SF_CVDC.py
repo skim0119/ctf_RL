@@ -86,7 +86,9 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         q_w = self.sf_q_weight.weights[0]
         q_w_std = tf.math.reduce_std(q_w, axis=1, keepdims=True)
-        w = self.sf_v_weight.weights[0] * tf.nn.softmax(1/(q_w_std+1), axis=0)
+        w_mask = tf.cast(q_w_std[tf.argsort(q_w_std, axis=0)[-8,0]] > q_w_std, tf.float32)
+        w = self.sf_v_weight.weights[0]
+        w = w * w_mask
         #reward_predict = self.sf_v_weight(phi, training=False)
         reward_predict = tf.linalg.matmul(phi, w)
         icritic = tf.linalg.matmul(psi, w)
