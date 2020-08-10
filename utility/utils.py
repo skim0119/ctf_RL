@@ -98,35 +98,6 @@ def path_create(path, override=False):
         except OSError:
             raise OSError("Creation of the directory {} failed".format(path))
 
-def discount_rewards(rewards, gamma, normalized=False, mask_array=None):
-    """ take 1D float numpy array of rewards and compute discounted reward
-
-    Args:
-        rewards (numpy.array): list of rewards.
-        gamma (float): discount rate
-        normalize (bool): If true, normalize at the end (default=False)
-
-    Returns:
-        numpy.list : Return discounted reward
-
-    """
-
-    if mask_array is None:
-        return scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1], axis=-1)[::-1]
-    else:
-        y, adv = 0.0, []
-        mask_reverse = mask_array[::-1]
-        for i, reward in enumerate(reversed(rewards)):
-            y = reward + gamma * y * (1 - mask_reverse[i])
-            adv.append(y)
-        disc_r = np.array(adv)[::-1]
-
-        if normalized:
-            disc_r = (disc_r - np.mean(disc_r)) / (np.std(disc_r) + 1e-13)
-
-        return disc_r
-
-
 def q_retrace(reward, value_ext, gamma, is_weight):
     retrace_weight = np.minimum(1.0, is_weight)
     td_target = reward + gamma * value_ext[1:]

@@ -40,17 +40,17 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_Full_08' 
+TRAIN_NAME = 'PPO_STACK_Full_01_convoy' 
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 MAP_PATH = './fair_3g_20'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_setting_3v3_3g_full.ini'
+env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
 
 ## Data Path
 path_create(LOG_PATH)
