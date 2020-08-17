@@ -25,18 +25,21 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         super(V4SF_CVDC_DECENTRAL, self).__init__()
 
         # Feature Encoding
-        self.feature_layer = V4Decentral(input_shape, action_size)
-        self.pi_layer = V4Decentral(input_shape, action_size)
+        self.feature_layer = V4Decentral(input_shape, action_size, name='feature_encoding')
+        self.pi_layer = V4Decentral(input_shape, action_size, name='pi_encoding')
 
         # Decoder
+        self.action_dense1 = layers.Dense(units=128, activation='relu')
+        self.decoder_pre_dense1 = layers.Dense(units=128, activation='relu')
+        self.decoder_dense1 = layers.Dense(units=128, activation='relu')
         self.decoder = V4INVDecentral()
 
         # Phi
-        self.phi_dense1 = layers.Dense(units=atoms, activation='sigmoid')
-        self.sf_v_weight = layers.Dense(units=1, activation='linear', use_bias=False,
-                kernel_constraint=tf.keras.constraints.MaxNorm(2))
-        self.sf_q_weight = layers.Dense(units=action_size, activation='linear', use_bias=False,
-                kernel_constraint=tf.keras.constraints.MaxNorm(2))
+        self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+        self.sf_v_weight = layers.Dense(units=1, activation='linear', use_bias=False,)
+                #kernel_constraint=tf.keras.constraints.MaxNorm(2))
+        self.sf_q_weight = layers.Dense(units=action_size, activation='linear', use_bias=False,)
+                #kernel_constraint=tf.keras.constraints.MaxNorm(2))
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
@@ -47,7 +50,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Psi
         self.psi_dense1 = layers.Dense(units=128, activation='relu')
         self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
-        self.psi_dropout = layers.Dropout(0.1)
+        self.smoothed_pseudo_H = tf.Variable(1.0)
 
         # Loss
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
@@ -59,34 +62,41 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
     def call(self, inputs):
         # Run full network
-        obs = inputs
+        obs = inputs[0]
+        action = inputs[1]
+        action_one_hot = tf.one_hot(action, self.action_size, dtype=tf.float32)
+
+        # Feature Encoding SF-phi
+        net = self.feature_layer(obs)
+        phi = self.phi_dense1(net)
+        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
 
         # Actor
         net = self.pi_layer(obs)
+        net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 
-        # Feature Encoding SF-phi
-        net = self.feature_layer(obs)
-        phi = self.phi_dense1(net)
-
         # Decoder
-        decoded_state = self.decoder(tf.stop_gradient(phi))
+        dec_net = self.decoder_pre_dense1(phi)
+        act_net = self.action_dense1(action_one_hot)
+        net = tf.math.multiply(dec_net, act_net)
+        net = self.decoder_dense1(net)
+        decoded_state = self.decoder(net)
 
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
 
-        net = self.psi_dense1(phi)
-        net = self.psi_dense2(net)
-        #net = self.psi_dropout(net)
+        net = self.psi_dense1(phi, training=False)
+        net = self.psi_dense2(net, training=False)
         critic = self.sf_v_weight(net, training=True)
         q = self.sf_q_weight(net, training=True)
 
         q_w = self.sf_q_weight.weights[0]
         q_w_std = tf.math.reduce_std(q_w, axis=1, keepdims=True)
-        w_mask = tf.cast(q_w_std[tf.argsort(q_w_std, axis=0)[-8,0]] > q_w_std, tf.float32)
+        w_mask = tf.cast(q_w_std[tf.argsort(q_w_std, axis=0)[-8,0]] <= q_w_std, tf.float32)
         w = self.sf_v_weight.weights[0]
         w = w * w_mask
         #reward_predict = self.sf_v_weight(phi, training=False)
@@ -101,7 +111,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
               'critic': critic,
               'decoded_state': decoded_state,
               'Q': q,
-              'icritic': icritic,
+              'icritic': critic - icritic,
               }
 
         return actor, SF
@@ -115,13 +125,12 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
 
         # Feature Encoding
         self.feature_layer = V4(input_shape)
-        self.z_mean = layers.Dense(units=atoms, activation='sigmoid')
-        self.z_log_var = layers.Dense(units=atoms, activation=tf.math.softplus)
 
         # Decoding
         self.decoder = V4INV()
 
         # Phi
+        self.phi = layers.Dense(units=atoms, activation='sigmoid')
         #self.phi_dense1 = layers.Dense(units=atoms, activation='elu')
         self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False,
                 kernel_constraint=tf.keras.constraints.MaxNorm(2))
@@ -141,114 +150,70 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         self.flat = layers.Flatten()
 
         # Loss
-        self.rp_loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
-        self.reward_loss = tf.keras.losses.MeanSquaredError(
+        
+        # Loss Operations
+        self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
+        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
                 reduction=tf.keras.losses.Reduction.SUM)
-        self.critic_loss = tf.keras.losses.MeanSquaredError()
+        self.rp_loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
     def print_summary(self):
         self.feature_layer.print_summary()
         #self.summary()
-
-    def inference_network(self, inputs):
-        state = inputs
-
-        # Encoder
-        net = self.feature_layer(state)
-        q_mu = self.z_mean(net)
-        q_log_var = self.z_log_var(net)
-        q_var = tf.math.exp(q_log_var)
-        q_sigma = tf.math.sqrt(q_var)
-        q_z = tfp.distributions.Normal(loc=q_mu, scale=q_sigma)
-        
-        return q_z, q_mu, q_log_var
-
-    def generative_network(self, q_z):
-        z = q_z.sample()
-        p_x_given_z_logits = self.decoder(z)
-        # p_x_given_z = tfp.distributions.Bernoulli(logits=p_x_given_z_logits) # Bernoulli for binary image
-        p_x_given_z = tfp.distributions.MultivariateNormalDiag(
-                #tf.reshape(p_x_given_z_logits,[-1]), scale_identity_multiplier=0.05)
-                self.flat(p_x_given_z_logits), scale_identity_multiplier=0.05)
-        return p_x_given_z, p_x_given_z_logits
-
-    def sample_generate(self):
-        q_z = tfp.distributions.Normal(loc=np.zeros(self.atoms, dtype=np.float32),
-                                       scale=np.ones(self.atoms, dtype=np.float32))
-        z = q_z.sample([1])
-        p_x_given_z_logits = self.decoder(z)
-        # p_x_given_z = tfp.distributions.Bernoulli(logits=p_x_given_z_logits) # Bernoulli for binary image
-        p_x_given_z = tfp.distributions.MultivariateNormalDiag(
-                #tf.reshape(p_x_given_z_logits,[-1]), scale_identity_multiplier=0.05)
-                self.flat(p_x_given_z_logits), scale_identity_multiplier=0.05)
-        return p_x_given_z, p_x_given_z_logits
 
     def call(self, inputs):
         state = inputs
 
         # Encoder
         n_sample = state.shape[0]
-        q_z, z_mean, z_log_var = self.inference_network(inputs)
+
+        # Phi
+        net = self.feature_layer(state)
+        net = self.phi(net)
 
         # Decoder
-        p_x_given_z, z_decoded = self.generative_network(q_z)
-
-        # Reconstruction Distribution
-        z = z_mean
-        #z = q_z.sample()
+        z_decoded = self.decoder(net)
 
         # Critic
         #phi = self.phi_dense1(net)
-        phi = z
-        r_pred = self.successor_weight(phi)
-        psi = self.psi_dense1(tf.stop_gradient(phi))
+        phi = net
+        r_pred = self.successor_weight(net, training=False)
+
+        psi = self.psi_dense1(tf.stop_gradient(net))
         psi = self.psi_dense2(psi)
         psi = self.psi_dropout(psi)
-        critic = self.successor_weight(psi, training=False)
+        critic = self.successor_weight(psi, training=True)
 
         # UNREAL-RP
-        rp = self.rp_dense(z)
+        rp = self.rp_dense(net)
 
-        feature = {'latent': z,
-                   'z_mean': z_mean,
-                   'z_log_var': z_log_var,
-                   'z_decoded': z_decoded,
-                   'q_z': q_z,
-                   'p_x_given_z': p_x_given_z}
+        feature = {'latent': net,
+                   'z_decoded': z_decoded,}
         SF = {'reward_predict': r_pred,
               'phi': phi,
               'psi': psi,
               'critic': critic,
-              'UNREAL_rp': rp}
+              'UNREAL_rp': rp,}
 
         return SF, feature 
-    
+
 @tf.function
-def loss_reward_central(model, state, reward):
-    # Critic - Reward Prediction
+def loss_central(model, state, td_target, td_target_c, reward,
+        psi_beta, beta_kl, recon_beta, critic_beta, unreal_rp_beta):
     inputs = state
     SF, feature = model(inputs)
-    r_pred = SF['reward_predict']
-    reward_mse = model.reward_loss(tf.cast(reward, tf.float32), r_pred)
 
-    # UNREAL - Reward Prediction
+    # Reward Prediction Accuracy (regression, not trained)
+    pred_reward = SF['reward_predict']
+    reward_acc = model.mse_loss_sum(reward, pred_reward)
+
+    # UNREAL - reward prediction
     rp = SF['UNREAL_rp']
     reward_label = reward + 1
     reward_label = tf.math.maximum(reward+1,0)
     reward_label = tf.math.minimum(reward+1,2)
-    reward_label = tf.one_hot(tf.cast(reward_label, tf.int32), depth=3)
+    reward_label = tf.one_hot(reward_label, depth=3)
     rp_loss = model.rp_loss(reward_label, rp)
-
-    total = 0.1*rp_loss#reward_mse + rp_loss
-
-    info = {'reward_mse': reward_mse, 'rp_loss': rp_loss} 
-    return total, info
-
-@tf.function
-def loss_central_critic(model, state, td_target, td_target_c,
-        psi_beta, beta_kl, elbo_beta, critic_beta):
-    inputs = state
-    SF, feature = model(inputs)
 
     # Critic - TD Difference
     psi = SF['psi']
@@ -256,67 +221,66 @@ def loss_central_critic(model, state, td_target, td_target_c,
     psi_mse = tf.reduce_mean(tf.square(td_target - psi))
 
     td_target_c = tf.cast(td_target_c, tf.float32)
-    critic_mse = model.critic_loss(td_target_c, SF['critic'])
+    critic_mse = model.mse_loss_mean(td_target_c, SF['critic'])
 
-    # VAE ELBO loss
-    p_z = tfp.distributions.Normal(loc=np.zeros(model.atoms, dtype=np.float32),
-                                   scale=np.ones(model.atoms, dtype=np.float32))
-    q_z = feature['q_z']
-    p_x_given_z = feature['p_x_given_z']
-    e_log_likelihood = p_x_given_z.log_prob(model.flat(state)) # Reconstruction term
-    kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(q_z, p_z), 1)
-    elbo = tf.reduce_mean(e_log_likelihood - kl_loss, axis=0)
+    # Reconstruction loss
+    z_decoded = feature['z_decoded']
+    recon_loss = model.mse_loss_sum(state, z_decoded)
 
-    total_loss = psi_beta*psi_mse - elbo_beta*elbo + critic_beta*critic_mse
-
-    _, sample_generated_image = model.sample_generate()
+    total_loss = psi_beta*psi_mse - recon_beta*recon_loss+ critic_beta*critic_mse + unreal_rp_beta*rp_loss
 
     info = {
         'psi_mse': psi_mse,
         'elbo': -elbo,
         'critic_mse': critic_mse,
-        'sample_generated_image': sample_generated_image[0],
-        'sample_decoded_image': feature['z_decoded'][0]
+        'sample_decoded_image': z_decoded[0],
+        'reward_mse': reward_acc,
+        'rp_loss': rp_loss
         }
 
     return total_loss, info
 
 @tf.function
-def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards,
-        eps, entropy_beta, psi_beta, decoder_beta, critic_beta):
+def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,
+        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta):
     num_sample = state.shape[0]
 
     # Run Model
-    pi, v = model(state)
+    pi, v = model([state, action])
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
 
-    # Reward Loss
+    # Reward Accuracy
     reward_loss = model.mse_loss_sum(rewards, v['reward_predict'])
 
     # Decoder loss
-    generator_loss = tf.reduce_mean(tf.square(state - v['decoded_state']))
+    #generator_loss = model.mse_loss_sum(state, v['decoded_state'])
+    generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
 
     # Entropy
-    entropy = -tf.reduce_mean(actor * tf_log(actor), name='entropy')
-
-    # Psi Loss
-    #psi_mse = tf.reduce_mean(tf.square(td_target - psi))
-    psi_mse = model.mse_loss_mean(td_target, psi)
+    H = -tf.reduce_sum(actor * tf_log(actor), axis=-1) # Entropy H of each sample
+    mean_entropy = tf.reduce_mean(H)
+    pseudo_H = tf.stop_gradient(
+            tf.reduce_sum(actor*(1-actor), axis=-1))
+    mean_pseudo_H = tf.reduce_mean(pseudo_H)
+    smoothed_pseudo_H = model.smoothed_pseudo_H
 
     # Critic Loss
     v_pred = v['critic']
     v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
-    critic_mse = tf.reduce_mean(tf.maximum(
+    critic_mse = tf.maximum(
         tf.square(v_pred - td_target_c),
-        tf.square(v_pred_clipped - td_target_c)))
-    #critic_mse = model.mse_loss_mean(td_target_c, v_pred)
+        tf.square(v_pred_clipped - td_target_c))
+    critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
+    
+    # Psi Loss
+    psi_mse = model.mse_loss_mean(td_target, psi)
 
     # Actor Loss
-    action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
-    log_prob = tf.reduce_sum(log_logits * action_OH, 1)
-    old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
+    action_one_hot = tf.one_hot(action, model.action_size, dtype=tf.float32)
+    log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
+    old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
 
     # Clipped surrogate function
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
@@ -327,14 +291,19 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Q - Loss
     q = v['Q']
-    q_a = tf.reduce_sum(q * action_OH, 1)
+    q_a = tf.reduce_sum(q * action_one_hot, 1)
     q_loss = tf.reduce_mean(tf.square(q_a - td_target_c))
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*entropy + decoder_beta*generator_loss + critic_beta*critic_mse + 0.5*q_loss
+    # L2 loss
+    #l2_loss = tf.nn.l2_loss(model.sf_v_weight.weights[0]) + tf.nn.l2_loss(model.sf_q_weight.weights[0])
+
+    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*mean_entropy + decoder_beta*generator_loss + critic_beta*critic_mse + q_beta*q_loss# + 0.001*l2_loss
+
+    # Log
     info = {'actor_loss': actor_loss,
             'psi_loss': psi_mse,
             'critic_mse': critic_mse,
-            'entropy': entropy,
+            'entropy': mean_entropy,
             'generator_loss': generator_loss,
             'q_loss': q_loss,
             'reward_loss': reward_loss,

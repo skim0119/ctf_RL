@@ -9,7 +9,7 @@ from utility.logger import *
 
 from network.DistValue_SF_CVDC import V4SF_CVDC_CENTRAL, V4SF_CVDC_DECENTRAL
 from network.DistValue_SF_CVDC import get_gradient, train
-from network.DistValue_SF_CVDC import loss_central_critic, loss_reward_central
+from network.DistValue_SF_CVDC import loss_central
 from network.DistValue_SF_CVDC import loss_ppo, loss_multiagent_critic
 
 
@@ -30,6 +30,7 @@ class SF_CVDC:
         # Set Model
         self.model_central = V4SF_CVDC_CENTRAL(central_obs_shape[1:], atoms=atoms)
         self.model_decentral = V4SF_CVDC_DECENTRAL(decentral_obs_shape[1:], action_size=5, atoms=atoms)
+        self.model_decentral2 = V4SF_CVDC_DECENTRAL(decentral_obs_shape[1:], action_size=5, atoms=atoms)
 
         # Build Network
         self.model_central.print_summary()
@@ -44,6 +45,7 @@ class SF_CVDC:
                 directory=self.save_directory_central,
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
+
         self.save_directory_decentral = os.path.join(save_path, 'decentral')
         self.optimizer_decentral = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
         self.checkpoint_decentral = tf.train.Checkpoint(
@@ -54,25 +56,50 @@ class SF_CVDC:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
 
+        self.save_directory_decentral2 = os.path.join(save_path, 'decentral2')
+        self.optimizer_decentral2 = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
+        self.checkpoint_decentral2 = tf.train.Checkpoint(
+                optimizer=self.optimizer_decentral2, model=self.model_decentral2)
+        self.manager_decentral2 = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_decentral2,
+                directory=self.save_directory_decentral2,
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+
         # PPO Configuration
         self.ppo_config = {
-                'eps': tf.constant(0.2),
-                'entropy_beta': tf.constant(0.4),
-                'psi_beta': tf.constant(0.02),
-                'decoder_beta': tf.constant(1e-4),
+                'eps': tf.constant(0.20),
+                'entropy_beta': tf.constant(0.001),
+                'psi_beta': tf.constant(1.0),
+                'decoder_beta': tf.constant(1.0e-5),
                 'critic_beta': tf.constant(0.5),
+                'q_beta': tf.constant(0.5),
                 }
         # Critic Training Configuration
         self.central_config = {
                 'psi_beta': tf.constant(0.55),
                 'beta_kl': tf.constant(1e-2),
-                'elbo_beta': tf.constant(1e-4),
+                'recon_beta': tf.constant(1e-4),
                 'critic_beta': tf.constant(1.0),
+                'unreal_rp_beta': tf.constant(0.01),
                 }
 
-    def log(self, step):
+    def log(self, step, log_weights=True):
+        # Log the network
         sf_weight = self.model_decentral.sf_v_weight.get_weights()[0]
-        tb_log_histogram(sf_weight, 'weights/decentral_sf_weights', step)
+        sf_q_weight = self.model_decentral.sf_q_weight.get_weights()[0]
+
+        tb_log_histogram(sf_weight, 'weights/decentral_sf_v_weights', step)
+        tb_log_histogram(sf_q_weight, 'weights/decentral_sf_q_weights', step)
+
+        # Log weights
+        if log_weights:
+            for var in self.model_decentral.weights:
+                tb_log_histogram(var.numpy(), 'decentral1/'+var.name, step)
+            for var in self.model_decentral2.weights:
+                tb_log_histogram(var.numpy(), 'decentral2/'+var.name, step)
+            for var in self.model_central.weights:
+                tb_log_histogram(var.numpy(), 'central/'+var.name, step)
 
     def run_network_central(self, states):
         # states: environment state
@@ -81,20 +108,21 @@ class SF_CVDC:
         return env_critic, env_feature 
 
     def run_network_decentral(self, observations):
-        actor, dec_SF = self.model_decentral(observations)
-        return actor, dec_SF
+        num_sample = observations.shape[0]
+        temp_action = np.zeros(num_sample, dtype=np.int32)
+        actor1, dec_SF1 = self.model_decentral([observations, temp_action])
+        actor2, dec_SF2 = self.model_decentral2([observations, temp_action])
+
+        return actor1, dec_SF1, actor2, dec_SF2
+        #return actor, dec_SF
 
     # Centralize updater
-    def update_reward_prediction(self, inputs, *args):
-        _, info = train(self.model_central, loss_reward, self.optimizer_central, inputs)
-        return info
-
     def update_central_critic(self, inputs, *args):
-        _, info = train(self.model_central, loss_central_critic, self.optimizer_central, inputs, self.central_config)
+        _, info = train(self.model_central, loss_central, self.optimizer_central, inputs, self.central_config)
         return info
     
     # Decentralize updater
-    def update_decentral(self, agent_dataset, team_dataset, log):
+    def update_decentral(self, agent_dataset_g, agent_dataset_a, writer, log, step):
         actor_losses = []
         dec_psi_losses = []
         entropy = []
@@ -106,11 +134,20 @@ class SF_CVDC:
         multiagent_reward_loss = []
 
         # Get gradients
-        grads = []
-        for inputs in agent_dataset:
+        for inputs in agent_dataset_g:
             grad, info = get_gradient(self.model_decentral, loss_ppo, inputs, self.ppo_config)
             self.optimizer_decentral.apply_gradients(zip(grad, self.model_decentral.trainable_variables))
-            #grads.append(grad)
+            if log:
+                actor_losses.append(info['actor_loss'])
+                dec_psi_losses.append(info['psi_loss'])
+                entropy.append(info['entropy'])
+                decoder_losses.append(info['generator_loss'])
+                critic_mse.append(info['critic_mse'])
+                q_losses.append(info['q_loss'])
+                reward_mse.append(info['reward_loss'])
+        for inputs in agent_dataset_a:
+            grad, info = get_gradient(self.model_decentral2, loss_ppo, inputs, self.ppo_config)
+            self.optimizer_decentral2.apply_gradients(zip(grad, self.model_decentral2.trainable_variables))
             if log:
                 actor_losses.append(info['actor_loss'])
                 dec_psi_losses.append(info['psi_loss'])
@@ -155,26 +192,13 @@ class SF_CVDC:
 
     # Save and Load
     def initiate(self, verbose=1):
-        '''
-        last_checkpoint = tf.train.latest_checkpoint(self.save_directory_central)
-        if last_checkpoint is None:
-            return 0
-        else:
-            status = self.checkpoint_central.restore(last_checkpoint)
-            status.assert_existing_objects_matched()
-            #status.assert_consumed()
-            last_checkpoint = tf.train.latest_checkpoint(self.save_directory_decentral)
-            status = self.checkpoint_decentral.restore(last_checkpoint)
-            status.assert_existing_objects_matched() 
-            #status.assert_consumed()
-            return int(last_checkpoint.split('/')[-1].split('-')[-1])
-        '''
-
         cent_path = self.manager_central.restore_or_initialize()
         decent_path = self.manager_decentral.restore_or_initialize()
+        decent_path2 = self.manager_decentral2.restore_or_initialize()
         if verbose:
             print('Centralized initialization: {}'.format(cent_path))
             print('Decentralized initialization: {}'.format(decent_path))
+            print('Decentralized2 initialization: {}'.format(decent_path2))
         if cent_path == None:
             return 0
         else:
@@ -183,8 +207,10 @@ class SF_CVDC:
     def restore(self):
         status = self.checkpoint_central.restore(self.manager_central.latest_checkpoint)
         status = self.checkpoint_decentral.restore(self.manager_decentral.latest_checkpoint)
+        status = self.checkpoint_decentral2.restore(self.manager_decentral2.latest_checkpoint)
 
     def save(self, checkpoint_number):
         self.manager_central.save(checkpoint_number)
         self.manager_decentral.save(checkpoint_number)
+        self.manager_decentral2.save(checkpoint_number)
 

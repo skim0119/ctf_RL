@@ -37,14 +37,14 @@ class V4(tf.keras.Model):
             layers.Conv2D(filters=32, kernel_size=3, strides=1, activation='elu'),
             layers.Conv2D(filters=32, kernel_size=2, strides=1, activation='elu'),
             layers.Flatten(),
-            layers.Dense(units=128, activation='elu'),])
+            layers.Dense(units=128, activation='elu'),], name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=dynamic_input_shape),
             layers.Conv2D(filters=16, kernel_size=3, strides=2, activation='elu'),
             layers.Conv2D(filters=16, kernel_size=2, strides=1, activation='elu'),
             #Non_local_nn(4),
             layers.Flatten(),
-            layers.Dense(units=128, activation='elu'),])
+            layers.Dense(units=128, activation='elu'),], name='dynamic_network')
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
 
     def print_summary(self):
@@ -75,14 +75,15 @@ class V4INV(tf.keras.Model):
             layers.Dense(units=512, activation='elu'),
             layers.Reshape([4,4,32]),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')])
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')],
+            name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
             layers.Dense(units=512, activation='elu'),
             layers.Reshape([4,4,32]),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh'),
-            ])
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')],
+            name='dynamic_network')
 
     def print_summary(self):
         self.static_network.summary()
@@ -150,8 +151,8 @@ class V4Decentral(tf.keras.Model):
 
 class V4INVDecentral(tf.keras.Model):
     @store_args
-    def __init__(self, trainable=True, name='FeatureNN_Inverse'):
-        super(V4INVDecentral, self).__init__(name=name)
+    def __init__(self, trainable=True, name='FeatureNN_Inverse', **kwargs):
+        super(V4INVDecentral, self).__init__()
 
         # Feature Encoder
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
@@ -160,14 +161,15 @@ class V4INVDecentral(tf.keras.Model):
             layers.Dense(units=1296, activation='elu'),
             layers.Reshape([9,9,16]),
             layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')])
+            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')],
+            name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
             layers.Dense(units=1296, activation='elu'),
             layers.Reshape([9,9,16]),
             layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh'),
-            ])
+            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')],
+            name='dynamic_network')
 
     def print_summary(self):
         self.static_network.summary()
