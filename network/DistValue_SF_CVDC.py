@@ -18,6 +18,7 @@ from utility.tf_utils import tf_clipped_log as tf_log
 
 import numpy as np
 
+
 class V4SF_CVDC_DECENTRAL(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, action_size=5, atoms=8,
@@ -58,8 +59,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
                 initial_value=beta,
                 name='feature_scale',
                 dtype=tf.float32,
-                constraint=[tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1),
-                            tf.keras.constraints.NonNeg()],
+                constraint=tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1),
             )
 
         # Loss
@@ -116,15 +116,16 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         inv_critic = tf.linalg.matmul(psi, w)
         '''
 
+        beta = tf.math.abs(self.beta)
         wv = self.sf_v_weight.weights[0]
         wq = self.sf_q_weight.weights[0]
-        wv_neg = wv * (1.0-self.beta)
+        wv_neg = wv * (1.0-beta)
         reward_predict = tf.linalg.matmul(phi, wv_neg)
         inv_critic = tf.linalg.matmul(psi, wv_neg)
 
         # For learnability
-        wq_pos = tf.stop_gradient(wq) * self.beta
-        wv_neg = tf.stop_gradient(wv) * (1.0-self.beta)
+        wq_pos = tf.stop_gradient(wq) * beta
+        wv_neg = tf.stop_gradient(wv) * (1.0-beta)
         psi_q_pos = tf.linalg.matmul(tf.stop_gradient(psi), wq_pos)
         psi_v_neg = tf.linalg.matmul(tf.stop_gradient(psi), wv_neg)
 
