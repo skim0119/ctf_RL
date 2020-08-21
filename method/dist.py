@@ -68,13 +68,13 @@ class SF_CVDC:
 
         # PPO Configuration
         self.ppo_config = {
-                'eps': tf.constant(0.20),
-                'entropy_beta': tf.constant(0.5),
-                'psi_beta': tf.constant(100),
-                'decoder_beta': tf.constant(1.0e-5),
-                'critic_beta': tf.constant(10),
-                'q_beta': tf.constant(20),
-                'learnability_beta': tf.constant(1e4),
+                'eps': tf.constant(0.20, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.5, dtype=tf.float32),
+                'psi_beta': tf.constant(100, dtype=tf.float32),
+                'decoder_beta': tf.constant(1.0e-5, dtype=tf.float32),
+                'critic_beta': tf.constant(10, dtype=tf.float32),
+                'q_beta': tf.constant(20, dtype=tf.float32),
+                'learnability_beta': tf.constant(1e4, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {
