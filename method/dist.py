@@ -168,8 +168,6 @@ class SF_CVDC:
         for inputs in agent_dataset_a:
             grad, info = get_gradient(self.model_decentral2, loss_ppo, inputs, self.ppo_config)
             self.optimizer_decentral2.apply_gradients(zip(grad, self.model_decentral2.trainable_variables))
-            self.optimizer_decentral2.apply_gradients(
-                    zip(info['grads_learnability'], [self.model_decentral2.beta]))
             if log:
                 actor_losses.append(info['actor_loss'])
                 dec_psi_losses.append(info['psi_loss'])
