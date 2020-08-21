@@ -75,14 +75,14 @@ class V4INV(tf.keras.Model):
             layers.Dense(units=512, activation='elu'),
             layers.Reshape([4,4,32]),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')],
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='linear')],
             name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
             layers.Dense(units=512, activation='elu'),
             layers.Reshape([4,4,32]),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='tanh')],
+            layers.Conv2DTranspose(filters=3, kernel_size=4, strides=2, activation='linear')],
             name='dynamic_network')
 
     def print_summary(self):
@@ -161,14 +161,14 @@ class V4INVDecentral(tf.keras.Model):
             layers.Dense(units=1296, activation='elu'),
             layers.Reshape([9,9,16]),
             layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')],
+            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='linear')],
             name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
             layers.Dense(units=1296, activation='elu'),
             layers.Reshape([9,9,16]),
             layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=1, activation='elu'),
-            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='tanh')],
+            layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='linear')],
             name='dynamic_network')
 
     def print_summary(self):

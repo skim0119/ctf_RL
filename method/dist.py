@@ -37,7 +37,7 @@ class SF_CVDC:
 
         # Build Trainer
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
+        self.optimizer_central = tf.keras.optimizers.Adam(lr)#, clipnorm=0.5)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -47,7 +47,7 @@ class SF_CVDC:
                 keep_checkpoint_every_n_hours=1)
 
         self.save_directory_decentral = os.path.join(save_path, 'decentral')
-        self.optimizer_decentral = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
+        self.optimizer_decentral = tf.keras.optimizers.Adam(lr)#, clipnorm=0.5)
         self.checkpoint_decentral = tf.train.Checkpoint(
                 optimizer=self.optimizer_decentral, model=self.model_decentral)
         self.manager_decentral = tf.train.CheckpointManager(
@@ -69,11 +69,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20),
-                'entropy_beta': tf.constant(0.001),
-                'psi_beta': tf.constant(1.0),
+                'entropy_beta': tf.constant(0.5),
+                'psi_beta': tf.constant(100),
                 'decoder_beta': tf.constant(1.0e-5),
-                'critic_beta': tf.constant(0.5),
-                'q_beta': tf.constant(0.5),
+                'critic_beta': tf.constant(10),
+                'q_beta': tf.constant(20),
+                'learnability_beta': tf.constant(1e4),
                 }
         # Critic Training Configuration
         self.central_config = {
@@ -84,22 +85,38 @@ class SF_CVDC:
                 'unreal_rp_beta': tf.constant(0.01),
                 }
 
-    def log(self, step, log_weights=True):
-        # Log the network
+    def log(self, step, log_weights=True, logs=None):
+        # Log specific part of the network
         sf_weight = self.model_decentral.sf_v_weight.get_weights()[0]
         sf_q_weight = self.model_decentral.sf_q_weight.get_weights()[0]
+        tb_log_histogram(sf_weight, 'monitor/decentral_sf_v_weights', step)
+        tb_log_histogram(sf_q_weight, 'monitor/decentral_sf_q_weights', step)
 
-        tb_log_histogram(sf_weight, 'weights/decentral_sf_v_weights', step)
-        tb_log_histogram(sf_q_weight, 'weights/decentral_sf_q_weights', step)
+        tb_log_histogram(
+                self.model_decentral.beta,
+                'learnability_beta/decentral1_beta',
+                step
+            )
+        tb_log_histogram(
+                self.model_decentral2.beta,
+                'learnability_beta/decentral2_beta',
+                step
+            )
 
         # Log weights
         if log_weights:
             for var in self.model_decentral.weights:
-                tb_log_histogram(var.numpy(), 'decentral1/'+var.name, step)
+                tb_log_histogram(var.numpy(), 'decentral1_weight/'+var.name, step)
             for var in self.model_decentral2.weights:
-                tb_log_histogram(var.numpy(), 'decentral2/'+var.name, step)
+                tb_log_histogram(var.numpy(), 'decentral2_weight/'+var.name, step)
             for var in self.model_central.weights:
-                tb_log_histogram(var.numpy(), 'central/'+var.name, step)
+                tb_log_histogram(var.numpy(), 'central_weight/'+var.name, step)
+
+        # Log Information
+        # - information must be given in dictionary form
+        if logs is not None:
+            for name, val in logs.items():
+                tf.summary.scalar(name, val, step=step)
 
     def run_network_central(self, states):
         # states: environment state
@@ -133,6 +150,8 @@ class SF_CVDC:
         multiagent_value_loss = []
         multiagent_reward_loss = []
 
+        learnability_loss = []
+
         # Get gradients
         for inputs in agent_dataset_g:
             grad, info = get_gradient(self.model_decentral, loss_ppo, inputs, self.ppo_config)
@@ -145,9 +164,12 @@ class SF_CVDC:
                 critic_mse.append(info['critic_mse'])
                 q_losses.append(info['q_loss'])
                 reward_mse.append(info['reward_loss'])
+                learnability_loss.append(info['learnability_loss'])
         for inputs in agent_dataset_a:
             grad, info = get_gradient(self.model_decentral2, loss_ppo, inputs, self.ppo_config)
             self.optimizer_decentral2.apply_gradients(zip(grad, self.model_decentral2.trainable_variables))
+            self.optimizer_decentral2.apply_gradients(
+                    zip(info['grads_learnability'], [self.model_decentral2.beta]))
             if log:
                 actor_losses.append(info['actor_loss'])
                 dec_psi_losses.append(info['psi_loss'])
@@ -156,6 +178,7 @@ class SF_CVDC:
                 critic_mse.append(info['critic_mse'])
                 q_losses.append(info['q_loss'])
                 reward_mse.append(info['reward_loss'])
+                learnability_loss.append(info['learnability_loss'])
         '''
         for inputs in team_dataset:
             grad, info = get_gradient(self.model_decentral, loss_multiagent_critic, inputs)
@@ -177,18 +200,23 @@ class SF_CVDC:
         # Update network
         self.optimizer_decentral.apply_gradients(zip(total_grad, self.model_decentral.trainable_variables))
         '''
-                
-        logs = {'dec_actor_loss': np.mean(actor_losses),
-                'dec_psi_loss': np.mean(dec_psi_losses),
-                'dec_entropy': np.mean(entropy),
-                'dec_generator_loss': np.mean(decoder_losses),
-                'dec_critic_loss': np.mean(critic_mse),
-                'dec_q_loss': np.mean(q_losses),
-                'dec_reward_loss': np.mean(reward_mse),
-                #'dec_ma_critic': np.mean(multiagent_value_loss),
-                #'dec_ma_reward': np.mean(multiagent_reward_loss),
-                }
-        return logs
+
+        if log:
+            tag = 'summary/'
+            logs = {tag+'dec_actor_loss': np.mean(actor_losses),
+                    tag+'dec_psi_loss': np.mean(dec_psi_losses),
+                    tag+'dec_entropy': np.mean(entropy),
+                    tag+'dec_generator_loss': np.mean(decoder_losses),
+                    tag+'dec_critic_loss': np.mean(critic_mse),
+                    tag+'dec_q_loss': np.mean(q_losses),
+                    tag+'dec_reward_loss': np.mean(reward_mse),
+                    tag+'dec_learnability_loss': np.mean(learnability_loss),
+                    #tag+'dec_ma_critic': np.mean(multiagent_value_loss),
+                    #tag+'dec_ma_reward': np.mean(multiagent_reward_loss),
+                    }
+            with writer.as_default():
+                self.log(step, logs=logs)
+                writer.flush()
 
     # Save and Load
     def initiate(self, verbose=1):

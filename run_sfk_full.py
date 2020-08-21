@@ -46,7 +46,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'CVDC_CONVOY31_TV_14'
+TRAIN_NAME = 'CVDC_CONVOY31_TV_16'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -56,7 +56,7 @@ GPU_CAPACITY = 0.95
 
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
@@ -298,16 +298,12 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
             }).shuffle(64).repeat(epoch).batch(batch_size)
     '''
 
-    logs = network.update_decentral(agent_dataset_g, agent_dataset_a, writer=writer, log=log, step=step)
-
+    network.update_decentral(agent_dataset_g, agent_dataset_a, writer=writer, log=log, step=step)
     if log:
         with writer.as_default():
-            tag = 'summary/'
-            network.log(step)
+            tag = 'advantages/'
             tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
             tb_log_histogram(np.array(advantage_list2), tag+'dec_advantages_global', step=global_episodes)
-            for name, val in logs.items():
-                tf.summary.scalar(tag+name, val, step=step)
             writer.flush()
 
 def get_action(log_logits):
@@ -438,7 +434,7 @@ while True:
                     psi0[idx],
                     vg1[idx],
                     psi1[idx],
-                    reward[env_idx] - 0.5*reward_pred1[idx],
+                    reward[env_idx] - reward_pred1[idx],
                     #reward_pred1[idx] + reward[env_idx]*0.5,
                     vc0[idx],
                     vc1[idx],

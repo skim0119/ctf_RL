@@ -52,6 +52,15 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
         self.smoothed_pseudo_H = tf.Variable(1.0)
 
+        # Learnabilty Maximizer
+        beta = np.ones([atoms,1], dtype=np.float32)
+        self.beta = tf.Variable(
+                initial_value=beta,
+                name='feature_scale',
+                dtype=tf.float32,
+                constraint=tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1)
+            )
+
         # Loss
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
         self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
@@ -63,7 +72,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
     def call(self, inputs):
         # Run full network
         obs = inputs[0]
-        action = inputs[1]
+        action = inputs[1] # Action is included for decoder
         action_one_hot = tf.one_hot(action, self.action_size, dtype=tf.float32)
 
         # Feature Encoding SF-phi
@@ -94,6 +103,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         critic = self.sf_v_weight(net, training=True)
         q = self.sf_q_weight(net, training=True)
 
+        # Masking method for lowest 1/8th variation
+        '''
         q_w = self.sf_q_weight.weights[0]
         q_w_std = tf.math.reduce_std(q_w, axis=1, keepdims=True)
         w_mask = tf.cast(q_w_std[tf.argsort(q_w_std, axis=0)[-8,0]] <= q_w_std, tf.float32)
@@ -101,7 +112,20 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         w = w * w_mask
         #reward_predict = self.sf_v_weight(phi, training=False)
         reward_predict = tf.linalg.matmul(phi, w)
-        icritic = tf.linalg.matmul(psi, w)
+        inv_critic = tf.linalg.matmul(psi, w)
+        '''
+
+        wv = self.sf_v_weight.weights[0]
+        wq = self.sf_q_weight.weights[0]
+        wv_neg = wv * (1.0-self.beta)
+        reward_predict = tf.linalg.matmul(phi, wv_neg)
+        inv_critic = tf.linalg.matmul(psi, wv_neg)
+
+        # For learnability
+        wq_pos = tf.stop_gradient(wq) * self.beta
+        wv_neg = tf.stop_gradient(wv) * (1.0-self.beta)
+        psi_q_pos = tf.linalg.matmul(tf.stop_gradient(psi), wq_pos)
+        psi_v_neg = tf.linalg.matmul(tf.stop_gradient(psi), wv_neg)
 
         actor = {'softmax': softmax_logits,
                  'log_softmax': log_logits}
@@ -111,7 +135,9 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
               'critic': critic,
               'decoded_state': decoded_state,
               'Q': q,
-              'icritic': critic - icritic,
+              'icritic': critic - inv_critic,
+              'psi_q_pos': psi_q_pos,
+              'psi_v_neg': psi_v_neg,
               }
 
         return actor, SF
@@ -142,9 +168,7 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
         self.psi_dropout = layers.Dropout(0.3)
 
         # UNREAL-RP
-        output_bias = tf.keras.initializers.Constant([-2.302585, -0.223143, -2.302585])
-        self.rp_dense = layers.Dense(units=3, activation='softmax',
-                bias_initializer=output_bias)
+        self.rp_dense = layers.Dense(units=3, activation='softmax')
 
         # Misc Layers
         self.flat = layers.Flatten()
@@ -189,8 +213,8 @@ class V4SF_CVDC_CENTRAL(tf.keras.Model):
 
         feature = {'latent': net,
                    'z_decoded': z_decoded,}
-        SF = {'reward_predict': r_pred,
-              'phi': phi,
+        SF = {'phi': phi,
+              'reward_predict': r_pred,
               'psi': psi,
               'critic': critic,
               'UNREAL_rp': rp,}
@@ -242,11 +266,12 @@ def loss_central(model, state, td_target, td_target_c, reward,
 
 @tf.function
 def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,
-        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta):
+        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta,):
     num_sample = state.shape[0]
 
     # Run Model
     pi, v = model([state, action])
+    pi_next, v_next = model([next_state, action])
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
@@ -281,10 +306,8 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     action_one_hot = tf.one_hot(action, model.action_size, dtype=tf.float32)
     log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
     old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
-
-    # Clipped surrogate function
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
-    surrogate = ratio * advantage
+    surrogate = ratio * advantage # Clipped surrogate function
     clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
@@ -297,7 +320,20 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     # L2 loss
     #l2_loss = tf.nn.l2_loss(model.sf_v_weight.weights[0]) + tf.nn.l2_loss(model.sf_q_weight.weights[0])
 
-    total_loss = actor_loss + psi_beta*psi_mse - entropy_beta*mean_entropy + decoder_beta*generator_loss + critic_beta*critic_mse + q_beta*q_loss# + 0.001*l2_loss
+    # Learnability
+    var_action = tf.reduce_sum(tf.square(v['psi_q_pos']-v_next['psi_q_pos']) * tf.stop_gradient(pi['softmax']), axis=1)
+    var_environment = tf.square((v['psi_v_neg'] - v_next['psi_v_neg'])[:,0])
+    learnability_loss = tf.reduce_mean(-var_action)
+    #learnability_loss = tf.reduce_mean(-var_action+0.5*var_environment)
+
+    total_loss = actor_loss
+    total_loss += psi_beta*psi_mse
+    total_loss -= entropy_beta*mean_entropy
+    total_loss += decoder_beta*generator_loss
+    total_loss += critic_beta*critic_mse
+    total_loss += q_beta*q_loss
+    total_loss += learnability_beta*learnability_loss
+    #total_loss += 0.001*l2_loss
 
     # Log
     info = {'actor_loss': actor_loss,
@@ -307,6 +343,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
             'generator_loss': generator_loss,
             'q_loss': q_loss,
             'reward_loss': reward_loss,
+            'learnability_loss': learnability_loss,
             }
 
     return total_loss, info
