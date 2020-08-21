@@ -75,7 +75,7 @@ config.read(config_path)
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
+lambd          = 0.8#config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
@@ -435,7 +435,6 @@ while True:
                     vg1[idx],
                     psi1[idx],
                     reward[env_idx] - reward_pred1[idx],
-                    #reward_pred1[idx] + reward[env_idx]*0.5,
                     vc0[idx],
                     vc1[idx],
                     ])

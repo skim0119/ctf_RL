@@ -58,7 +58,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
                 initial_value=beta,
                 name='feature_scale',
                 dtype=tf.float32,
-                constraint=tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1)
+                constraint=[tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1),
+                            tf.keras.constraints.NonNeg()],
             )
 
         # Loss
@@ -98,8 +99,8 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
 
-        net = self.psi_dense1(phi, training=False)
-        net = self.psi_dense2(net, training=False)
+        net = self.psi_dense1(phi)
+        net = self.psi_dense2(net)
         critic = self.sf_v_weight(net, training=True)
         q = self.sf_q_weight(net, training=True)
 
@@ -314,7 +315,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Q - Loss
     q = v['Q']
-    q_a = tf.reduce_sum(q * action_one_hot, 1)
+    q_a = tf.reduce_sum(q * tf.stop_gradient(actor), 1)
     q_loss = tf.reduce_mean(tf.square(q_a - td_target_c))
 
     # L2 loss
@@ -323,8 +324,8 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     # Learnability
     var_action = tf.reduce_sum(tf.square(v['psi_q_pos']-v_next['psi_q_pos']) * tf.stop_gradient(pi['softmax']), axis=1)
     var_environment = tf.square((v['psi_v_neg'] - v_next['psi_v_neg'])[:,0])
-    learnability_loss = tf.reduce_mean(-var_action)
-    #learnability_loss = tf.reduce_mean(-var_action+0.5*var_environment)
+    #learnability_loss = tf.reduce_mean(-var_action)
+    learnability_loss = tf.reduce_mean(-var_action+0.5*var_environment)
 
     total_loss = actor_loss
     total_loss += psi_beta*psi_mse
