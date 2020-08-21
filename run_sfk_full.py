@@ -46,7 +46,7 @@ LOG_DEVICE = False
 OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'CVDC_CONVOY31_TV_16'
+TRAIN_NAME = 'CVDC_CONVOY31_TV_17'
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -56,7 +56,7 @@ GPU_CAPACITY = 0.95
 
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 4
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
@@ -97,7 +97,7 @@ map_size     = config.getint('DEFAULT', 'MAP_SIZE')
 ## PPO Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 2
+minimum_batch_size = 1024 * 4
 print(minimum_batch_size)
 
 ## Setup
@@ -434,7 +434,7 @@ while True:
                     psi0[idx],
                     vg1[idx],
                     psi1[idx],
-                    reward[env_idx] - reward_pred1[idx],
+                    reward[env_idx] - 0.01*reward_pred1[idx],
                     vc0[idx],
                     vc1[idx],
                     ])
