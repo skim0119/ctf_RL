@@ -5,6 +5,7 @@ import os
 import sys
 
 import shutil
+import argparse
 import configparser
 
 import signal
@@ -35,12 +36,19 @@ from utility.gae import gae
 
 from method.ActorCritic import PPO_Module as Network
 
+parser = argparse.ArgumentParser(description='PPO trainer for convoy')
+parser.add_argument('--name', type=str)
+parser.add_argument('--map_size', type=int)
+parser.add_argument('--nbg', type=int)
+parser.add_argument('--nba', type=int)
+parser.add_argument('--nrg', type=int)
+parser.add_argument('--nra', type=int)
+args = parser.parse_args()
+
 PROGBAR = True
-LOG_DEVICE = False
-OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'PPO_STACK_Full_01_convoy' 
+TRAIN_NAME = args.name+'_c('+str(args.nbg)+'g'+str(args.nba)+'a)('+str(args.nrg)+'g'+str(args.nra)+'a)' #'PPO_STACK_Full_01_convoy' 
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -51,6 +59,12 @@ NENV = multiprocessing.cpu_count() // 4
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
+game_config = configparser.ConfigParser()
+game_config.read(env_setting_path)
+game_config['elements']['NUM_BLUE'] = str(args.nbg)
+game_config['elements']['NUM_BLUE_UAV'] = str(args.nba)
+game_config['elements']['NUM_RED'] = str(args.nrg)
+game_config['elements']['NUM_RED_UAV'] = str(args.nra)
 
 ## Data Path
 path_create(LOG_PATH)
@@ -82,7 +96,7 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
-map_size     = config.getint('DEFAULT', 'MAP_SIZE')
+map_size     = args.map_size # config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -103,10 +117,10 @@ log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
-map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
+#map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-            config_path=env_setting_path)
+            config_path=game_config)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
 num_blue = len(envs.get_team_blue()[0])
@@ -116,55 +130,94 @@ num_agent = num_blue# + num_red
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
-network = Network(input_shape=input_size, action_size=action_space, scope='main', save_path=MODEL_PATH)
+# Agent Type Setup
+agent_type = []
+if args.nba != 0:
+    agent_type.append(args.nba)
+if args.nbg != 0:
+    agent_type.append(args.nbg)
+num_type = len(agent_type)
+agent_type_masking = np.zeros([num_type, num_blue], dtype=bool)
+agent_type_index = np.zeros([num_blue], dtype=int)
+prev_i = 0
+for idx, i in enumerate(np.cumsum(agent_type)):
+    agent_type_masking[idx, prev_i:i] = True
+    agent_type_index[prev_i:i] = idx
+    prev_i = i
+print(agent_type_masking)
+print(agent_type_index)
+print(agent_type_masking.shape)
+agent_type_masking = np.tile(agent_type_maskin, NENV)
+print(agent_type_masking.shape)
+input('')
+
+# Network Setup
+network = Network(
+    input_shape=input_size,
+    action_size=action_space,
+    agent_type=agent_type,
+    save_path=MODEL_PATH
+)
 
 # Resotre / Initialize
 global_episodes = network.initiate()
 print(global_episodes)
 
 writer = tf.summary.create_file_writer(LOG_PATH)
-network.save(global_episodes)
-
+#network.save(global_episodes)
 
 ### TRAINING ###
 def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+    train_datasets = []
+
     advantage_list = []
-    traj_buffer = defaultdict(list)
-    buffer_size = 0
+    traj_buffer = [defaultdict(list) for _ in range(num_type)]
     for idx, traj in enumerate(trajs):
-        if len(traj) == 0:
-            continue
-        buffer_size += len(traj)
+        atype = agent_type_index[idx%num_type]
 
         td_target, advantages = gae(traj[2], traj[3], traj[5][-1],
                 gamma, lambd, normalize=False)
         advantage_list.append(advantages)
         
-        traj_buffer['state'].extend(traj[0])
-        traj_buffer['action'].extend(traj[1])
-        traj_buffer['td_target'].extend(td_target)
-        traj_buffer['advantage'].extend(advantages)
-        traj_buffer['old_log_logit'].extend(traj[4])
+        traj_buffer[atype]['state'].extend(traj[0])
+        traj_buffer[atype]['action'].extend(traj[1])
+        traj_buffer[atype]['td_target'].extend(td_target)
+        traj_buffer[atype]['advantage'].extend(advantages)
+        traj_buffer[atype]['old_log_logit'].extend(traj[4])
 
-    train_dataset = tf.data.Dataset.from_tensor_slices({
-        'state': np.stack(traj_buffer['state']),
-        'old_log_logit': np.stack(traj_buffer['old_log_logit']),
-        'action': np.stack(traj_buffer['action']),
-        'advantage': np.stack(traj_buffer['advantage']).astype(np.float32),
-        'td_target': np.stack(traj_buffer['td_target']).astype(np.float32),
-        }).shuffle(64).repeat(epoch).batch(batch_size)
+    for atype in range(num_type)
+        train_dataset = tf.data.Dataset.from_tensor_slices({
+            'state': np.stack(traj_buffer[atype]['state']),
+            'old_log_logit': np.stack(traj_buffer[atype]['old_log_logit']),
+            'action': np.stack(traj_buffer[atype]['action']),
+            'advantage': np.stack(traj_buffer[atype]['advantage']).astype(np.float32),
+            'td_target': np.stack(traj_buffer[atype]['td_target']).astype(np.float32),
+            }).shuffle(64).repeat(epoch).batch(batch_size)
+        train_datasets.append(train_dataset)
 
-    logs = network.update_network(train_dataset, log=log)
+    logs = network.update_network(train_datasets, writer=writer, step=step, tag='losses/', log=log)
     if log:
         with writer.as_default():
-            tag = 'summary/'
-            tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
-            for name, val in logs.items():
-                tf.summary.scalar(tag+name, val, step=step)
+            tag = 'debug/'
+            tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=step)
             writer.flush()
 
 def get_action(states):
-    a1, v1, p1 = network.run_network(states)
+    states_list = []
+    for mask in agent_type_masking:
+        state = np.compress(mask, states)
+        states_list.appen(state)
+        print(state.shape)
+    input('')
+
+    results = network.run_network(states_list)
+    a1 = np.empty([NENV*num_blue], dtype=np.int32)
+    v1 = np.empty([NENV*num_blue], dtype=np.float32)
+    p1 = np.empty([NENV*num_blue, action_space], dtype=np.float32)
+    for (a, v, p), mask in zip(results, agent_type_masking):
+        a1[mask] = a
+        v1[mask] = v
+        p1[mask,:] = p
     actions = np.reshape(a1, [NENV, num_blue])
     return a1, v1, p1, actions
 
@@ -182,8 +235,9 @@ while True:
     
     # Bootstrap
     s1 = envs.reset(
-            map_pool=map_list,
-            config_path=env_setting_path,
+            map_size=map_size,
+            #map_pool=map_list,
+            config_path=game_config,
             policy_red=policy.Roomba)
     s1 = s1.astype(np.float32)
     a1, v1, p1, actions = get_action(s1)

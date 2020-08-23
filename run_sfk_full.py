@@ -5,8 +5,8 @@ import os
 import sys
 
 import shutil
-import configparser
 import argparse
+import configparser
 
 import signal
 import threading
@@ -41,12 +41,20 @@ from utility.gae import gae
 
 from method.dist import SF_CVDC as Network
 
+parser = argparse.ArgumentParser(description='PPO trainer for convoy')
+parser.add_argument('--name', type=str)
+parser.add_argument('--map_size', type=int)
+parser.add_argument('--nbg', type=int)
+parser.add_argument('--nba', type=int)
+parser.add_argument('--nrg', type=int)
+parser.add_argument('--nra', type=int)
+args = parser.parse_args()
+
 PROGBAR = True
-LOG_DEVICE = False
-OVERRIDE = False
 
 ## Training Directory Reset
-TRAIN_NAME = 'CVDC_CONVOY31_TV_17'
+#TRAIN_NAME = 'CVDC_CONVOY31_TV_18'
+TRAIN_NAME = args.name+'_c('+str(args.nbg)+'g'+str(args.nba)+'a)('+str(args.nrg)+'g'+str(args.nra)+'a)' #'CVDC_CONVOY' 
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -60,6 +68,12 @@ NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
 env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
+game_config = configparser.ConfigParser()
+game_config.read(env_setting_path)
+game_config['elements']['NUM_BLUE'] = str(args.nbg)
+game_config['elements']['NUM_BLUE_UAV'] = str(args.nba)
+game_config['elements']['NUM_RED'] = str(args.nrg)
+game_config['elements']['NUM_RED_UAV'] = str(args.nra)
 
 ## Data Path
 path_create(LOG_PATH)
@@ -92,7 +106,7 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
 vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
-map_size     = config.getint('DEFAULT', 'MAP_SIZE')
+map_size     = args.map_size#config.getint('DEFAULT', 'MAP_SIZE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -115,10 +129,10 @@ log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
 map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
-_qenv = gym.make('cap-v0', map_size=map_size, config_path=env_setting_path)
+_qenv = gym.make('cap-v0', map_size=map_size, config_path=game_config)
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
-                            config_path=env_setting_path)
+                            config_path=game_config)
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
 num_blue = len(envs.get_team_blue()[0])
@@ -363,15 +377,13 @@ while True:
     
     # Bootstrap
     if log_save_analysis:
-        s1 = envs.reset(
-                config_path='env_setting_3v3_3g_full_rgb_convoy.ini',
-                policy_red=policy.Roomba,
-                )
+        game_config['experiments']['SAVE_BOARD_RGB'] = 'True'
     else:
-        s1 = envs.reset(
-                config_path=env_setting_path,
-                policy_red=policy.Roomba,
-                )
+        game_config['experiments']['SAVE_BOARD_RGB'] = 'False'
+    s1 = envs.reset(
+            config_path=game_config,
+            policy_red=policy.Roomba,
+            )
     s1 = s1.astype(np.float32)
     cent_s1 = envs.get_obs_blue().astype(np.float32) # Centralized
 
@@ -434,7 +446,7 @@ while True:
                     psi0[idx],
                     vg1[idx],
                     psi1[idx],
-                    reward[env_idx] - 0.01*reward_pred1[idx],
+                    reward[env_idx] - (reward_pred1[idx] if reward[env_idx] else 0),
                     vc0[idx],
                     vc1[idx],
                     ])
