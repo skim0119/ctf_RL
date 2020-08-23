@@ -1,0 +1,10 @@
+path=fair_3a1u_40
+num_board=1000
+seed=None
+dim=40
+density=0.15
+num_flag=1
+num_agent=3
+num_uav=1
+flag_boarder_distance=4
+agent_boarder_distance=3
