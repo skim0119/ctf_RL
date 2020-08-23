@@ -38,13 +38,13 @@ class PPO_Module:
                     keep_checkpoint_every_n_hours=1)
             self.models.append(model)
             self.optimizers.append(optimizer)
-            self.checkpoints.append(chckpoint)
+            self.checkpoints.append(checkpoint)
             self.managers.append(manager)
 
     def run_network(self, states_list):
         results = []
-        for states in states_list:
-            actor, critics, log_logits = self.model(states)
+        for states, model in zip(states_list, self.models):
+            actor, critics, log_logits = model(states)
             actions = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
             results.append([actions, critics, log_logits])
         return results

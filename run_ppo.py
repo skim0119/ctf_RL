@@ -1,7 +1,7 @@
 import pickle
 
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+os.environ["CUDA_VISIBLE_DEVICES"]="0"   
 import sys
 
 import shutil
@@ -48,17 +48,18 @@ args = parser.parse_args()
 PROGBAR = True
 
 ## Training Directory Reset
-TRAIN_NAME = args.name+'_c('+str(args.nbg)+'g'+str(args.nba)+'a)('+str(args.nrg)+'g'+str(args.nra)+'a)' #'PPO_STACK_Full_01_convoy' 
+TRAIN_NAME = '{}_convoy_{}g{}a_{}g{}a_m{}'.format(args.name, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
+
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 MAP_PATH = './fair_3g_20'
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 4
+NENV = multiprocessing.cpu_count() // 2
 print('Number of cpu_count : {}'.format(NENV))
 
-env_setting_path = 'env_setting_3v3_3g_full_convoy.ini'
+env_setting_path = "env_setting_3v3_3g_full_convoy.ini"
 game_config = configparser.ConfigParser()
 game_config.read(env_setting_path)
 game_config['elements']['NUM_BLUE'] = str(args.nbg)
@@ -144,12 +145,7 @@ for idx, i in enumerate(np.cumsum(agent_type)):
     agent_type_masking[idx, prev_i:i] = True
     agent_type_index[prev_i:i] = idx
     prev_i = i
-print(agent_type_masking)
-print(agent_type_index)
-print(agent_type_masking.shape)
-agent_type_masking = np.tile(agent_type_maskin, NENV)
-print(agent_type_masking.shape)
-input('')
+agent_type_masking = np.tile(agent_type_masking, NENV)
 
 # Network Setup
 network = Network(
@@ -173,7 +169,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
     advantage_list = []
     traj_buffer = [defaultdict(list) for _ in range(num_type)]
     for idx, traj in enumerate(trajs):
-        atype = agent_type_index[idx%num_type]
+        atype = agent_type_index[idx%num_blue]
 
         td_target, advantages = gae(traj[2], traj[3], traj[5][-1],
                 gamma, lambd, normalize=False)
@@ -185,7 +181,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
         traj_buffer[atype]['advantage'].extend(advantages)
         traj_buffer[atype]['old_log_logit'].extend(traj[4])
 
-    for atype in range(num_type)
+    for atype in range(num_type):
         train_dataset = tf.data.Dataset.from_tensor_slices({
             'state': np.stack(traj_buffer[atype]['state']),
             'old_log_logit': np.stack(traj_buffer[atype]['old_log_logit']),
@@ -205,10 +201,8 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
 def get_action(states):
     states_list = []
     for mask in agent_type_masking:
-        state = np.compress(mask, states)
-        states_list.appen(state)
-        print(state.shape)
-    input('')
+        state = np.compress(mask, states, axis=0)
+        states_list.append(state)
 
     results = network.run_network(states_list)
     a1 = np.empty([NENV*num_blue], dtype=np.int32)
