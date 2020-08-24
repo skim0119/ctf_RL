@@ -42,19 +42,18 @@ from utility.gae import gae
 from method.dist import SF_CVDC as Network
 
 parser = argparse.ArgumentParser(description='PPO trainer for convoy')
-parser.add_argument('--name', type=str)
-parser.add_argument('--map_size', type=int)
-parser.add_argument('--nbg', type=int)
-parser.add_argument('--nba', type=int)
-parser.add_argument('--nrg', type=int)
-parser.add_argument('--nra', type=int)
+parser.add_argument('--name', type=str, help='training name')
+parser.add_argument('--map_size', type=int, help='map size')
+parser.add_argument('--nbg', type=int, help='number of blue ground')
+parser.add_argument('--nba', type=int, help='number of blue air')
+parser.add_argument('--nrg', type=int, help='number of red air')
+parser.add_argument('--nra', type=int, help='number of red air')
 args = parser.parse_args()
 
 PROGBAR = True
 
 ## Training Directory Reset
-#TRAIN_NAME = 'CVDC_CONVOY31_TV_18'
-TRAIN_NAME = args.name+'_c('+str(args.nbg)+'g'+str(args.nba)+'a)('+str(args.nrg)+'g'+str(args.nra)+'a)' #'CVDC_CONVOY' 
+TRAIN_NAME = '{}_convoy_{}g{}a_{}g{}a_m{}'.format(args.name, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
 TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -89,7 +88,7 @@ config.read(config_path)
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd          = 0.8#config.getfloat('TRAINING', 'GAE_LAMBDA')
+lambd          = 0.9#config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
@@ -128,7 +127,7 @@ log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
-map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
+#map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
 _qenv = gym.make('cap-v0', map_size=map_size, config_path=game_config)
 def make_env(map_size):
     return lambda: gym.make('cap-v0', map_size=map_size,
@@ -141,12 +140,30 @@ num_agent = num_blue#+num_red
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
+    
+# Agent Type Setup
+agent_type = []
+if args.nba != 0:
+    agent_type.append(args.nba)
+if args.nbg != 0:
+    agent_type.append(args.nbg)
+num_type = len(agent_type)
+agent_type_masking = np.zeros([num_type, num_blue], dtype=bool)
+agent_type_index = np.zeros([num_blue], dtype=int)
+prev_i = 0
+for idx, i in enumerate(np.cumsum(agent_type)):
+    agent_type_masking[idx, prev_i:i] = True
+    agent_type_index[prev_i:i] = idx
+    prev_i = i
+agent_type_masking = np.tile(agent_type_masking, NENV)
 
-atoms = 64
+# Network Setup
+atoms = 128
 network = Network(
         central_obs_shape=cent_input_size,
         decentral_obs_shape=input_size,
         action_size=action_space, 
+        agent_type=agent_type,
         atoms=atoms,
         save_path=MODEL_PATH)
 
@@ -225,14 +242,16 @@ def train_central(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibat
             tb_log_ctf_frame(info['sample_decoded_image'], 'sample decoded image', step)
             writer.flush()
 
-def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
-    advantage_list = []
-    advantage_list2 = []
+def train_decentral(agent_trajs, epoch=epoch, batch_size=minibatch_size, writer=None, log=False, step=None):
+    train_datasets = []
+
     # Agent trajectory processing
-    traj_buffer_g = defaultdict(list)
-    traj_buffer_a = defaultdict(list)
+    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
+    advantage_lists = [[] for _ in range(num_type)]
     for trajs in agent_trajs:
         for idx, traj in enumerate(trajs):
+            atype = agent_type_index[idx]
+
             reward = traj[2]
             mask = traj[3]
             critic = traj[5]
@@ -249,14 +268,9 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
                     gamma, lambd, mask=mask, normalize=False)
             td_target_psi, _ = gae(phi, psi, _psi,#np.zeros_like(phi[0]),
                     gamma, lambd, mask=np.array(mask)[:,None], normalize=False)
-            advantage_list.append(advantages)
-            advantage_list2.append(advantages_global)
+            advantage_lists[atype].append(advantages)
 
-            if idx == 0:
-                traj_buffer = traj_buffer_a
-            else:
-                traj_buffer = traj_buffer_g
-
+            traj_buffer = traj_buffer_list[atype]
             traj_buffer['state'].extend(traj[0])
             traj_buffer['next_state'].extend(traj[4])
             traj_buffer['log_logit'].extend(traj[6])
@@ -267,97 +281,73 @@ def train_decentral(agent_trajs, team_trajs, epoch=epoch, batch_size=minibatch_s
             #traj_buffer['advantage'].extend(traj[11])
             traj_buffer['td_target_c'].extend(td_target_c)
             traj_buffer['rewards'].extend(reward)
-    agent_dataset_g = tf.data.Dataset.from_tensor_slices({
-            'state': np.stack(traj_buffer_g['state']).astype(np.float32),
-            'old_log_logit': np.stack(traj_buffer_g['log_logit']).astype(np.float32),
-            'action': np.stack(traj_buffer_g['action']),
-            'old_value': np.stack(traj_buffer_g['old_value']).astype(np.float32),
-            'td_target': np.stack(traj_buffer_g['td_target_psi']).astype(np.float32),
-            'advantage': np.stack(traj_buffer_g['advantage']).astype(np.float32),
-            'td_target_c': np.stack(traj_buffer_g['td_target_c']).astype(np.float32),
-            'rewards': np.stack(traj_buffer_g['rewards']).astype(np.float32),
-            'next_state': np.stack(traj_buffer_g['next_state']).astype(np.float32),
-        }).shuffle(64).repeat(epoch).batch(batch_size)
-    
-    agent_dataset_a = tf.data.Dataset.from_tensor_slices({
-            'state': np.stack(traj_buffer_a['state']).astype(np.float32),
-            'old_log_logit': np.stack(traj_buffer_a['log_logit']).astype(np.float32),
-            'action': np.stack(traj_buffer_a['action']),
-            'old_value': np.stack(traj_buffer_a['old_value']).astype(np.float32),
-            'td_target': np.stack(traj_buffer_a['td_target_psi']).astype(np.float32),
-            'advantage': np.stack(traj_buffer_a['advantage']).astype(np.float32),
-            'td_target_c': np.stack(traj_buffer_a['td_target_c']).astype(np.float32),
-            'rewards': np.stack(traj_buffer_a['rewards']).astype(np.float32),
-            'next_state': np.stack(traj_buffer_a['next_state']).astype(np.float32),
-        }).shuffle(64).repeat(epoch).batch(batch_size)
-
-    # Team trajectory preproessing
-    '''
-    traj_buffer = defaultdict(list)
-    for traj in team_trajs:
-        reward = traj[2]
-        critic = traj[3]
-        _critic = traj[4][-1]
-        td_target_c, _= gae(reward, critic, _critic,
-                gamma, lambd, normalize=False)
-        traj_buffer['team_state'].extend(traj[0])
-        traj_buffer['value_central'].extend(td_target_c)
-        traj_buffer['mask'].extend(traj[1])
-        traj_buffer['rewards'].extend(traj[2])
-    team_dataset = tf.data.Dataset.from_tensor_slices({
-            'team_state': np.stack(traj_buffer['team_state']),
-            'value_central': np.stack(traj_buffer['value_central']),
-            'mask': np.stack(traj_buffer['mask']),
-            'rewards': np.stack(traj_buffer['rewards']),
+    for atype in range(num_type):
+        traj_buffer = traj_buffer_list[atype]
+        train_dataset = tf.data.Dataset.from_tensor_slices({
+                'state': np.stack(traj_buffer['state']).astype(np.float32),
+                'old_log_logit': np.stack(traj_buffer['log_logit']).astype(np.float32),
+                'action': np.stack(traj_buffer['action']),
+                'old_value': np.stack(traj_buffer['old_value']).astype(np.float32),
+                'td_target': np.stack(traj_buffer['td_target_psi']).astype(np.float32),
+                'advantage': np.stack(traj_buffer['advantage']).astype(np.float32),
+                'td_target_c': np.stack(traj_buffer['td_target_c']).astype(np.float32),
+                'rewards': np.stack(traj_buffer['rewards']).astype(np.float32),
+                'next_state': np.stack(traj_buffer['next_state']).astype(np.float32),
             }).shuffle(64).repeat(epoch).batch(batch_size)
-    '''
+        train_datasets.append(train_dataset)
 
-    network.update_decentral(agent_dataset_g, agent_dataset_a, writer=writer, log=log, step=step)
+    network.update_decentral(train_datasets, writer=writer, log=log, step=step, tag='losses/')
     if log:
         with writer.as_default():
             tag = 'advantages/'
-            tb_log_histogram(np.array(advantage_list), tag+'dec_advantages', step=global_episodes)
-            tb_log_histogram(np.array(advantage_list2), tag+'dec_advantages_global', step=global_episodes)
+            for idx, adv_list in enumerate(advantage_lists):
+                tb_log_histogram(np.array(adv_list), tag+'dec_advantages_{}'.format(idx), step=step)
             writer.flush()
 
 def get_action(log_logits):
     a = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
-    action = np.reshape(a, [NENV, num_agent])
-    return a, action
+    return a
 
-def run_network(s1):
-    actor, critic, actor2, critic2 = network.run_network_decentral(s1)
-    a1, action = get_action(actor['log_softmax'])
-    vg1 = critic['critic'].numpy()[:,0]
-    vc1 = critic['icritic'].numpy()[:,0]
-    phi1 = critic['phi'].numpy()
-    psi1 = critic['psi'].numpy()
-    log_logits1 = actor['log_softmax'].numpy()
-    reward_pred1 = critic['reward_predict'].numpy()[:,0]
+def run_network(states):
+    states_list = []
+    for mask in agent_type_masking:
+        state = np.compress(mask, states, axis=0)
+        states_list.append(state)
 
-    # Replace first agent information
-    a2, action2 = get_action(actor2['log_softmax'])
-    vg2 = critic2['critic'].numpy()[:,0]
-    vc2 = critic2['icritic'].numpy()[:,0]
-    phi2 = critic2['phi'].numpy()
-    psi2 = critic2['psi'].numpy()
-    log_logits2 = actor2['log_softmax'].numpy()
-    reward_pred2 = critic2['reward_predict'].numpy()[:,0]
+    # Run network
+    results = network.run_network_decentral(states_list)
 
-    a1[::3] = a2[::3]
-    action[:,0] = action2[:,0]
-    vg1[::3] = vg2[::3]
-    vc1[::3] = vc2[::3]
-    phi1[::3] = phi2[::3]
-    psi1[::3] = psi2[::3]
-    log_logits1[::3] = log_logits2[::3]
-    reward_pred1[::3] = reward_pred2[::3]
+    # Container
+    a1 = np.empty([NENV*num_agent], dtype=np.int32)
+    vg1 = np.empty([NENV*num_agent], dtype=np.float32)
+    vc1 = np.empty([NENV*num_agent], dtype=np.float32)
+    phi1 = np.empty([NENV*num_agent, atoms], dtype=np.float32)
+    psi1 = np.empty([NENV*num_agent, atoms], dtype=np.float32)
+    log_logits1 = np.empty([NENV*num_agent, action_space], dtype=np.float32)
+    reward_pred1 = np.empty([NENV*num_agent], dtype=np.float32)
 
+    # Postprocessing
+    for (actor, critic), mask in zip(results, agent_type_masking):
+        a = get_action(actor['log_softmax'])
+        vg = critic['critic'].numpy()[:,0]
+        vc = critic['icritic'].numpy()[:,0]
+        phi = critic['phi'].numpy()
+        psi = critic['psi'].numpy()
+        log_logits = actor['log_softmax'].numpy()
+        reward_pred = critic['reward_predict'].numpy()[:,0]
+        
+        a1[mask] = a
+        vg1[mask] = vg
+        vc1[mask] = vc
+        phi1[mask,:] = phi
+        psi1[mask,:] = psi
+        log_logits1[mask,:] = log_logits
+        reward_pred1[mask] = reward_pred
+    action = np.reshape(a1, [NENV, num_blue])
     return a1, action, vg1, vc1, phi1, psi1, log_logits1, reward_pred1
 
 batch = []
 dec_batch = []
-ma_batch = []
 num_batch = 0
 dec_batch_size = 0
 #while global_episodes < total_episodes:
@@ -370,9 +360,7 @@ while True:
     is_alive = [True for agent in envs.get_team_blue().flat]
     is_done = [False for env in range(NENV*num_agent)]
 
-    #trajs = [Trajectory(depth=14) for _ in range(NENV*num_agent)]
     trajs = [[Trajectory(depth=14) for _ in range(num_agent)] for _ in range(NENV)]
-    ma_trajs = [Trajectory(depth=5) for _ in range(NENV)]
     cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]
     
     # Bootstrap
@@ -459,16 +447,6 @@ while True:
                 cent_s1[env_idx],
                 ])
             '''
-            '''
-            # MA trajectory
-            ma_trajs[env_idx].append([
-                s0[env_idx*num_agent:(env_idx+1)*num_agent],
-                was_alive[env_idx*num_agent:(env_idx+1)*num_agent],
-                reward[env_idx],
-                np.sum(vg0[env_idx*num_agent:(env_idx+1)*num_agent]),
-                np.sum(vg1[env_idx*num_agent:(env_idx+1)*num_agent]),
-                ])
-            '''
 
         if log_save_analysis:
             for env_idx in range(NENV):
@@ -482,18 +460,18 @@ while True:
     etime_roll = time.time()
 
     # decentralize training
-    #ma_batch.extend(ma_trajs)
     dec_batch.extend(trajs)
     dec_batch_size = len(dec_batch) * 200 * num_agent
     if dec_batch_size > minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, 'im_log')
-        train_decentral(dec_batch, ma_batch, 
-                epoch=epoch, batch_size=minibatch_size,
-                writer=writer, log=log_image_on, step=global_episodes)
+        train_decentral(
+            dec_batch,
+            epoch=epoch, batch_size=minibatch_size,
+            writer=writer, log=log_image_on, step=global_episodes
+        )
         etime_train = time.time()
         dec_batch = []
-        ma_batch = []
         dec_batch_size = 0
         log_traintime.append(etime_train - stime_train)
     # centralize training

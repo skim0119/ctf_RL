@@ -1,7 +1,7 @@
 import pickle
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"   
+#os.environ["CUDA_VISIBLE_DEVICES"]="0"   
 import sys
 
 import shutil
@@ -49,7 +49,6 @@ PROGBAR = True
 
 ## Training Directory Reset
 TRAIN_NAME = '{}_convoy_{}g{}a_{}g{}a_m{}'.format(args.name, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
-
 TRAIN_TAG = 'PPO e2e model w Stacked Frames: '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
@@ -191,7 +190,7 @@ def train(network, trajs, bootstrap=0.0, epoch=epoch, batch_size=minibatch_size,
             }).shuffle(64).repeat(epoch).batch(batch_size)
         train_datasets.append(train_dataset)
 
-    logs = network.update_network(train_datasets, writer=writer, step=step, tag='losses/', log=log)
+    network.update_network(train_datasets, writer=writer, step=step, tag='losses/', log=log)
     if log:
         with writer.as_default():
             tag = 'debug/'
