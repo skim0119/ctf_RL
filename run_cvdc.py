@@ -1,7 +1,7 @@
 import pickle
 
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"]="-1"   
+os.environ["CUDA_VISIBLE_DEVICES"]="0"   
 import sys
 
 import shutil
@@ -86,7 +86,7 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 # Training
-total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 200000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = 0.9#config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -104,9 +104,9 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
-vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = args.map_size#config.getint('DEFAULT', 'MAP_SIZE')
+vision_range = map_size-1#config.getint('DEFAULT', 'VISION_RANGE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -351,8 +351,8 @@ batch = []
 dec_batch = []
 num_batch = 0
 dec_batch_size = 0
-#while global_episodes < total_episodes:
-while True:
+while global_episodes < total_episodes:
+#while True:
     # Flags
     log_save_analysis = interval_flag(global_episodes, 1024*4, 'save_log')
 
@@ -547,9 +547,9 @@ while True:
         ax_reward1.autoscale(True)
 
         env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)
-        agent_obs1 = ax_agent1.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
-        agent_obs2 = ax_agent2.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
-        agent_obs3 = ax_agent3.imshow(np.ones((39,39,3)), vmin=0, vmax=1)
+        agent_obs1 = ax_agent1.imshow(np.ones((59,59,3)), vmin=0, vmax=1)
+        agent_obs2 = ax_agent2.imshow(np.ones((59,59,3)), vmin=0, vmax=1)
+        agent_obs3 = ax_agent3.imshow(np.ones((59,59,3)), vmin=0, vmax=1)
         env_reward_plot, env_value_plot = ax_value.plot([],[], [],[])
         reward_plot1, = ax_reward1.plot([],[]) 
         reward_plot2, = ax_reward2.plot([],[]) 

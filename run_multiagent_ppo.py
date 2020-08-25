@@ -1,7 +1,7 @@
 import pickle
 
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"]="0"   
+os.environ["CUDA_VISIBLE_DEVICES"]="1"   
 import sys
 
 import shutil
@@ -77,7 +77,7 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 # Training
-total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
+total_episodes = 200000#config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
 lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
@@ -95,9 +95,9 @@ moving_average_step    = config.getint('LOG', 'MOVING_AVERAGE_SIZE')
 
 # Environment/Policy Settings
 action_space = config.getint('DEFAULT', 'ACTION_SPACE')
-vision_range = config.getint('DEFAULT', 'VISION_RANGE')
 keep_frame   = 1#config.getint('DEFAULT', 'KEEP_FRAME')
 map_size     = args.map_size # config.getint('DEFAULT', 'MAP_SIZE')
+vision_range = map_size-1#config.getint('DEFAULT', 'VISION_RANGE')
 
 ## PPO Batch Replay Settings
 minibatch_size = 256
@@ -217,8 +217,8 @@ def get_action(states):
 
 batch = []
 num_batch = 0
-#while global_episodes < total_episodes:
-while True:
+while global_episodes < total_episodes:
+#while True:
     
     # initialize parameters 
     episode_rew = np.zeros(NENV)

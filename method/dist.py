@@ -71,7 +71,7 @@ class SF_CVDC:
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.01, dtype=tf.float32),
-                'psi_beta': tf.constant(0.0, dtype=tf.float32),
+                'psi_beta': tf.constant(0.01, dtype=tf.float32),
                 'decoder_beta': tf.constant(1.0e-5, dtype=tf.float32),
                 'critic_beta': tf.constant(50, dtype=tf.float32),
                 'q_beta': tf.constant(30, dtype=tf.float32),
