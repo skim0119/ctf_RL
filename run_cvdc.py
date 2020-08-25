@@ -41,8 +41,9 @@ from utility.gae import gae
 
 from method.dist import SF_CVDC as Network
 
-parser = argparse.ArgumentParser(description='PPO trainer for convoy')
-parser.add_argument('--name', type=str, help='training name')
+parser = argparse.ArgumentParser(description='CVDC(learnability) trainer for convoy')
+parser.add_argument('--train_number', type=int, help='training train_number')
+parser.add_argument('--machine', type=str, help='training machine')
 parser.add_argument('--map_size', type=int, help='map size')
 parser.add_argument('--nbg', type=int, help='number of blue ground')
 parser.add_argument('--nba', type=int, help='number of blue air')
@@ -53,8 +54,8 @@ args = parser.parse_args()
 PROGBAR = True
 
 ## Training Directory Reset
-TRAIN_NAME = '{}_convoy_{}g{}a_{}g{}a_m{}'.format(args.name, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
-TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
+TRAIN_NAME = 'CVDC_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}'.format(args.machine, args.train_number, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
+TRAIN_TAG = 'Central value decentralized control(learnability), '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME

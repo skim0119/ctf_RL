@@ -41,20 +41,21 @@ from utility.gae import gae
 
 from method.dist import SF_CVDC as Network
 
-parser = argparse.ArgumentParser(description='PPO trainer for convoy')
-parser.add_argument('--name', type=str)
-parser.add_argument('--map_size', type=int)
-parser.add_argument('--nbg', type=int)
-parser.add_argument('--nba', type=int)
-parser.add_argument('--nrg', type=int)
-parser.add_argument('--nra', type=int)
+parser = argparse.ArgumentParser(description='CVDC(COMA) trainer for convoy')
+parser.add_argument('--train_number', type=int, help='training train_number')
+parser.add_argument('--machine', type=str, help='training machine')
+parser.add_argument('--map_size', type=int, help='map size')
+parser.add_argument('--nbg', type=int, help='number of blue ground')
+parser.add_argument('--nba', type=int, help='number of blue air')
+parser.add_argument('--nrg', type=int, help='number of red air')
+parser.add_argument('--nra', type=int, help='number of red air')
 args = parser.parse_args()
 
 PROGBAR = True
 
 ## Training Directory Reset
-TRAIN_NAME = '{}_convoy_{}g{}a_{}g{}a_m{}'.format(args.name, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
-TRAIN_TAG = 'Central value decentralized control, '+TRAIN_NAME
+TRAIN_NAME = 'COMA_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}'.format(args.machine, args.train_number, args.nbg, args.nba, args.nrg, args.nra, args.map_size)
+TRAIN_TAG = 'Central value decentralized control(countfactual), '+TRAIN_NAME
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -88,7 +89,7 @@ config.read(config_path)
 total_episodes = config.getint('TRAINING', 'TOTAL_EPISODES')
 max_ep         = 200#config.getint('TRAINING', 'MAX_STEP')
 gamma          = config.getfloat('TRAINING', 'DISCOUNT_RATE')
-lambd          = 0.8#config.getfloat('TRAINING', 'GAE_LAMBDA')
+lambd          = config.getfloat('TRAINING', 'GAE_LAMBDA')
 ppo_e          = config.getfloat('TRAINING', 'PPO_EPSILON')
 critic_beta    = config.getfloat('TRAINING', 'CRITIC_BETA')
 entropy_beta   = config.getfloat('TRAINING', 'ENTROPY_BETA')
