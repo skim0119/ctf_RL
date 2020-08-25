@@ -10,7 +10,7 @@ import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 
 from network.attention import Non_local_nn
-from network.model_V4 import V4
+from network.model_V4_30 import V4
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
 

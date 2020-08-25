@@ -11,8 +11,8 @@ import tensorflow.keras.backend as K
 import tensorflow_probability as tfp
 
 from network.attention import Non_local_nn
-from network.model_V4 import V4, V4INV
-from network.model_V4 import V4Decentral, V4INVDecentral
+from network.model_V4_30 import V4, V4INV
+from network.model_V4_30 import V4Decentral, V4INVDecentral
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
 
