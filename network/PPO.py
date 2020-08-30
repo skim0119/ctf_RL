@@ -9,7 +9,6 @@ from tensorflow import keras
 import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 
-from network.attention import Non_local_nn
 from network.model_V4_30 import V4
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
@@ -24,6 +23,7 @@ class V4PPO(tf.keras.Model):
 
         # Feature Encoding
         self.feature_layer = V4(input_shape, action_size)
+        self.pi_layer = V4(input_shape, action_size)
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
@@ -39,16 +39,15 @@ class V4PPO(tf.keras.Model):
         self.feature_layer.summary()
 
     def call(self, inputs):
-        # Feature Encoding
-        net = self.feature_layer(inputs)
-
         # Actor
+        net = self.pi_layer(inputs)
         actor_net = self.actor_dense1(net)
         actor_net = self.actor_dense2(actor_net)
         actor = self.softmax(actor_net)
         log_logits = self.log_softmax(actor_net)
 
         # Critic
+        net = self.feature_layer(inputs)
         critic = self.critic_dense1(net)
         critic = self.critic_dense2(critic)
         critic = tf.reshape(critic, [-1])

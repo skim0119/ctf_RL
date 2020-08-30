@@ -2,6 +2,7 @@ import argparse
 import configparser
 import multiprocessing
 import os
+
 # os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import pickle
 import shutil
@@ -41,7 +42,9 @@ parser.add_argument("--nbg", type=int, help="number of blue ground")
 parser.add_argument("--nba", type=int, help="number of blue air")
 parser.add_argument("--nrg", type=int, help="number of red air")
 parser.add_argument("--nra", type=int, help="number of red air")
-parser.add_argument("--silence", action='store_false', help="call to disable the progress bar")
+parser.add_argument(
+    "--silence", action="store_false", help="call to disable the progress bar"
+)
 args = parser.parse_args()
 
 PROGBAR = args.silence
@@ -81,8 +84,8 @@ path_create(MODEL_PATH)
 # Training
 total_episodes = 100000
 max_ep = 200
-gamma = 0.98 # GAE - discount
-lambd = 0.98 # GAE - lambda
+gamma = 0.98  # GAE - discount
+lambd = 0.98  # GAE - lambda
 # Log
 save_network_frequency = 1024
 save_stat_frequency = 128
@@ -112,6 +115,8 @@ log_traintime = MovingAverage(moving_average_step)
 # map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
 def make_env(map_size):
     return lambda: gym.make("cap-v0", map_size=map_size, config_path=game_config)
+
+
 envs = [make_env(map_size) for i in range(NENV)]
 envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
 num_blue = len(envs.get_team_blue()[0])

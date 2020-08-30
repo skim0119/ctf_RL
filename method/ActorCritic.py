@@ -56,29 +56,14 @@ class PPO_Module:
             assert tag is not None
 
         for idx, (train_dataset, model, optimizer) in enumerate(zip(train_datasets, self.models, self.optimizers)):
-            #grads = []
             actor_losses, critic_losses, entropies = [], [], []
             for inputs in train_dataset:
                 _, info = train(model, optimizer, inputs)
-                #grad, info = get_gradient(model, inputs)
-                #grads.append(grad)
                 if log:
                     actor_losses.append(info['actor_loss'])
                     critic_losses.append(info['critic_loss'])
                     entropies.append(info['entropy'])
 
-            ''' 
-            # Accumulate gradients
-            num_grads = len(grads)
-            total_grad = grads.pop(0)
-            while grads:
-                grad = grads.pop(0)
-                for i, val in enumerate(grad):
-                    total_grad[i] += val
-
-            # Update network
-            self.optimizer.apply_gradients(zip(total_grad, self.model.trainable_variables))
-            '''
             if log:
                 logs = {f'actor_loss/agent{idx}': np.mean(actor_losses),
                         f'critic_loss/agent{idx}': np.mean(critic_losses),

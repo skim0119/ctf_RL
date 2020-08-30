@@ -4,7 +4,7 @@ import sys
 
 RUNNING_SCRIPT = [
     "run_multiagent_ppo.py",
-    "run_multiagent_ppo_SF.py",
+#    "run_multiagent_ppo_SF.py",
     "run_COMA.py",
     "run_cvdc.py",
 ]
@@ -22,6 +22,7 @@ args = parser.parse_args()
 if args.device:
     device = ','.join(args.device)
     os.environ["CUDA_VISIBLE_DEVICES"] = device
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 def make_command(run_file_name):
     words = ["python", run_file_name,
@@ -32,10 +33,17 @@ def make_command(run_file_name):
              "--nba", str(args.nba),
              "--nrg", str(args.nbg+args.nba),
              "--nra", str(0),
-             "--silence", str(args.silence),
              ]
-    return ' '.join(words)
+    command = ' '.join(words)
+    if args.silence:
+        command += ' --silence'
+    command += ' &'
+    return command
 
-print(make_command('test.py'))
-#os.system("python run_multiagent_ppo.py")
+for script_name in RUNNING_SCRIPT:
+    command = make_command(script_name)
+    print('Continue with script:')
+    print(command)
+    input('continue?')
+    os.system(command)
 
