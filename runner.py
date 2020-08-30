@@ -48,8 +48,8 @@ for script_name in RUNNING_SCRIPT:
     input('continue?')
     os.system(command)
 
-time.sleep(10000)
+time.sleep(100)
 print(f'Start Time : {time.ctime()}')
 print(f'    running: {args.nbg}g{args.nba}a')
 while True:
-    time.sleep(2000)
+    time.sleep(200)
