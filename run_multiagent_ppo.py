@@ -239,8 +239,8 @@ def get_action(states):
 
 batch = []
 num_batch = 0
-while global_episodes < total_episodes:
-    # while True:
+#while global_episodes < total_episodes:
+while True:
 
     # initialize parameters
     episode_rew = np.zeros(NENV)

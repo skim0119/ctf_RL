@@ -418,8 +418,8 @@ batch = []
 dec_batch = []
 num_batch = 0
 dec_batch_size = 0
-while global_episodes < total_episodes:
-    # while True:
+#while global_episodes < total_episodes:
+while True:
     # Flags
     log_save_analysis = interval_flag(global_episodes, 1024 * 4, "save_log")
 

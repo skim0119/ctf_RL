@@ -23,7 +23,7 @@ args = parser.parse_args()
 if args.device:
     device = ','.join(args.device)
     os.environ["CUDA_VISIBLE_DEVICES"] = device
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+#os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 def make_command(run_file_name):
     words = ["python", run_file_name,

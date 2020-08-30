@@ -346,7 +346,8 @@ batch = []
 dec_batch = []
 num_batch = 0
 dec_batch_size = 0
-while global_episodes < total_episodes:
+#while global_episodes < total_episodes:
+while True:
     # initialize parameters
     episode_rew = np.zeros(NENV)
     is_alive = [True for agent in envs.get_team_blue().flat]
