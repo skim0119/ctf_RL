@@ -1,0 +1,41 @@
+import argparse
+import os
+import sys
+
+RUNNING_SCRIPT = [
+    "run_multiagent_ppo.py",
+    "run_multiagent_ppo_SF.py",
+    "run_COMA.py",
+    "run_cvdc.py",
+]
+
+parser = argparse.ArgumentParser(description="PPO trainer for convoy")
+parser.add_argument("--train_number", type=int, help="training train_number", default=0)
+parser.add_argument("--machine", type=str, help="training machine", required=True)
+parser.add_argument("--map_size", type=int, help="map size", default=30)
+parser.add_argument("--nbg", type=int, help="number of blue ground", default=3)
+parser.add_argument("--nba", type=int, help="number of blue air", default=0)
+parser.add_argument("--silence", action='store_true', help="call to disable the progress bar")
+parser.add_argument("--device", nargs="*", help="GPU numbers")
+args = parser.parse_args()
+
+if args.device:
+    device = ','.join(args.device)
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+
+def make_command(run_file_name):
+    words = ["python", run_file_name,
+             "--train_number", str(args.train_number),
+             "--machine", args.machine,
+             "--map_size", str(args.map_size),
+             "--nbg", str(args.nbg),
+             "--nba", str(args.nba),
+             "--nrg", str(args.nbg+args.nba),
+             "--nra", str(0),
+             "--silence", str(args.silence),
+             ]
+    return ' '.join(words)
+
+print(make_command('test.py'))
+#os.system("python run_multiagent_ppo.py")
+
