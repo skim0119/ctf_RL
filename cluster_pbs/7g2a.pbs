@@ -17,7 +17,7 @@ module list
 
 conda activate /projects/tran-research-group/skim449/conda/ctf
 
-cd $PBS_O_WORKDIR
+cd $PBS_O_WORKDIR/../
 which python
 which pip
 pwd
