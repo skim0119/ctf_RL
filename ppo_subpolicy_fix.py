@@ -41,7 +41,7 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 6
+assert len(sys.argv) == 7
 
 device_t = sys.argv[2]
 N_ATT = int(sys.argv[3])
@@ -55,7 +55,7 @@ RBETA = 0.8
 num_mode = 3
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[1]
+TRAIN_NAME = sys.argv[1]+str(time.time())+'_'+sys.argv[6][-1]
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
@@ -64,7 +64,7 @@ GPU_CAPACITY = 0.95
 
 NENV = 8 # multiprocessing.cpu_count() 
 
-MODEL_LOAD_PATH = './model/fix_baseline_80/' # initialize values
+MODEL_LOAD_PATH = './model/' + sys.argv[6] + '/' # initialize values
 ENV_SETTING_PATH = 'setting_full.ini'
 
 ## Data Path
@@ -368,7 +368,7 @@ while True:
 
     if log_on:
         step = sess.run(global_step)
-        tag = 'fix_baseline/'
+        tag = 'team_training/'
         record({
             tag+'length': log_length(),
             tag+'win-rate': log_winrate(),

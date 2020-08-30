@@ -38,8 +38,8 @@ from utility.gae import gae
 
 from method.ppo import PPO_multimodes as Network
 
-assert len(sys.argv) == 4
-device_t = sys.argv[3]
+assert len(sys.argv) == 3
+device_t = sys.argv[2]
 
 num_mode = 3
 MODE_NAME = lambda mode: ['_attack', '_scout', '_defense', ''][mode]
@@ -53,7 +53,7 @@ LOG_DEVICE = False
 RBETA = 0.8
 
 ## Training Directory Reset
-TRAIN_NAME = sys.argv[2]+str(time.time()) #'fix_baseline'
+TRAIN_NAME = sys.argv[1]+str(time.time()) #'fix_baseline'
 LOG_PATH = './logs/'+TRAIN_NAME
 MODEL_PATH = './model/' + TRAIN_NAME
 SAVE_PATH = './save/' + TRAIN_NAME
