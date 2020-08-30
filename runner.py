@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 
 RUNNING_SCRIPT = [
     "run_multiagent_ppo.py",
@@ -47,3 +48,8 @@ for script_name in RUNNING_SCRIPT:
     input('continue?')
     os.system(command)
 
+time.sleep(10000)
+print(f'Start Time : {time.ctime()}')
+print(f'    running: {args.nbg}g{args.nba}a')
+while True:
+    time.sleep(2000)
