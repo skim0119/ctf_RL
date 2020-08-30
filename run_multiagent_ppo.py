@@ -2,17 +2,18 @@ import argparse
 import configparser
 import multiprocessing
 import os
+# os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import pickle
 import shutil
 import signal
 import sys
 import threading
 
-# os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import tensorflow as tf
 
 physical_devices = tf.config.experimental.list_physical_devices("GPU")
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+for device in physical_devices:
+    tf.config.experimental.set_memory_growth(device, True)
 
 import math
 import random
@@ -40,9 +41,10 @@ parser.add_argument("--nbg", type=int, help="number of blue ground")
 parser.add_argument("--nba", type=int, help="number of blue air")
 parser.add_argument("--nrg", type=int, help="number of red air")
 parser.add_argument("--nra", type=int, help="number of red air")
+parser.add_argument("--silence", action='store_false', help="call to disable the progress bar")
 args = parser.parse_args()
 
-PROGBAR = True
+PROGBAR = args.silence
 
 ## Training Directory Reset
 TRAIN_NAME = "PPO_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format(
