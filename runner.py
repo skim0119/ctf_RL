@@ -45,7 +45,6 @@ for script_name in RUNNING_SCRIPT:
     command = make_command(script_name)
     print('Continue with script:')
     print(command)
-    input('continue?')
     os.system(command)
 
 time.sleep(100)
