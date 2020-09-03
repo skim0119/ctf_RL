@@ -69,7 +69,7 @@ class COMA:
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.01, dtype=tf.float32),
-                'q_beta': tf.constant(30, dtype=tf.float32),
+                'q_beta': tf.constant(1.0, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {'critic_beta': tf.constant(1.0)}

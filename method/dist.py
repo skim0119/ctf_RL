@@ -10,7 +10,7 @@ from utility.logger import *
 from network.DistValue_SF_CVDC import V4SF_CVDC_CENTRAL, V4SF_CVDC_DECENTRAL
 from network.DistValue_SF_CVDC import get_gradient, train
 from network.DistValue_SF_CVDC import loss_central
-from network.DistValue_SF_CVDC import loss_ppo, loss_multiagent_critic
+from network.DistValue_SF_CVDC import loss_ppo
 
 
 class SF_CVDC:
@@ -25,7 +25,7 @@ class SF_CVDC:
         agent_type,
         save_path,
         atoms=4,
-        lr=1e-4,
+        lr=1e-3,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
@@ -70,12 +70,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.01, dtype=tf.float32),
-                'psi_beta': tf.constant(0.00, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
                 'decoder_beta': tf.constant(1.0e-5, dtype=tf.float32),
-                'critic_beta': tf.constant(50, dtype=tf.float32),
-                'q_beta': tf.constant(30, dtype=tf.float32),
-                'learnability_beta': tf.constant(1e2, dtype=tf.float32),
+                'critic_beta': tf.constant(5, dtype=tf.float32),
+                'q_beta': tf.constant(3, dtype=tf.float32),
+                'learnability_beta': tf.constant(1e1, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {

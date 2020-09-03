@@ -83,7 +83,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # Actor
         net = self.pi_layer(obs)
-        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
         softmax_logits = self.softmax(net)
@@ -103,18 +103,6 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         net = self.psi_dense2(net)
         critic = self.sf_v_weight(net, training=True)
         q = self.sf_q_weight(net, training=True)
-
-        # Masking method for lowest 1/8th variation
-        '''
-        q_w = self.sf_q_weight.weights[0]
-        q_w_std = tf.math.reduce_std(q_w, axis=1, keepdims=True)
-        w_mask = tf.cast(q_w_std[tf.argsort(q_w_std, axis=0)[-8,0]] <= q_w_std, tf.float32)
-        w = self.sf_v_weight.weights[0]
-        w = w * w_mask
-        #reward_predict = self.sf_v_weight(phi, training=False)
-        reward_predict = tf.linalg.matmul(phi, w)
-        inv_critic = tf.linalg.matmul(psi, w)
-        '''
 
         beta = tf.math.abs(self.beta)
         wv = self.sf_v_weight.weights[0]
@@ -283,7 +271,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Decoder loss
     #generator_loss = model.mse_loss_sum(state, v['decoded_state'])
-    generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
+    generator_loss = model.mse_loss_mean(next_state, v['decoded_state'])
 
     # Entropy
     H = -tf.reduce_sum(actor * tf_log(actor), axis=-1) # Entropy H of each sample
@@ -348,26 +336,6 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
             'learnability_loss': learnability_loss,
             }
 
-    return total_loss, info
-
-@tf.function
-def loss_multiagent_critic(model, team_state, value_central, rewards, mask):
-    # states_list should be given in flat format
-    num_batch, num_agent, lx, ly, lc = team_state.shape
-    mask = tf.cast(mask, tf.float32)
-
-    states_list = tf.reshape(team_state, [num_batch*num_agent, lx, ly, lc])
-    _, v = model(states_list)
-    critics = tf.reshape(v['critic'], mask.shape) * mask
-    group_critic = tf.reduce_sum(critics, axis=1)
-    mse = model.mse_loss_mean(value_central, group_critic)
-
-    rewards_prediction = tf.reshape(v['reward_predict'], mask.shape) * mask
-    rewards_prediction = tf.reduce_sum(rewards_prediction, axis=1)
-    reward_loss = model.mse_loss_sum(rewards, rewards_prediction)
-
-    total_loss = 0.001*mse
-    info = {'ma_critic': mse, 'reward_loss': reward_loss}
     return total_loss, info
 
 def get_gradient(model, loss, inputs, hyperparameters={}):
