@@ -4,7 +4,7 @@ import sys
 import time
 
 RUNNING_SCRIPT = [
-    #"run_multiagent_ppo.py",
+    "run_multiagent_ppo.py",
 #    "run_multiagent_ppo_SF.py",
    # "run_COMA.py",
     "run_cvdc.py",
@@ -46,6 +46,7 @@ for script_name in RUNNING_SCRIPT:
     print('Continue with script:')
     print(command)
     os.system(command)
+    time.sleep(10)
 
 print(f'Start Time : {time.ctime()}')
 print(f'    running: {args.nbg}g{args.nba}a')
