@@ -30,27 +30,27 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         self.pi_layer = V4Decentral(input_shape, action_size, name='pi_encoding')
 
         # Decoder
-        self.action_dense1 = layers.Dense(units=128, activation='relu')
-        self.decoder_pre_dense1 = layers.Dense(units=128, activation='relu')
-        self.decoder_dense1 = layers.Dense(units=128, activation='relu')
+        self.action_dense1 = layers.Dense(units=128, activation='elu')
+        self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
+        self.decoder_dense1 = layers.Dense(units=128, activation='elu')
         self.decoder = V4INVDecentral()
 
         # Phi
-        self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+        self.phi_dense1 = layers.Dense(units=atoms, activation='elu')
         self.sf_v_weight = layers.Dense(units=1, activation='linear', use_bias=False,)
                 #kernel_constraint=tf.keras.constraints.MaxNorm(2))
         self.sf_q_weight = layers.Dense(units=action_size, activation='linear', use_bias=False,)
                 #kernel_constraint=tf.keras.constraints.MaxNorm(2))
 
         # Actor
-        self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_size, activation='relu')
+        self.actor_dense1 = layers.Dense(128, activation='elu')
+        self.actor_dense2 = layers.Dense(action_size, activation='elu')
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Psi
-        self.psi_dense1 = layers.Dense(units=128, activation='relu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
+        self.psi_dense1 = layers.Dense(units=128, activation='elu')
+        self.psi_dense2 = layers.Dense(units=atoms, activation='elu')
         self.smoothed_pseudo_H = tf.Variable(1.0)
 
         # Learnabilty Maximizer
@@ -102,6 +102,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         net = self.psi_dense1(phi)
         net = self.psi_dense2(net)
         critic = self.sf_v_weight(net, training=True)
+        critic = tf.reshape(critic, [-1])
         q = self.sf_q_weight(net, training=True)
 
         beta = tf.math.abs(self.beta)
@@ -109,9 +110,11 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         wq = self.sf_q_weight.weights[0]
         wv_neg = wv * (1.0-beta)
         reward_predict = tf.linalg.matmul(phi, wv_neg)
+        reward_predict = tf.reshape(reward_predict, [-1])
         inv_critic = tf.linalg.matmul(psi, wv_neg)
+        inv_critic = tf.reshape(inv_critic, [-1])
 
-        # For learnability
+        # For learnability update
         wq_pos = tf.stop_gradient(wq) * beta
         wv_neg = tf.stop_gradient(wv) * (1.0-beta)
         psi_q_pos = tf.linalg.matmul(tf.stop_gradient(psi), wq_pos)
@@ -271,10 +274,10 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Decoder loss
     #generator_loss = model.mse_loss_sum(state, v['decoded_state'])
-    generator_loss = model.mse_loss_mean(next_state, v['decoded_state'])
+    generator_loss = 0.0
 
     # Entropy
-    H = -tf.reduce_sum(actor * tf_log(actor), axis=-1) # Entropy H of each sample
+    H = -tf.reduce_mean(actor * tf_log(actor), axis=-1) # Entropy H of each sample
     mean_entropy = tf.reduce_mean(H)
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
@@ -290,7 +293,8 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
     
     # Psi Loss
-    psi_mse = model.mse_loss_mean(td_target, psi)
+    #psi_mse = model.mse_loss_mean(td_target, psi)
+    psi_mse = 0.0
 
     # Actor Loss
     action_one_hot = tf.one_hot(action, model.action_size, dtype=tf.float32)
@@ -304,8 +308,11 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Q - Loss
     q = v['Q']
-    q_a = tf.reduce_sum(q * tf.stop_gradient(actor), 1)
-    q_loss = tf.reduce_mean(tf.square(q_a - td_target_c))
+    #q_a = tf.reduce_sum(q * tf.stop_gradient(actor), 1)
+    q_a = tf.reduce_sum(q * action_one_hot, 1)  # Current Q value
+    q_target = rewards + 0.98 * tf.reduce_max(tf.stop_gradient(v_next['Q']), axis=1)
+    #q_loss = tf.reduce_mean(tf.square(td_target_c - q_a))
+    q_loss = tf.reduce_mean(tf.square(q_target - q_a))
 
     # L2 loss
     #l2_loss = tf.nn.l2_loss(model.sf_v_weight.weights[0]) + tf.nn.l2_loss(model.sf_q_weight.weights[0])
@@ -317,9 +324,9 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     learnability_loss = tf.reduce_mean(-var_action+0.5*var_environment)
 
     total_loss = actor_loss
-    total_loss += psi_beta*psi_mse
+    #total_loss += psi_beta*psi_mse
     total_loss -= entropy_beta*mean_entropy
-    total_loss += decoder_beta*generator_loss
+    #total_loss += decoder_beta*generator_loss
     total_loss += critic_beta*critic_mse
     total_loss += q_beta*q_loss
     total_loss += learnability_beta*learnability_loss

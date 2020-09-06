@@ -4,9 +4,9 @@ import sys
 import time
 
 RUNNING_SCRIPT = [
-    "run_multiagent_ppo.py",
+    #"run_multiagent_ppo.py",
 #    "run_multiagent_ppo_SF.py",
-    "run_COMA.py",
+   # "run_COMA.py",
     "run_cvdc.py",
 ]
 
@@ -23,7 +23,7 @@ args = parser.parse_args()
 if args.device:
     device = ','.join(args.device)
     os.environ["CUDA_VISIBLE_DEVICES"] = device
-#os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 def make_command(run_file_name):
     words = ["python", run_file_name,
@@ -47,8 +47,5 @@ for script_name in RUNNING_SCRIPT:
     print(command)
     os.system(command)
 
-time.sleep(100)
 print(f'Start Time : {time.ctime()}')
 print(f'    running: {args.nbg}g{args.nba}a')
-while True:
-    time.sleep(200)

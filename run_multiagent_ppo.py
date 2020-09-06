@@ -185,6 +185,7 @@ def train(
         traj_buffer[atype]["td_target"].extend(td_target)
         traj_buffer[atype]["advantage"].extend(advantages)
         traj_buffer[atype]["old_log_logit"].extend(traj[4])
+        traj_buffer[atype]["old_value"].extend(traj[3])
 
     for atype in range(num_type):
         train_dataset = (
@@ -193,12 +194,9 @@ def train(
                     "state": np.stack(traj_buffer[atype]["state"]),
                     "old_log_logit": np.stack(traj_buffer[atype]["old_log_logit"]),
                     "action": np.stack(traj_buffer[atype]["action"]),
-                    "advantage": np.stack(traj_buffer[atype]["advantage"]).astype(
-                        np.float32
-                    ),
-                    "td_target": np.stack(traj_buffer[atype]["td_target"]).astype(
-                        np.float32
-                    ),
+                    "advantage": np.stack(traj_buffer[atype]["advantage"]).astype(np.float32),
+                    "td_target": np.stack(traj_buffer[atype]["td_target"]).astype(np.float32),
+                    "old_value": np.stack(traj_buffer[atype]["old_value"]).astype(np.float32),
                 }
             )
             .shuffle(64)
@@ -220,21 +218,27 @@ def train(
 
 
 def get_action(states):
+    # State Process
     states_list = []
     for mask in agent_type_masking:
         state = np.compress(mask, states, axis=0)
         states_list.append(state)
 
+    # Run network
     results = network.run_network(states_list)
+
+    # Container
     a1 = np.empty([NENV * num_blue], dtype=np.int32)
     v1 = np.empty([NENV * num_blue], dtype=np.float32)
     p1 = np.empty([NENV * num_blue, action_space], dtype=np.float32)
+
+    # Postprocessing
     for (a, v, p), mask in zip(results, agent_type_masking):
         a1[mask] = a
         v1[mask] = v
         p1[mask, :] = p
     actions = np.reshape(a1, [NENV, num_blue])
-    return a1, v1, p1, actions
+    return actions, a1, v1, p1
 
 
 batch = []
@@ -257,7 +261,7 @@ while True:
         policy_red=policy.Roomba,
     )
     s1 = s1.astype(np.float32)
-    a1, v1, p1, actions = get_action(s1)
+    actions, a1, v1, p1 = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
@@ -271,7 +275,7 @@ while True:
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         episode_rew += reward
 
-        a1, v1, p1, actions = get_action(s1)
+        actions, a1, v1, p1 = get_action(s1)
 
         # push to buffer
         for idx, agent in enumerate(envs.get_team_blue().flat):

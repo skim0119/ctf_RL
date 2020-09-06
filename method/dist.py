@@ -70,12 +70,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
-                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
-                'decoder_beta': tf.constant(1.0e-5, dtype=tf.float32),
-                'critic_beta': tf.constant(5, dtype=tf.float32),
-                'q_beta': tf.constant(3, dtype=tf.float32),
-                'learnability_beta': tf.constant(1e1, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.00, dtype=tf.float32),
+                'psi_beta': tf.constant(0, dtype=tf.float32),
+                'decoder_beta': tf.constant(0, dtype=tf.float32),
+                'critic_beta': tf.constant(0.5, dtype=tf.float32),
+                'q_beta': tf.constant(0.0, dtype=tf.float32),
+                'learnability_beta': tf.constant(0, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {
@@ -126,7 +126,8 @@ class SF_CVDC:
             num_sample = states.shape[0]
             temp_action = np.zeros(num_sample, dtype=np.int32)
             actor, SF = model([states, temp_action])
-            results.append([actor, SF])
+            actions = tf.random.categorical(actor["log_softmax"], 1, dtype=tf.int32).numpy().ravel()
+            results.append([actions, actor, SF])
         return results
 
     # Centralize updater

@@ -33,7 +33,8 @@ class V4PPO(tf.keras.Model):
 
         # Critic
         self.critic_dense1 = layers.Dense(64, activation='relu')
-        self.critic_dense2 = layers.Dense(1)
+        self.critic_dense2 = layers.Dense(1, activation='linear')
+        self.smoothed_pseudo_H = tf.Variable(1.0)
 
     def print_summary(self):
         self.feature_layer.summary()
@@ -54,7 +55,7 @@ class V4PPO(tf.keras.Model):
 
         return actor, critic, log_logits
 
-def loss(model, state, old_log_logit, action, advantage, td_target,
+def loss(model, state, old_log_logit, action, advantage, td_target, old_value,
          eps=0.2, entropy_beta=0.05, critic_beta=0.5, 
          gamma=0.98, training=True, return_losses=False):
     num_sample = state.shape[0]
@@ -64,10 +65,20 @@ def loss(model, state, old_log_logit, action, advantage, td_target,
 
     # Entropy
     entropy = -tf.reduce_mean(actor * tf_log(actor), name='entropy')
+    pseudo_H = tf.stop_gradient(
+            tf.reduce_sum(actor*(1-actor), axis=-1))
+    mean_pseudo_H = tf.reduce_mean(pseudo_H)
+    smoothed_pseudo_H = model.smoothed_pseudo_H
 
     # Critic Loss
-    td_error = td_target - critic
-    critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
+    #td_error = td_target - critic
+    #critic_loss = tf.reduce_mean(tf.square(td_error), name='critic_loss')
+    v_pred = critic
+    v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
+    critic_mse = tf.maximum(
+        tf.square(v_pred - td_target),
+        tf.square(v_pred_clipped - td_target))
+    critic_loss = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
 
     # Actor Loss
     action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
