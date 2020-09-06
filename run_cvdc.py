@@ -358,11 +358,6 @@ def train_decentral(
             writer.flush()
 
 
-def get_action(log_logits):
-    a = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
-    return a
-
-
 def run_network(states):
     # State Process
     states_list = []
