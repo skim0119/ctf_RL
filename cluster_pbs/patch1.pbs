@@ -1,11 +1,11 @@
 #!/bin/bash
 #PBS -q eng-research
-#PBS -N convoy_3g0a
+#PBS -N ctf-patch1
 #PBS -l walltime=48:00:00
 #PBS -l nodes=1:ppn=40:V100
 #PBS -j oe
 #PBS -M skim449@illinois.edu
-#PBS -o convoy_3g0a.out
+#PBS -o ctf-patch1.out
 #PBS -e cluster_error.out
 
 module load anaconda/3
@@ -22,4 +22,5 @@ which python
 which pip
 pwd
 
-python runner.py --train_number 0 --machine CL --nbg 3 --nba 0 --silence
+python runner.py --train_number 1 --machine CL --nbg 3 --nba 0 --silence --device 0 &
+python runner.py --train_number 1 --machine CL --nbg 5 --nba 0 --silence --device 1
