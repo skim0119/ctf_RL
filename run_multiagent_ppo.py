@@ -171,32 +171,41 @@ def train(
     train_datasets = []
 
     advantage_list = []
-    traj_buffer = [defaultdict(list) for _ in range(num_type)]
-    for idx, traj in enumerate(trajs):
-        atype = agent_type_index[idx % num_blue]
+    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
+    for trajs in trajs:
+        for idx, traj in enumerate(trajs):
+    #for idx, traj in enumerate(trajs):
+            atype = agent_type_index[idx]
 
-        td_target, advantages = gae(
-            traj[2], traj[3], traj[5][-1], gamma, lambd, normalize=False
-        )
-        advantage_list.append(advantages)
+            reward = traj[2]
+            critic = traj[3]
+            _critic = traj[5][-1]
 
-        traj_buffer[atype]["state"].extend(traj[0])
-        traj_buffer[atype]["action"].extend(traj[1])
-        traj_buffer[atype]["td_target"].extend(td_target)
-        traj_buffer[atype]["advantage"].extend(advantages)
-        traj_buffer[atype]["old_log_logit"].extend(traj[4])
-        traj_buffer[atype]["old_value"].extend(traj[3])
+            td_target, advantages = gae(
+                reward, critic, _critic,
+                gamma, lambd, normalize=False
+            )
+            advantage_list.append(advantages)
+
+            traj_buffer = traj_buffer_list[atype]
+            traj_buffer["state"].extend(traj[0])
+            traj_buffer["action"].extend(traj[1])
+            traj_buffer["td_target"].extend(td_target)
+            traj_buffer["advantage"].extend(advantages)
+            traj_buffer["old_log_logit"].extend(traj[4])
+            traj_buffer["old_value"].extend(traj[3])
 
     for atype in range(num_type):
+        traj_buffer = traj_buffer_list[atype]
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
-                    "state": np.stack(traj_buffer[atype]["state"]),
-                    "old_log_logit": np.stack(traj_buffer[atype]["old_log_logit"]),
-                    "action": np.stack(traj_buffer[atype]["action"]),
-                    "advantage": np.stack(traj_buffer[atype]["advantage"]).astype(np.float32),
-                    "td_target": np.stack(traj_buffer[atype]["td_target"]).astype(np.float32),
-                    "old_value": np.stack(traj_buffer[atype]["old_value"]).astype(np.float32),
+                    "state": np.stack(traj_buffer["state"]).astype(np.float32),
+                    "old_log_logit": np.stack(traj_buffer["old_log_logit"]).astype(np.float32),
+                    "action": np.stack(traj_buffer["action"]),
+                    "advantage": np.stack(traj_buffer["advantage"]).astype(np.float32),
+                    "td_target": np.stack(traj_buffer["td_target"]).astype(np.float32),
+                    "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
                 }
             )
             .shuffle(64)
@@ -251,7 +260,8 @@ while True:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
-    trajs = [Trajectory(depth=6) for _ in range(num_blue * NENV)]
+    #trajs = [Trajectory(depth=6) for _ in range(num_blue * NENV)]
+    trajs = [[Trajectory(depth=6) for _ in range(num_agent)] for _ in range(NENV)]
 
     # Bootstrap
     s1 = envs.reset(
@@ -278,23 +288,27 @@ while True:
         actions, a1, v1, p1 = get_action(s1)
 
         # push to buffer
-        for idx, agent in enumerate(envs.get_team_blue().flat):
-            env_idx = idx // num_blue
-            # if was_alive[idx] and not was_done[env_idx]:
-            if not was_done[env_idx]:
-                trajs[idx].append(
+        for env_idx in range(NENV):
+            for agent_id in range(num_agent):
+                idx = env_idx * num_agent + agent_id
+                trajs[env_idx][agent_id].append(
                     [s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx], v1[idx]]
                 )
+        #for idx, agent in enumerate(envs.get_team_blue().flat):
+        #    env_idx = idx // num_blue
+            # if was_alive[idx] and not was_done[env_idx]:
+            #if not was_done[env_idx]:
 
         was_alive = is_alive
         was_done = done
 
-        if np.all(done):
-            break
+        #if np.all(done):
+        #    break
     etime_roll = time.time()
 
     batch.extend(trajs)
-    num_batch += sum([len(traj) for traj in trajs])
+    #num_batch += sum([len(traj) for traj in trajs])
+    num_batch = len(batch) * 200 * num_agent
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, "im_log")

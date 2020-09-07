@@ -7,7 +7,7 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.PPO import V4PPO, train, get_gradient
+from network.PPO import V4PPO, train, get_gradient, loss
 
 class PPO_Module:
     @store_args
@@ -55,9 +55,12 @@ class PPO_Module:
             assert step is not None
             assert tag is not None
 
-        for idx, (train_dataset, model, optimizer) in enumerate(zip(train_datasets, self.models, self.optimizers)):
+        for i in range(self.num_agent_type):
+            dataset = train_datasets[i]
+            model = self.models[i]
+            optimizer = self.optimizers[i]
             actor_losses, critic_losses, entropies = [], [], []
-            for inputs in train_dataset:
+            for inputs in dataset:
                 _, info = train(model, optimizer, inputs)
                 if log:
                     actor_losses.append(info['actor_loss'])
@@ -65,9 +68,9 @@ class PPO_Module:
                     entropies.append(info['entropy'])
 
             if log:
-                logs = {f'actor_loss/agent{idx}': np.mean(actor_losses),
-                        f'critic_loss/agent{idx}': np.mean(critic_losses),
-                        f'entropy/agent{idx}': np.mean(entropies)}
+                logs = {f'actor_loss/agent{i}': np.mean(actor_losses),
+                        f'critic_loss/agent{i}': np.mean(critic_losses),
+                        f'entropy/agent{i}': np.mean(entropies)}
                 with writer.as_default():
                     for name, val in logs.items():
                         tf.summary.scalar(tag+name, val, step=step)

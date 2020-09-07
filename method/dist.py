@@ -24,8 +24,8 @@ class SF_CVDC:
         action_size,
         agent_type,
         save_path,
-        atoms=4,
-        lr=1e-3,
+        atoms=128,
+        lr=1e-4,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
@@ -70,12 +70,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.00, dtype=tf.float32),
-                'psi_beta': tf.constant(0, dtype=tf.float32),
-                'decoder_beta': tf.constant(0, dtype=tf.float32),
-                'critic_beta': tf.constant(0.5, dtype=tf.float32),
-                'q_beta': tf.constant(0.0, dtype=tf.float32),
-                'learnability_beta': tf.constant(0, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.05, dtype=tf.float32),
+                'psi_beta': tf.constant(0.01, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-4, dtype=tf.float32),
+                'critic_beta': tf.constant(50, dtype=tf.float32),
+                'q_beta': tf.constant(30, dtype=tf.float32),
+                'learnability_beta': tf.constant(1.0, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {
@@ -159,8 +159,9 @@ class SF_CVDC:
             model = self.dec_models[i]
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
-                grad, info = get_gradient(model, loss_ppo, inputs, self.ppo_config)
-                optimizer.apply_gradients(zip(grad, model.trainable_variables))
+                _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
+                #grad, info = get_gradient(model, loss_ppo, inputs, self.ppo_config)
+                #optimizer.apply_gradients(zip(grad, model.trainable_variables))
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])
@@ -179,8 +180,6 @@ class SF_CVDC:
                     tag+'dec_q_loss': np.mean(q_losses),
                     tag+'dec_reward_loss': np.mean(reward_mse),
                     tag+'dec_learnability_loss': np.mean(learnability_loss),
-                    #tag+'dec_ma_critic': np.mean(multiagent_value_loss),
-                    #tag+'dec_ma_reward': np.mean(multiagent_reward_loss),
                     }
             with writer.as_default():
                 self.log(step, logs=logs)

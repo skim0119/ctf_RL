@@ -284,12 +284,8 @@ def train_decentral(
 
             # Zero bootstrap because all trajectory terminates
             td_target_c, advantages_global = gae(
-                reward,
-                critic,
-                _critic,
-                gamma,
-                lambd,
-               # mask=mask,
+                reward, critic, _critic,
+                gamma, lambd, # mask=mask,
                 normalize=False
             )
             _, advantages = gae(
@@ -437,9 +433,6 @@ while True:
     _agent2_o = [[] for _ in range(NENV)]
     _agent3_o = [[] for _ in range(NENV)]
 
-    # _x = global_episodes / 10000
-    # _rg = 1 if 1 <= _x else ((3*_x**2) - (2*_x**3)) # reward ratio
-
     for step in range(max_ep):
         s0 = s1
         a0 = a1
@@ -525,7 +518,6 @@ while True:
         )
         etime_train = time.time()
         dec_batch = []
-        dec_batch_size = 0
         log_traintime.append(etime_train - stime_train)
     # centralize training
     """

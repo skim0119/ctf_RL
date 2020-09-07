@@ -32,8 +32,9 @@ class V4PPO(tf.keras.Model):
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         # Critic
-        self.critic_dense1 = layers.Dense(64, activation='relu')
-        self.critic_dense2 = layers.Dense(1, activation='linear')
+        self.critic_dense1 = layers.Dense(128, activation='relu')
+        self.critic_dense2 = layers.Dense(128, activation='relu')
+        self.critic_dense3 = layers.Dense(1, activation='linear', use_bias=False)
         self.smoothed_pseudo_H = tf.Variable(1.0)
 
     def print_summary(self):
@@ -42,16 +43,17 @@ class V4PPO(tf.keras.Model):
     def call(self, inputs):
         # Actor
         net = self.pi_layer(inputs)
-        actor_net = self.actor_dense1(net)
-        actor_net = self.actor_dense2(actor_net)
-        actor = self.softmax(actor_net)
-        log_logits = self.log_softmax(actor_net)
+        net = self.actor_dense1(net)
+        net = self.actor_dense2(net)
+        actor = self.softmax(net)
+        log_logits = self.log_softmax(net)
 
         # Critic
         net = self.feature_layer(inputs)
-        critic = self.critic_dense1(net)
-        critic = self.critic_dense2(critic)
-        critic = tf.reshape(critic, [-1])
+        net = self.critic_dense1(net)
+        net = self.critic_dense2(net)
+        net = self.critic_dense3(net)
+        critic = tf.reshape(net , [-1])
 
         return actor, critic, log_logits
 
@@ -64,7 +66,8 @@ def loss(model, state, old_log_logit, action, advantage, td_target, old_value,
     actor, critic, log_logits = model(state)
 
     # Entropy
-    entropy = -tf.reduce_mean(actor * tf_log(actor), name='entropy')
+    H = -tf.reduce_mean(actor * tf_log(actor), axis=-1)
+    mean_entropy = tf.reduce_mean(H)
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
@@ -93,13 +96,13 @@ def loss(model, state, old_log_logit, action, advantage, td_target, old_value,
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
     actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
 
-    total_loss = actor_loss + critic_beta*critic_loss - entropy_beta*entropy
+    total_loss = actor_loss + critic_beta*critic_loss - entropy_beta*mean_entropy
 
     info = None
     if return_losses:
         info = {'actor_loss': actor_loss,
                 'critic_loss': critic_loss,
-                'entropy': entropy}
+                'entropy': mean_entropy}
 
     return total_loss, info
 

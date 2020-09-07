@@ -25,8 +25,8 @@ class V4COMA_d(tf.keras.Model):
         super(V4COMA_d, self).__init__()
 
         # Feature Encoding
-        self.feature_layer = V4Decentral(input_shape, action_size)
-        self.pi_layer = V4Decentral(input_shape, action_size)
+        self.feature_layer = V4(input_shape, action_size)
+        self.pi_layer = V4(input_shape, action_size)
 
         # Critic
         self.critic_dense1 = layers.Dense(units=atoms, activation='relu')

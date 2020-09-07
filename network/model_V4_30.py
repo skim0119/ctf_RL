@@ -160,17 +160,17 @@ class V4INVDecentral(tf.keras.Model):
         self.dense1 = layers.Dense(units=V4.LATENT_DIM, activation='elu')
         self.static_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=784, activation='elu'),
-            layers.Reshape([7,7,16]),
-            layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=0, activation='elu'),
+            layers.Dense(units=3136, activation='elu'),
+            layers.Reshape([14,14,16]),
+            #layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=0, activation='elu'),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, output_padding=0, activation='elu'),
             layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='linear')],
             name='static_network')
         self.dynamic_network = keras.Sequential([
             layers.Input(shape=[V4.LATENT_DIM//2]),
-            layers.Dense(units=784, activation='elu'),
-            layers.Reshape([7,7,16]),
-            layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=0, activation='elu'),
+            layers.Dense(units=3136, activation='elu'),
+            layers.Reshape([14,14,16]),
+            #layers.Conv2DTranspose(filters=32, kernel_size=2, strides=2, output_padding=0, activation='elu'),
             layers.Conv2DTranspose(filters=32, kernel_size=3, strides=2, output_padding=0, activation='elu'),
             layers.Conv2DTranspose(filters=3, kernel_size=3, strides=2, activation='linear')],
             name='dynamic_network')
@@ -198,6 +198,7 @@ if __name__=='__main__':
     print('centralized network:')
     sample_size = 32
     map_size = 30
+    map_size = map_size*2-1
     image_shape = [map_size,map_size,6]
     sample_shape = [sample_size]+image_shape
     latent_size = 128
@@ -209,8 +210,8 @@ if __name__=='__main__':
 
     sample = np.random.random(sample_shape).astype(np.float32)
     output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
+    print('c-inc-input: ', sample.shape)
+    print('c-inc-output: ', output.shape)
 
     # Decoder Shape Summary
     model = V4INV()
@@ -218,12 +219,12 @@ if __name__=='__main__':
 
     sample = np.random.random(latent_shape).astype(np.float32)
     output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
+    print('c-dec-input: ', sample.shape)
+    print('c-dec-output: ', output.shape)
 
     print('decentralized network:')
     sample_size = 32
-    map_size = map_size*2-1
+    #map_size = map_size*2-1
     image_shape = [map_size,map_size,6]
     sample_shape = [sample_size]+image_shape
     latent_size = 128
@@ -235,8 +236,8 @@ if __name__=='__main__':
 
     sample = np.random.random(sample_shape).astype(np.float32)
     output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
+    print('d-inc-input: ', sample.shape)
+    print('d-inc-output: ', output.shape)
 
     # Decoder Shape Summary
     model = V4INVDecentral()
@@ -244,6 +245,6 @@ if __name__=='__main__':
 
     sample = np.random.random(latent_shape).astype(np.float32)
     output = model(sample)
-    print('input: ', sample.shape)
-    print('output: ', output.shape)
+    print('d-dec-input: ', sample.shape)
+    print('d-dec-output: ', output.shape)
 
