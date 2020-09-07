@@ -82,7 +82,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
 
         # Actor
         net = self.pi_layer(obs)
-        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
         softmax_logits = self.softmax(net)
