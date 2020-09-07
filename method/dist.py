@@ -75,7 +75,7 @@ class SF_CVDC:
                 'decoder_beta': tf.constant(1e-4, dtype=tf.float32),
                 'critic_beta': tf.constant(50, dtype=tf.float32),
                 'q_beta': tf.constant(30, dtype=tf.float32),
-                'learnability_beta': tf.constant(1.0, dtype=tf.float32),
+                'learnability_beta': tf.constant(1e3, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {
