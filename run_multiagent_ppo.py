@@ -65,7 +65,7 @@ MODEL_PATH = "./model/" + TRAIN_NAME
 MAP_PATH = "./fair_3g_20"
 GPU_CAPACITY = 0.95
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print("Number of cpu_count : {}".format(NENV))
 
 env_setting_path = "env_setting_convoy.ini"

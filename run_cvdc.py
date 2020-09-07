@@ -79,7 +79,7 @@ GPU_CAPACITY = 0.95
 
 # slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print("Number of cpu_count : {}".format(NENV))
 
 env_setting_path = "env_setting_convoy.ini"
@@ -315,8 +315,7 @@ def train_decentral(
             traj_buffer["action"].extend(traj[1])
             traj_buffer["old_value"].extend(critic)
             traj_buffer["td_target_psi"].extend(td_target_psi)
-            #traj_buffer["advantage"].extend(advantages)
-            traj_buffer["advantage"].extend(advantages_global)
+            traj_buffer["advantage"].extend(advantages)
             traj_buffer["td_target_c"].extend(td_target_c)
             traj_buffer["rewards"].extend(reward)
     for atype in range(num_type):
