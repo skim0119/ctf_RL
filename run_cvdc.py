@@ -475,7 +475,7 @@ while True:
                         psi0[idx],
                         vg1[idx],
                         psi1[idx],
-                        reward[env_idx],  #  - (reward_pred1[idx] if reward[env_idx] else 0),
+                        reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
                         vc0[idx],
                         vc1[idx],
                     ]

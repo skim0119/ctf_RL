@@ -78,7 +78,7 @@ class V4SF_CVDC_DECENTRAL(tf.keras.Model):
         # Feature Encoding SF-phi
         net = self.feature_layer(obs)
         phi = self.phi_dense1(net)
-        #phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
 
         # Actor
         net = self.pi_layer(obs)

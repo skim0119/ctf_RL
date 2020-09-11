@@ -24,8 +24,8 @@ class SF_CVDC:
         action_size,
         agent_type,
         save_path,
-        atoms=128,
-        lr=1e-4,
+        atoms=256,
+        lr=1e-3,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
@@ -41,7 +41,7 @@ class SF_CVDC:
         # Build Network (Central)
         self.model_central = V4SF_CVDC_CENTRAL(central_obs_shape[1:], atoms=atoms)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr)#, clipnorm=0.5)
+        self.optimizer_central = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -54,7 +54,7 @@ class SF_CVDC:
         for i in range(self.num_agent_type):
             model = V4SF_CVDC_DECENTRAL(decentral_obs_shape[1:], action_size=5, atoms=atoms)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
-            optimizer = tf.keras.optimizers.Adam(lr)#, clipnorm=0.5)
+            optimizer = tf.keras.optimizers.Adam(lr, clipnorm=0.5)
             checkpoint = tf.train.Checkpoint(
                    optimizer=optimizer, model=model)
             manager = tf.train.CheckpointManager(
@@ -70,12 +70,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.05, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.1, dtype=tf.float32),
                 'psi_beta': tf.constant(0.01, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-4, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
                 'critic_beta': tf.constant(50, dtype=tf.float32),
                 'q_beta': tf.constant(30, dtype=tf.float32),
-                'learnability_beta': tf.constant(1e3, dtype=tf.float32),
+                'learnability_beta': tf.constant(1e1, dtype=tf.float32),
                 }
         # Critic Training Configuration
         self.central_config = {
