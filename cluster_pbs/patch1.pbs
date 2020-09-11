@@ -22,5 +22,5 @@ which python
 which pip
 pwd
 
-python runner.py --train_number 1 --machine CL --nbg 3 --nba 0 --silence --device 0 &
-python runner.py --train_number 1 --machine CL --nbg 5 --nba 0 --silence --device 1
+python runner.py --train_number 2 --machine CL --nbg 3 --nba 0 --silence --device 0 &
+python runner.py --train_number 2 --machine CL --nbg 5 --nba 0 --silence --device 1
