@@ -46,6 +46,8 @@ for script_name in RUNNING_SCRIPT:
     print(command)
     os.system(command)
     time.sleep(10)
+while True:
+    time.sleep(1000)
 
 print(f'Start Time : {time.ctime()}')
 print(f'    running: {args.nbg}g{args.nba}a')
