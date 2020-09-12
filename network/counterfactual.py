@@ -66,10 +66,10 @@ class V4COMA_d(tf.keras.Model):
         net = self.critic_dense1(net)
         q = self.sf_q_weight(net)
         critic = tf.gather(q, action, axis=1)
-        iq = tf.reduce_sum(q * tf.stop_gradient(softmax_logits), axis=1) - critic
+        revQ = tf.gather(q, 0, axis=1)
 
         actor = {'softmax': softmax_logits, 'log_softmax': log_logits, 'action': action}
-        SF = {'critic': critic, 'Q': q, 'revQ': iq}
+        SF = {'critic': critic, 'Q': q, 'revQ': revQ}
 
         return actor, SF
 
@@ -126,7 +126,7 @@ def loss_central(model, state, td_target_c,
     return total_loss, info
 
 @tf.function
-def loss_ppo(model, state, old_log_logit, action, old_value, advantage, td_target_c, next_state,
+def loss_ppo(model, state, old_log_logit, action, old_value, advantage, td_target_c, next_state, rewards,
         eps, entropy_beta, q_beta):
     num_sample = state.shape[0]
 
@@ -153,7 +153,8 @@ def loss_ppo(model, state, old_log_logit, action, old_value, advantage, td_targe
     # Q - Loss
     q = v['Q']
     q_a = tf.reduce_sum(q * action_one_hot, 1)
-    q_loss = tf.reduce_mean(tf.square(q_a - td_target_c))
+    q_target = rewards + 0.98 * tf.reduce_max(tf.stop_gradient(v_next['Q']), axis=1)
+    q_loss = tf.reduce_mean(tf.square(q_a - q_target))
 
     total_loss = actor_loss
     total_loss -= entropy_beta*mean_entropy

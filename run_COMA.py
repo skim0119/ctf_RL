@@ -78,7 +78,7 @@ GPU_CAPACITY = 0.95
 
 # slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print("Number of cpu_count : {}".format(NENV))
 
 env_setting_path = "env_setting_convoy.ini"
@@ -180,16 +180,8 @@ print(global_episodes)
 # input('start?')
 
 writer = tf.summary.create_file_writer(LOG_PATH)
-# network.save(global_episodes)
 
 ### TRAINING ###
-def make_ds(features, labels, shuffle_buffer_size=64, repeat=False):
-    ds = tf.data.Dataset.from_tensor_slices((features, labels))
-    ds = ds.shuffle(shuffle_buffer_size, seed=0)
-    if repeat:
-        ds = ds.repeat()
-    return ds
-
 
 def train_central(
     network,
@@ -205,20 +197,18 @@ def train_central(
     for idx, traj in enumerate(trajs):
         # Forward
         states = np.array(traj[0])
-        last_state = np.array(traj[3])[-1:, :, :, :]
+        last_state = np.array(traj[1])[-1:, :, :, :]
+        reward = traj[2]
+
         env_critic, _ = network.run_network_central(states)
         _env_critic, _ = network.run_network_central(last_state)
         critic = env_critic["critic"].numpy()[:, 0].tolist()
         _critic = _env_critic["critic"].numpy()[0, 0]
 
-        reward = traj[1]
-
-        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd)
+        # TD-target
+        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount=False)
 
         traj_buffer["state"].extend(traj[0])
-        #traj_buffer["reward"].extend(traj[1])
-        #traj_buffer["done"].extend(traj[2])
-        #traj_buffer["next_state"].extend(traj[3])
         traj_buffer["td_target_c"].extend(td_target_c)
 
     train_dataset = (
@@ -274,6 +264,7 @@ def train_decentral(
 
             traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
+            traj_buffer["rewards"].extend(traj[2])
             traj_buffer["next_state"].extend(traj[4])
             traj_buffer["log_logit"].extend(traj[6])
             traj_buffer["action"].extend(traj[1])
@@ -286,6 +277,7 @@ def train_decentral(
             tf.data.Dataset.from_tensor_slices(
                 {
                     "state": np.stack(traj_buffer["state"]).astype(np.float32),
+                    "rewards": np.stack(traj_buffer["rewards"]).astype(np.float32),
                     "old_log_logit": np.stack(traj_buffer["log_logit"]).astype(np.float32),
                     "action": np.stack(traj_buffer["action"]),
                     "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
@@ -407,12 +399,13 @@ while True:
                     ]
                 )
             # Central trajectory
+            '''
             cent_trajs[env_idx].append([
                 cent_s0[env_idx],
-                reward[env_idx],
-                done[env_idx],
                 cent_s1[env_idx],
+                reward[env_idx],
                 ])
+            '''
 
     etime_roll = time.time()
 
@@ -435,6 +428,7 @@ while True:
         dec_batch_size = 0
         log_traintime.append(etime_train - stime_train)
     # centralize training
+    '''
     batch.extend(cent_trajs)
     num_batch += sum([len(traj) for traj in cent_trajs])
     if num_batch >= minimum_batch_size:
@@ -442,6 +436,7 @@ while True:
         train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
         num_batch = 0
         batch = []
+    '''
 
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())
