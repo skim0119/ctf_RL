@@ -4,8 +4,8 @@ import sys
 import time
 
 RUNNING_SCRIPT = [
-    "run_multiagent_ppo.py",
-    "run_COMA.py",
+    #"run_multiagent_ppo.py",
+    #"run_COMA.py",
     "run_cvdc.py",
 ]
 

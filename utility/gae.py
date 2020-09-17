@@ -15,7 +15,7 @@ def gae(
     lambd,
     terminal=False,
     mask=None,
-    discount=True,
+    discount_adv=True,
     normalize=True,
     td_lambda=False,
 ):
@@ -54,7 +54,7 @@ def gae(
     advantages = td_target - value_ext[:-1]
 
     # Discount Advantage (default: True)
-    if discount:
+    if discount_adv:
         advantages = discount(advantages, gamma * lambd)
 
     if td_lambda:

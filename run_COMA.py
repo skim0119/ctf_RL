@@ -206,7 +206,7 @@ def train_central(
         _critic = _env_critic["critic"].numpy()[0, 0]
 
         # TD-target
-        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount=False)
+        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount_adv=False)
 
         traj_buffer["state"].extend(traj[0])
         traj_buffer["td_target_c"].extend(td_target_c)
@@ -246,8 +246,8 @@ def train_decentral(
 
             # Centralized
             cent_state = np.array(traj[9])
-            env_critic, _ = network.run_network_central(cent_state)
-            cent_critic = env_critic["critic"].numpy()[:, 0]
+            #env_critic, _ = network.run_network_central(cent_state)
+            #cent_critic = env_critic["critic"].numpy()[:, 0]
 
             reward = traj[2]
             mask = traj[3]
@@ -259,7 +259,7 @@ def train_decentral(
                 reward, critic, _critic,
                 gamma, lambd, mask=mask, normalize=False
             )
-            advantages = cent_critic - traj[8]
+            advantages = np.array(critic) - traj[8]
             advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
@@ -323,7 +323,7 @@ def run_network(states):
     for (actor, critic), mask in zip(results, agent_type_masking):
         a = actor['action'].numpy().ravel()
         vg = critic["critic"].numpy()[:, 0]
-        revQ = critic["revQ"].numpy()[:, 0]
+        revQ = critic["revQ"].numpy()[:]
         log_logits = actor["log_softmax"].numpy()
 
         a1[mask] = a

@@ -43,7 +43,7 @@ from utility.gae import gae
 
 # from utility.slack import SlackAssist
 
-from method.dist import SF_CVDC as Network
+from method.CVDC import SF_CVDC as Network
 
 parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number")
@@ -194,38 +194,27 @@ def train_central(
 ):
     traj_buffer = defaultdict(list)
     for idx, traj in enumerate(trajs):
-        if len(traj) == 0:
-            continue
-
         # Forward
         states = np.array(traj[0])
-        last_state = np.array(traj[3])[-1:, :, :, :]
+        last_state = np.array(traj[1])[-1:, :, :, :]
+        reward = traj[2]
+
         env_critic, _ = network.run_network_central(states)
         _env_critic, _ = network.run_network_central(last_state)
         critic = env_critic["critic"].numpy()[:, 0].tolist()
         _critic = _env_critic["critic"].numpy()[0, 0]
-        phi = env_critic["phi"].numpy().tolist()
-        psi = env_critic["psi"].numpy().tolist()
-        _psi = _env_critic["psi"].numpy()[0]
 
-        reward = traj[1]
-
-        td_target_c, advantages = gae(reward, critic, _critic, gamma, lambd)
-        td_target_psi, _ = gae(phi, psi, _psi, gamma, lambd, normalize=False)
+        # TD-target
+        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount_adv=False)
 
         traj_buffer["state"].extend(traj[0])
-        traj_buffer["reward"].extend(traj[1])
-        traj_buffer["done"].extend(traj[2])
-        traj_buffer["next_state"].extend(traj[3])
-        traj_buffer["td_target_psi"].extend(td_target_psi)
         traj_buffer["td_target_c"].extend(td_target_c)
 
     train_dataset = (
         tf.data.Dataset.from_tensor_slices(
             {
-                "state": np.stack(traj_buffer["state"]),
-                "td_target": np.stack(traj_buffer["td_target_psi"]),
-                "td_target_c": np.stack(traj_buffer["td_target_c"]),
+                "state": np.stack(traj_buffer["state"]).astype(np.float32),
+                "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
             }
         )
         .shuffle(64)
@@ -233,28 +222,9 @@ def train_central(
         .batch(batch_size)
     )
 
-    psi_losses = []
-    elbo_losses = []
-    critic_losses = []
-    for inputs in train_dataset:
-        info = network.update_central_critic(inputs)
-        if log:
-            psi_losses.append(info["psi_mse"])
-            elbo_losses.append(info["elbo"])
-            critic_losses.append(info["critic_mse"])
-    if log:
-        with writer.as_default():
-            tag = "summary/"
-            tf.summary.scalar(tag + "main_psi_loss", np.mean(psi_losses), step=step)
-            tf.summary.scalar(tag + "main_ELBO_loss", np.mean(elbo_losses), step=step)
-            tf.summary.scalar(
-                tag + "main_critic_loss", np.mean(critic_losses), step=step
-            )
-            tb_log_ctf_frame(
-                info["sample_generated_image"], "sample generated image", step
-            )
-            tb_log_ctf_frame(info["sample_decoded_image"], "sample decoded image", step)
-            writer.flush()
+    network.update_central(
+        train_dataset, writer=writer, log=log, step=step, tag="losses/"
+    )
 
 
 def train_decentral(
@@ -304,8 +274,11 @@ def train_decentral(
                 gamma,
                 lambd,
                # mask=np.array(mask)[:, None],
+                discount_adv=False,
                 normalize=False,
             )
+            beta = (-0.9/40000)*step + 1
+            advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
             advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
@@ -475,7 +448,8 @@ while True:
                         psi0[idx],
                         vg1[idx],
                         psi1[idx],
-                        reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                        #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                        reward[env_idx]-reward_pred1[idx],
                         vc0[idx],
                         vc1[idx],
                     ]
