@@ -234,6 +234,7 @@ def train_decentral(
     writer=None,
     log=False,
     step=None,
+    log_image=False,
 ):
     train_datasets = []
 
@@ -314,7 +315,7 @@ def train_decentral(
         train_datasets.append(train_dataset)
 
     network.update_decentral(
-        train_datasets, writer=writer, log=log, step=step, tag="losses/"
+        train_datasets, writer=writer, log=log, step=step, tag="losses/", log_image=log_image,
     )
     if log:
         with writer.as_default():
