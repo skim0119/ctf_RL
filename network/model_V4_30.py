@@ -109,7 +109,7 @@ class V4Decentral(tf.keras.Model):
     LATENT_DIM = 128
 
     @store_args
-    def __init__(self, input_shape, action_size=5,
+    def __init__(self, input_shape, action_size=5, 
                  trainable=True, name='FeatureNN'):
         super(V4Decentral, self).__init__(name=name)
 

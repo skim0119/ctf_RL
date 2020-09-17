@@ -20,7 +20,7 @@ def tb_log_histogram(data, tag, step, **kargs):
 def tb_log_ctf_frame(frame, tag, step):
     num_images = frame.shape[2]
     fig = plt.figure(1)
-    ncol = 4
+    ncol = 6
     nrow = (num_images//ncol)+1
     scale = 3
     fig, axs = plt.subplots(nrow, ncol, figsize=(ncol*scale, nrow*scale))
