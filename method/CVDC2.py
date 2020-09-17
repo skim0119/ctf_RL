@@ -151,7 +151,7 @@ class SF_CVDC:
                 writer.flush()
     
     # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, image_log=False):
+    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):
         if log:
             assert writer is not None
             assert step is not None
@@ -200,7 +200,7 @@ class SF_CVDC:
                 self.log(step, logs=logs)
                 writer.flush()
 
-        if image_log:
+        if log_image:
             with writer.as_default():
                 for i in range(self.num_agent_type):
                     test_dataset = datasets[i]
@@ -211,9 +211,9 @@ class SF_CVDC:
                     idx = np.random.randint(low=0, high=n_state, size=8)
                     test_states = tf.gather(test_states, indices=idx, axis=0)
                     _, SF = self.dec_models[i]([test_states, np.zeros(8, dtype=int)])
-                    tb_log_ctf_frame(test_states, tag=f'given states agent{i}', step=step)
-                    tb_log_ctf_frame(SF['decoded_state'], tag=f'decoded states agent{i}', step=step)
-                    tb_log_ctf_frame(SF['filtered_decoded_state'], tag=f'filtered states agent{i}', step=step)
+                    tb_log_ctf_frame(np.stack(test_states, axis=0), tag=f'given states agent{i}', step=step)
+                    tb_log_ctf_frame(np.stack(SF['decoded_state'], axis=0), tag=f'decoded states agent{i}', step=step)
+                    tb_log_ctf_frame(np.stack(SF['filtered_decoded_state'], axis=0), tag=f'filtered states agent{i}', step=step)
                 writer.flush()
 
     # Save and Load
