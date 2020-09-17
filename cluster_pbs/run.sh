@@ -1,5 +1,5 @@
-qsub patch1.pbs
-qsub patch2.pbs
-qsub patch3.pbs
-qsub patch4.pbs
-qsub patch5.pbs
+sbatch patch1.pbs
+sbatch patch2.pbs
+sbatch patch3.pbs
+sbatch patch4.pbs
+sbatch patch5.pbs

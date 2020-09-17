@@ -200,7 +200,8 @@ class SF_CVDC:
                 self.log(step, logs=logs)
                 writer.flush()
 
-        if log_image:
+        #if log_image:
+        if False:
             with writer.as_default():
                 for i in range(self.num_agent_type):
                     test_dataset = datasets[i]
