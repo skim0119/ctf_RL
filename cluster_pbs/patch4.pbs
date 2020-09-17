@@ -1,12 +1,12 @@
 #!/bin/bash
-#PBS -q eng-research
-#PBS -N ctf-patch4
-#PBS -l walltime=48:00:00
-#PBS -l nodes=1:ppn=40:V100
-#PBS -j oe
-#PBS -M skim449@illinois.edu
-#PBS -o ctf-patch4.out
-#PBS -e cluster_error.out
+#SBATCH --partition=eng-research
+#SBATCH --job-name=ctf-patch4
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=40
+#SBATCH --constraint=V100
+#SBATCH --mail-user=skim449@illinois.edu
+#SBATCH --output=ctf-patch4.out
+#SBATCH --error=cluster_error.out
 
 module load anaconda/3
 module load vim/8.1
@@ -17,7 +17,7 @@ module list
 
 conda activate /projects/tran-research-group/skim449/conda/ctf
 
-cd $PBS_O_WORKDIR/../
+cd $SLURM_SUBMIT_DIR/../
 which python
 which pip
 pwd
