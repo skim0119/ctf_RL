@@ -79,7 +79,7 @@ GPU_CAPACITY = 0.95
 
 # slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 4
+NENV = multiprocessing.cpu_count() // 2
 print("Number of cpu_count : {}".format(NENV))
 
 env_setting_path = "env_setting_convoy.ini"
