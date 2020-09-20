@@ -278,9 +278,9 @@ def train_decentral(
                 discount_adv=False,
                 normalize=False,
             )
-            beta = (-0.9/40000)*step + 1
-            advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
-            advantage_lists[atype].append(advantages)
+            #beta = min((-0.9/40000)*step + 1, 1.0)
+            #advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
+            #advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
