@@ -196,7 +196,7 @@ def train_central(
     for idx, traj in enumerate(trajs):
         # Forward
         states = np.array(traj[0])
-        last_state = np.array(traj[1])[-1:, :, :, :]
+        last_state = np.array(traj[3])[-1:, :, :, :]
         reward = traj[2]
 
         env_critic, _ = network.run_network_central(states)
@@ -253,12 +253,20 @@ def train_decentral(
             _critic = traj[9][-1]
             _psi = np.array(traj[10][-1])
 
+            cent_state = np.array(traj[14])
+            env_critic, _ = network.run_network_central(cent_state)
+            env_critic = env_critic["critic"].numpy()[:, 0].tolist()
+            cent_last_state = np.array(traj[15])[-1:, :, :, :]
+            _env_critic, _ = network.run_network_central(cent_last_state)
+            _env_critic = _env_critic["critic"].numpy()[0, 0]
+
             # Zero bootstrap because all trajectory terminates
             td_target_c, advantages_global = gae(
                 reward, critic, _critic,
                 gamma, lambd, # mask=mask,
                 normalize=False
             )
+            '''
             _, advantages = gae(
                 traj[11],
                 traj[12],
@@ -266,6 +274,15 @@ def train_decentral(
                 gamma,
                 lambd,
                # mask=mask,
+                normalize=False,
+            )
+            '''
+            _, advantages = gae(
+                reward,
+                env_critic,
+                _env_critic,
+                gamma,
+                lambd,
                 normalize=False,
             )
             td_target_psi, _ = gae(
@@ -380,7 +397,7 @@ while True:
     is_alive = [True for agent in envs.get_team_blue().flat]
     is_done = [False for env in range(NENV * num_agent)]
 
-    trajs = [[Trajectory(depth=14) for _ in range(num_agent)] for _ in range(NENV)]
+    trajs = [[Trajectory(depth=16) for _ in range(num_agent)] for _ in range(NENV)]
     cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]
 
     # Bootstrap
@@ -390,7 +407,7 @@ while True:
         game_config["experiments"]["SAVE_BOARD_RGB"] = "False"
     s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)
     s1 = s1.astype(np.float32)
-    #cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
+    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
 
     actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(s1)
 
@@ -416,13 +433,13 @@ while True:
         log_logits0 = log_logits1
         was_alive = is_alive
         was_done = is_done
-        #cent_s0 = cent_s1
+        cent_s0 = cent_s1
 
         # Run environment
         s1, reward, done, history = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         s1 = s1.astype(np.float32)  # Decentralize observation
-        #cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
+        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
         episode_rew += reward
 
         # Run decentral network
@@ -454,17 +471,17 @@ while True:
                         reward[env_idx],
                         vc0[idx],
                         vc1[idx],
+                        cent_s0[env_idx],
+                        cent_s1[env_idx],
                     ]
                 )
             # Central trajectory
-            """
             cent_trajs[env_idx].append([
                 cent_s0[env_idx],
                 reward[env_idx],
                 done[env_idx],
                 cent_s1[env_idx],
                 ])
-            """
 
         if log_save_analysis:
             for env_idx in range(NENV):
@@ -497,7 +514,6 @@ while True:
         dec_batch = []
         log_traintime.append(etime_train - stime_train)
     # centralize training
-    """
     batch.extend(cent_trajs)
     num_batch += sum([len(traj) for traj in cent_trajs])
     if num_batch >= minimum_batch_size:
@@ -505,7 +521,6 @@ while True:
         train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
         num_batch = 0
         batch = []
-    """
 
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())

@@ -25,7 +25,7 @@ class SF_CVDC:
         agent_type,
         save_path,
         atoms=256,
-        lr=5e-4,
+        lr=5e-5,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
