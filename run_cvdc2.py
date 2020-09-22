@@ -79,7 +79,7 @@ GPU_CAPACITY = 0.95
 
 # slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 
-NENV = multiprocessing.cpu_count() // 2
+NENV = multiprocessing.cpu_count() // 4
 print("Number of cpu_count : {}".format(NENV))
 
 env_setting_path = "env_setting_convoy.ini"
@@ -164,7 +164,7 @@ for idx, i in enumerate(np.cumsum(agent_type)):
 agent_type_masking = np.tile(agent_type_masking, NENV)
 
 # Network Setup
-atoms = 128
+atoms = 256
 network = Network(
     central_obs_shape=cent_input_size,
     decentral_obs_shape=input_size,
@@ -256,7 +256,7 @@ def train_decentral(
             cent_state = np.array(traj[14])
             env_critic, _ = network.run_network_central(cent_state)
             env_critic = env_critic["critic"].numpy()[:, 0].tolist()
-            cent_last_state = np.array(traj[15])[-1:, :, :, :]
+            cent_last_state = np.array(traj[15])[-1:, ...]
             _env_critic, _ = network.run_network_central(cent_last_state)
             _env_critic = _env_critic["critic"].numpy()[0, 0]
 
@@ -266,7 +266,6 @@ def train_decentral(
                 gamma, lambd, # mask=mask,
                 normalize=False
             )
-            '''
             _, advantages = gae(
                 traj[11],
                 traj[12],
@@ -285,6 +284,7 @@ def train_decentral(
                 lambd,
                 normalize=False,
             )
+            '''
             td_target_psi, _ = gae(
                 phi,
                 psi,
@@ -385,8 +385,6 @@ def run_network(states):
 
 batch = []
 dec_batch = []
-num_batch = 0
-dec_batch_size = 0
 #while global_episodes < total_episodes:
 while True:
     # Flags
@@ -466,9 +464,9 @@ while True:
                         psi0[idx],
                         vg1[idx],
                         psi1[idx],
-                        #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
-                        #reward[env_idx]-reward_pred1[idx],
                         reward[env_idx],
+                            #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                            #reward[env_idx]-reward_pred1[idx],
                         vc0[idx],
                         vc1[idx],
                         cent_s0[env_idx],
@@ -496,8 +494,7 @@ while True:
 
     # decentralize training
     dec_batch.extend(trajs)
-    dec_batch_size = len(dec_batch) * 200 * num_agent
-    if dec_batch_size > minimum_batch_size:
+    if len(dec_batch) * 200 * num_agent > minimum_batch_size:
         stime_train = time.time()
         log = interval_flag(global_episodes, save_image_frequency, "im_log")
         log_image = interval_flag(global_episodes, 1024, "ima_log")
@@ -515,11 +512,9 @@ while True:
         log_traintime.append(etime_train - stime_train)
     # centralize training
     batch.extend(cent_trajs)
-    num_batch += sum([len(traj) for traj in cent_trajs])
-    if num_batch >= minimum_batch_size:
+    if len(batch) * 200 >= minimum_batch_size // 2:
         log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
         train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
-        num_batch = 0
         batch = []
 
     log_episodic_reward.extend(episode_rew.tolist())

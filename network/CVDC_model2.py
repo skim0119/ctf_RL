@@ -162,8 +162,8 @@ class Central(tf.keras.Model):
         self.feature_layer = V4(input_shape)
 
         # Critic
-        self.critic_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
+        self.critic_dense1 = layers.Dense(units=256, activation='relu')
+        self.successor_weight = layers.Dense(units=1, activation='linear')
 
         # Loss Operations
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
@@ -190,15 +190,26 @@ class Central(tf.keras.Model):
         return SF, feature 
 
 @tf.function
-def loss_central(model, state, td_target_c,
-        critic_beta):
+def loss_central(model, state, td_target_c):
     inputs = state
     SF, feature = model(inputs)
 
     # Critic - TD Difference
     critic_mse = model.mse_loss_mean(td_target_c, SF['critic'])
 
-    total_loss = critic_beta * critic_mse
+    total_loss = critic_mse
+    info = {'critic_mse': critic_mse}
+
+    return total_loss, info
+
+@tf.function
+def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):
+    # Critic Loss
+    _, v = model([state, action])
+    critic_mse = model.mse_loss_mean(td_target_c, v['critic'])
+    psi_mse = model.mse_loss_mean(td_target_psi, v['psi'])
+    
+    total_loss = critic_mse + psi_mse * 0.01
     info = {'critic_mse': critic_mse}
 
     return total_loss, info

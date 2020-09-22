@@ -25,7 +25,7 @@ class SF_CVDC:
         agent_type,
         save_path,
         atoms=256,
-        lr=5e-5,
+        lr=2e-4,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
@@ -41,7 +41,7 @@ class SF_CVDC:
         # Build Network (Central)
         self.model_central = Central(central_obs_shape[1:], atoms=atoms)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+        self.optimizer_central = tf.keras.optimizers.Adam(1e-4)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -76,13 +76,11 @@ class SF_CVDC:
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.01, dtype=tf.float32),
                 'psi_beta': tf.constant(0.000, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-2, dtype=tf.float32),
-                'critic_beta': tf.constant(10, dtype=tf.float32),
-                'q_beta': tf.constant(10, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.0, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'critic_beta': tf.constant(1, dtype=tf.float32),
+                'q_beta': tf.constant(1, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.0001, dtype=tf.float32),
                 }
-        # Critic Training Configuration
-        self.central_config = {'critic_beta': tf.constant(1.0)}
 
     def log(self, step, log_weights=True, logs=None):
         # Log specific part of the network
@@ -140,7 +138,7 @@ class SF_CVDC:
         model = self.model_central
         optimizer = self.optimizer_central
         for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs, self.central_config)
+            _, info = train(model, loss_central, optimizer, inputs)
             if log:
                 critic_losses.append(info["critic_mse"])
         if log:
