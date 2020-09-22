@@ -252,13 +252,14 @@ def train_decentral(
             psi = np.array(traj[8]).tolist()
             _critic = traj[9][-1]
             _psi = np.array(traj[10][-1])
-
+            '''
             cent_state = np.array(traj[14])
             env_critic, _ = network.run_network_central(cent_state)
             env_critic = env_critic["critic"].numpy()[:, 0].tolist()
             cent_last_state = np.array(traj[15])[-1:, ...]
             _env_critic, _ = network.run_network_central(cent_last_state)
             _env_critic = _env_critic["critic"].numpy()[0, 0]
+            '''
 
             # Zero bootstrap because all trajectory terminates
             td_target_c, advantages_global = gae(
@@ -295,9 +296,9 @@ def train_decentral(
                 discount_adv=False,
                 normalize=False,
             )
-            #beta = min((-0.9/40000)*step + 1, 1.0)
-            #advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
-            #advantage_lists[atype].append(advantages)
+            beta = max(min((-0.9/50000)*step + 1, 1.0),0.1)
+            advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
+            advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
@@ -337,6 +338,7 @@ def train_decentral(
     if log:
         with writer.as_default():
             tag = "advantages/"
+            tf.summary.scalar('beta/adv_beta', beta, step=step)
             for idx, adv_list in enumerate(advantage_lists):
                 tb_log_histogram(
                     np.array(adv_list), tag + "dec_advantages_{}".format(idx), step=step
