@@ -20,17 +20,12 @@ import numpy as np
 
 class V4COMA_d(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_size=5, atoms=8,
+    def __init__(self, input_shape, action_size=5, atoms=128,
             trainable=True):
         super(V4COMA_d, self).__init__()
 
         # Feature Encoding
         self.feature_layer = V4(input_shape, action_size)
-        self.pi_layer = V4(input_shape, action_size)
-
-        # Critic
-        self.critic_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.sf_q_weight = layers.Dense(units=action_size, activation='linear', use_bias=False,)
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
@@ -40,140 +35,93 @@ class V4COMA_d(tf.keras.Model):
 
         # Loss
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
-        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
-                reduction=tf.keras.losses.Reduction.SUM)
+        #self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
+        #        reduction=tf.keras.losses.Reduction.SUM)
 
     def print_summary(self):
         self.feature_layer.summary()
 
     def call(self, inputs):
-        # Run full network
-        obs = inputs[0]
-
-        # Feature Encoding SF-phi
-        net = self.feature_layer(obs)
-
         # Actor
-        net = self.pi_layer(obs)
-        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = self.feature_layer(inputs)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
         action = tf.squeeze(tf.random.categorical(log_logits, 1, dtype=tf.int32))
 
-        # Critic
-        net = self.critic_dense1(net)
-        q = self.sf_q_weight(net)
-        critic = tf.gather(q, action, axis=1)
-        revQ = tf.gather(q, 0, axis=1)
-
         actor = {'softmax': softmax_logits, 'log_softmax': log_logits, 'action': action}
-        SF = {'critic': critic, 'Q': q, 'revQ': revQ}
 
-        return actor, SF
+        return actor
 
 
 class V4COMA_c(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, atoms,
+    def __init__(self, input_shape, num_agent, action_size=5, atoms=128,
                  trainable=True):
         super(V4COMA_c, self).__init__()
 
         # Feature Encoding
         self.feature_layer = V4(input_shape)
+        self.action_space = action_size**num_agent
 
         # Critic
         self.critic_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.successor_weight = layers.Dense(units=1, activation='linear', use_bias=False)
+        self.critic_dense2 = layers.Dense(units=self.action_space)
 
         # Loss Operations
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
-        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
-                reduction=tf.keras.losses.Reduction.SUM)
+        #self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
+        #        reduction=tf.keras.losses.Reduction.SUM)
 
     def print_summary(self):
         self.feature_layer.print_summary()
 
-    def call(self, inputs):
-        state = inputs
+    def call(self, inputs, actions):
+        # dim[inputs] : [num_batch, num_agent, lx, ly, ch]
+        states = tf.unstack(inputs, axis=1)
 
-        # Encoder
-        n_sample = state.shape[0]
-        net = self.feature_layer(state)
+        arr = []
+        for idx in range(self.num_agent):
+            net = self.feature_layer(states[idx])
+            arr.append(net)
+
+        net = tf.concat(arr, axis=1)
 
         # Critic  
         net = self.critic_dense1(net)
-        critic = self.successor_weight(net)
+        critic = self.critic_dense2(net)
 
-        feature = {'latent': net}
-        SF = {'critic': critic}
+        action_one_hot = tf.one_hot(actions, self.action_space)
+        critic_a = tf.reduce_sum(critic * action_one_hot, axis=1)
 
-        return SF, feature 
+        return critic, critic_a
 
 @tf.function
-def loss_central(model, state, td_target_c,
-        critic_beta):
-    inputs = state
-    SF, feature = model(inputs)
+def loss_central(model, metastate, metaaction, td_target):
+    Q, Q_s_a = model(metastate, metaaction)
 
     # Critic - TD Difference
-    critic_mse = model.mse_loss_mean(td_target_c, SF['critic'])
+    critic_mse = model.mse_loss_mean(Q_s_a, td_target)
 
-    total_loss = critic_beta * critic_mse
-    info = {'critic_mse': critic_mse}
+    info = {'critic_loss': critic_mse}
 
-    return total_loss, info
+    return critic_mse, info
 
 @tf.function
-def loss_ppo(model, state, old_log_logit, action, old_value, advantage, td_target_c, next_state, rewards,
-        eps, entropy_beta, q_beta):
-    num_sample = state.shape[0]
-
+def loss_decentral(model, state, action, advantage):
     # Run Model
-    pi, v = model([state, action])
-    pi_next, v_next = model([next_state, action])
-    actor = pi['softmax']
-    log_logits = pi['log_softmax']
-
-    # Entropy
-    H = -tf.reduce_sum(actor * tf_log(actor), axis=-1) # Entropy H of each sample
-    mean_entropy = tf.reduce_mean(H)
+    actor = model(state)
+    pi = actor['softmax']
 
     # Actor Loss
-    action_one_hot = tf.one_hot(action, model.action_size, dtype=tf.float32)
-    log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
-    old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
-    ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
-    surrogate = ratio * advantage # Clipped surrogate function
-    clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
-    surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
-    actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
+    action_one_hot = tf.one_hot(action, model.action_size)
+    pi_a = tf.reduce_sum(pi * action_one_hot, axis=1)
+    actor_loss = -tf.reduce_sum(advantage * tf_log(pi_a))
 
-    # Q - Loss
-    q = v['Q']
-    q_a = tf.reduce_sum(q * action_one_hot, 1)
-    q_target = rewards + 0.98 * tf.reduce_max(tf.stop_gradient(v_next['Q']), axis=1)
-    q_loss = tf.reduce_mean(tf.square(q_a - q_target))
+    info = {'actor_loss': actor_loss}
 
-    total_loss = actor_loss
-    total_loss -= entropy_beta*mean_entropy
-    total_loss += q_beta*q_loss
-
-    # Log
-    info = {'actor_loss': actor_loss,
-            'entropy': mean_entropy,
-            'q_loss': q_loss,
-            }
-
-    return total_loss, info
-
-def get_gradient(model, loss, inputs, hyperparameters={}):
-    with tf.GradientTape() as tape:
-        loss_val, info = loss(model, **inputs, **hyperparameters)
-    grads = tape.gradient(loss_val, model.trainable_variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-    return grads, info
+    return actor_loss, info
 
 def train(model, loss, optimizer, inputs, hyperparameters={}):
     with tf.GradientTape() as tape:

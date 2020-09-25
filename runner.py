@@ -8,7 +8,7 @@ RUNNING_SCRIPT = [
     #"run_COMA.py",
     #"run_cvdc.py",
     "run_cvdc2.py",
-    "run_IV.py",
+#    "run_IV.py",
     #"run_cvdc_comp.py",
     #"run_cvdc3.py", # drawing filtered decoded image
 ]

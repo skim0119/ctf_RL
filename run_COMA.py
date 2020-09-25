@@ -120,7 +120,7 @@ cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 * 4
+minimum_batch_size = 1024 
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -166,9 +166,9 @@ agent_type_masking = np.tile(agent_type_masking, NENV)
 # Network Setup
 atoms = 128
 network = Network(
-    central_obs_shape=cent_input_size,
-    decentral_obs_shape=input_size,
+    state_shape=input_size,
     action_size=action_space,
+    num_agent=num_agent,
     agent_type=agent_type,
     atoms=atoms,
     save_path=MODEL_PATH,
@@ -182,51 +182,6 @@ print(global_episodes)
 writer = tf.summary.create_file_writer(LOG_PATH)
 
 ### TRAINING ###
-
-def train_central(
-    network,
-    trajs,
-    bootstrap=0.0,
-    epoch=epoch,
-    batch_size=minibatch_size,
-    writer=None,
-    log=False,
-    step=None,
-):
-    traj_buffer = defaultdict(list)
-    for idx, traj in enumerate(trajs):
-        # Forward
-        states = np.array(traj[0])
-        last_state = np.array(traj[1])[-1:, :, :, :]
-        reward = traj[2]
-
-        env_critic, _ = network.run_network_central(states)
-        _env_critic, _ = network.run_network_central(last_state)
-        critic = env_critic["critic"].numpy()[:, 0].tolist()
-        _critic = _env_critic["critic"].numpy()[0, 0]
-
-        # TD-target
-        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount_adv=False)
-
-        traj_buffer["state"].extend(traj[0])
-        traj_buffer["td_target_c"].extend(td_target_c)
-
-    train_dataset = (
-        tf.data.Dataset.from_tensor_slices(
-            {
-                "state": np.stack(traj_buffer["state"]).astype(np.float32),
-                "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
-            }
-        )
-        .shuffle(64)
-        .repeat(epoch)
-        .batch(batch_size)
-    )
-
-    network.update_central(
-        train_dataset, writer=writer, log=log, step=step, tag="losses/"
-    )
-
 def train_decentral(
     agent_trajs,
     epoch=epoch,
@@ -235,74 +190,103 @@ def train_decentral(
     log=False,
     step=None,
 ):
-    train_datasets = []
 
     # Agent trajectory processing
     traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
-    advantage_lists = [[] for _ in range(num_type)]
-    for trajs in agent_trajs:
-        for idx, traj in enumerate(trajs):
+    traj_buffer_central = defaultdict(list)
+    for traj in agent_trajs:
+        meta_state = np.array(traj[0], dtype=np.float32) # [#, num_agent, lx, ly, ch]
+        actions = np.array(traj[1], dtype=int) # [#, num_agent]
+        reward = np.array(traj[2], dtype=np.float32) # [#]
+        pi = np.array(traj[3], dtype=np.float32) # [#, num_agent, num_action]
+        length = meta_state.shape[0]
+
+        meta_action = np.zeros(length, dtype=int)
+        #meta_pi = np.ones(meta_state.shape[0], dtype=np.float32)
+        for i in range(num_agent):
+            meta_action += actions[:,i]*(5**i)
+            #meta_pi *= np.take(pi[:,i], actions[:,i], axis=1)
+        Q, Q_s_a = network.run_network_central(meta_state, meta_action)
+        Q = Q.numpy()
+        Q_s_a = Q_s_a.numpy()
+        Q_ext = np.concatenate([Q, np.zeros_like(Q[0:1,:])], axis=0)
+
+        meta_pi = None
+        for i in range(num_agent):
+            new_shape = [length] + [1] * num_agent
+            new_shape[1+i] = action_space
+            pi_i = pi[:,i].reshape(new_shape)
+            if meta_pi is None:
+                meta_pi = pi_i
+            else:
+                meta_pi = pi_i * meta_pi
+        meta_pi = meta_pi.reshape([length, -1])
+
+        # Central : Compute central difference
+        td_target = reward + gamma * np.sum(meta_pi * Q_ext[1:], axis=1)
+
+        traj_buffer_central["metastate"].extend(meta_state.tolist())
+        traj_buffer_central["metaaction"].extend(meta_action.tolist())
+        traj_buffer_central["td_target"].extend(td_target.tolist())
+
+        # Decentral : Compute advantage V
+        for idx in range(num_agent): # Target specific agent
+            indiv_Q = np.zeros([length, action_space])
+            for fix_act in range(action_space):
+                meta_action_fix_agent = np.zeros(length, dtype=int)
+                for i in range(num_agent):
+                    if i == idx:
+                        meta_action_fix_agent += fix_act*(5**i)
+                    else:
+                        meta_action_fix_agent += actions[:,i]*(5**i)
+                for e in range(length):
+                    indiv_Q[e,fix_act] = Q[e,meta_action_fix_agent[e]]
+                #indiv_Q[:,fix_act] = np.take(Q, meta_action_fix_agent, axis=1)
+            indiv_adv = Q_s_a - np.sum(indiv_Q * pi[:,idx,:], axis=1)
+
             atype = agent_type_index[idx]
-
-            # Centralized
-            cent_state = np.array(traj[9])
-            #env_critic, _ = network.run_network_central(cent_state)
-            #cent_critic = env_critic["critic"].numpy()[:, 0]
-
-            reward = traj[2]
-            mask = traj[3]
-            critic = traj[5]
-            _critic = traj[7][-1]
-
-            # Zero bootstrap because all trajectory terminates
-            td_target_c, _ = gae(
-                reward, critic, _critic,
-                gamma, lambd, mask=mask, normalize=False
-            )
-            advantages = np.array(critic) - traj[8]
-            advantage_lists[atype].append(advantages)
-
             traj_buffer = traj_buffer_list[atype]
-            traj_buffer["state"].extend(traj[0])
-            traj_buffer["rewards"].extend(traj[2])
-            traj_buffer["next_state"].extend(traj[4])
-            traj_buffer["log_logit"].extend(traj[6])
-            traj_buffer["action"].extend(traj[1])
-            traj_buffer["old_value"].extend(critic)
-            traj_buffer["advantage"].extend(advantages)
-            traj_buffer["td_target_c"].extend(td_target_c)
+            traj_buffer["state"].extend(meta_state[:,idx,...].tolist())
+            traj_buffer["action"].extend(actions[:,idx].tolist())
+            traj_buffer["advantage"].extend(indiv_adv.tolist())
+
+    dataset_decentral = []
     for atype in range(num_type):
         traj_buffer = traj_buffer_list[atype]
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
                     "state": np.stack(traj_buffer["state"]).astype(np.float32),
-                    "rewards": np.stack(traj_buffer["rewards"]).astype(np.float32),
-                    "old_log_logit": np.stack(traj_buffer["log_logit"]).astype(np.float32),
-                    "action": np.stack(traj_buffer["action"]),
-                    "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
+                    "action": np.stack(traj_buffer["action"]).astype(int),
                     "advantage": np.stack(traj_buffer["advantage"]).astype(np.float32),
-                    "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
-                    "next_state": np.stack(traj_buffer["next_state"]).astype(np.float32),
                 }
             )
             .shuffle(64)
             .repeat(epoch)
             .batch(batch_size)
         )
-        train_datasets.append(train_dataset)
-
-    network.update_decentral(
-        train_datasets, writer=writer, log=log, step=step, tag="losses/"
+        dataset_decentral.append(train_dataset)
+    dataset_central = (
+        tf.data.Dataset.from_tensor_slices(
+            {
+                "metastate": np.stack(traj_buffer_central["metastate"]).astype(np.float32),
+                "metaaction": np.stack(traj_buffer_central["metaaction"]).astype(int),
+                "td_target": np.stack(traj_buffer_central["td_target"]).astype(np.float32),
+            }
+        )
+        .shuffle(64)
+        .repeat(epoch)
+        .batch(batch_size)
     )
+
+    network.update(
+        dataset_decentral, dataset_central, writer=writer, log=log, step=step, tag="losses/"
+    )
+    '''
     if log:
         with writer.as_default():
-            tag = "advantages/"
-            for idx, adv_list in enumerate(advantage_lists):
-                tb_log_histogram(
-                    np.array(adv_list), tag + "dec_advantages_{}".format(idx), step=step
-                )
             writer.flush()
+    '''
 
 def run_network(states):
     states_list = []
@@ -315,23 +299,17 @@ def run_network(states):
 
     # Container
     a1 = np.empty([NENV * num_agent], dtype=np.int32)
-    vg1 = np.empty([NENV * num_agent], dtype=np.float32)
-    revQ1 = np.empty([NENV * num_agent], dtype=np.float32)
-    log_logits1 = np.empty([NENV * num_agent, action_space], dtype=np.float32)
+    logits1 = np.empty([NENV * num_agent, action_space], dtype=np.float32)
 
     # Postprocessing
-    for (actor, critic), mask in zip(results, agent_type_masking):
+    for actor,  mask in zip(results, agent_type_masking):
         a = actor['action'].numpy().ravel()
-        vg = critic["critic"].numpy()[:, 0]
-        revQ = critic["revQ"].numpy()[:]
-        log_logits = actor["log_softmax"].numpy()
+        logits = actor["softmax"].numpy()
 
         a1[mask] = a
-        vg1[mask] = vg
-        revQ1[mask] = revQ
-        log_logits1[mask, :] = log_logits
+        logits1[mask, :] = logits
     action = np.reshape(a1, [NENV, num_blue])
-    return a1, action, vg1, revQ1, log_logits1
+    return a1, action, logits1
 
 
 batch = []
@@ -345,15 +323,13 @@ while True:
     is_alive = [True for agent in envs.get_team_blue().flat]
     is_done = [False for env in range(NENV * num_agent)]
 
-    trajs = [[Trajectory(depth=10) for _ in range(num_agent)] for _ in range(NENV)]
-    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]
+    trajs = [Trajectory(depth=5) for _ in range(NENV)]
 
     # Bootstrap
     s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)
     s1 = s1.astype(np.float32)
-    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
 
-    a1, action, vg1, revQ1, log_logits1 = run_network(s1)
+    a1, action, logits1 = run_network(s1)
 
     # Rollout
     stime_roll = time.time()
@@ -361,51 +337,30 @@ while True:
     for step in range(max_ep):
         s0 = s1
         a0 = a1
-        vg0 = vg1
-        revQ0 = revQ1
-        log_logits0 = log_logits1
+        logits0 = logits1
         was_alive = is_alive
         was_done = is_done
-        cent_s0 = cent_s1
 
         # Run environment
         s1, reward, done, history = envs.step(action)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         s1 = s1.astype(np.float32)  # Decentralize observation
-        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
         episode_rew += reward
 
         # Run decentral network
-        a1, action, vg1, revQ1, log_logits1 = run_network(s1)
+        a1, action, logits1 = run_network(s1)
 
         # Buffer
         for env_idx in range(NENV):
-            for agent_id in range(num_agent):
-                idx = env_idx * num_agent + agent_id
-                # if not was_done[env_idx] and was_alive[idx]: # fixed length
-                # Decentral trajectory
-                trajs[env_idx][agent_id].append(
-                    [
-                        s0[idx],
-                        a0[idx],
-                        reward[env_idx], 
-                        was_alive[idx],  # done[env_idx],masking
-                        s1[idx],
-                        vg0[idx],  # Advantage
-                        log_logits0[idx],  # PPO
-                        vg1[idx],
-                        revQ0[idx],
-                        cent_s0[env_idx]
-                    ]
-                )
-            # Central trajectory
-            '''
-            cent_trajs[env_idx].append([
-                cent_s0[env_idx],
-                cent_s1[env_idx],
-                reward[env_idx],
-                ])
-            '''
+            idx = env_idx * num_agent
+            trajs[env_idx].append(
+                [
+                    s0[idx:idx+num_agent],
+                    a0[idx:idx+num_agent],
+                    reward[env_idx], 
+                    logits0[idx:idx+num_agent],
+                ]
+            )
 
     etime_roll = time.time()
 
@@ -427,16 +382,6 @@ while True:
         dec_batch = []
         dec_batch_size = 0
         log_traintime.append(etime_train - stime_train)
-    # centralize training
-    '''
-    batch.extend(cent_trajs)
-    num_batch += sum([len(traj) for traj in cent_trajs])
-    if num_batch >= minimum_batch_size:
-        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
-        train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
-        num_batch = 0
-        batch = []
-    '''
 
     log_episodic_reward.extend(episode_rew.tolist())
     log_winrate.extend(envs.blue_win())

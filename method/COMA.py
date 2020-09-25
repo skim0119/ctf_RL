@@ -8,8 +8,8 @@ from utility.utils import store_args
 from utility.logger import *
 
 from network.counterfactual import V4COMA_d, V4COMA_c
-from network.counterfactual import get_gradient, train
-from network.counterfactual import loss_central, loss_ppo
+from network.counterfactual import train
+from network.counterfactual import loss_central, loss_decentral
 
 
 class COMA:
@@ -18,9 +18,9 @@ class COMA:
     @store_args
     def __init__(
         self,
-        central_obs_shape,
-        decentral_obs_shape,
+        state_shape,
         action_size,
+        num_agent,
         agent_type,
         save_path,
         atoms=4,
@@ -37,9 +37,9 @@ class COMA:
         self.dec_managers = []
 
         # Build Network (Central)
-        self.model_central = V4COMA_c(central_obs_shape[1:], atoms=atoms)
+        self.model_central = V4COMA_c(state_shape[1:], atoms=atoms, num_agent=num_agent)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+        self.optimizer_central = tf.keras.optimizers.Adam(lr*10)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -50,7 +50,7 @@ class COMA:
 
         # Build Network (Decentral)
         for i in range(self.num_agent_type):
-            model = V4COMA_d(decentral_obs_shape[1:], action_size=5, atoms=atoms)
+            model = V4COMA_d(state_shape[1:], action_size=5, atoms=atoms)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
             optimizer = tf.keras.optimizers.Adam(lr)
             checkpoint = tf.train.Checkpoint(
@@ -64,15 +64,6 @@ class COMA:
             self.dec_optimizers.append(optimizer)
             self.dec_checkpoints.append(checkpoint)
             self.dec_managers.append(manager)
-
-        # PPO Configuration
-        self.ppo_config = {
-                'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.01, dtype=tf.float32),
-                'q_beta': tf.constant(1.0, dtype=tf.float32),
-                }
-        # Critic Training Configuration
-        self.central_config = {'critic_beta': tf.constant(1.0)}
 
     def log(self, step, log_weights=True, logs=None):
         # Log weights
@@ -89,69 +80,43 @@ class COMA:
             for name, val in logs.items():
                 tf.summary.scalar(name, val, step=step)
 
-    def run_network_central(self, states):
-        # states: environment state
-        # observations: individual (centered) observation
-        env_critic, env_feature = self.model_central(states)
-        return env_critic, env_feature 
+    def run_network_central(self, meta_state, meta_action):
+        Q, Q_s_a = self.model_central(meta_state, meta_action)
+        return Q, Q_s_a
 
     def run_network_decentral(self, states_list):
         results = []
         for states, model in zip(states_list, self.dec_models):
-            num_sample = states.shape[0]
-            actor, SF = model([states])
-            results.append([actor, SF])
+            actor = model(states)
+            results.append(actor)
         return results
 
-    # Centralize updater
-    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):
-        if log:
-            assert writer is not None
-            assert step is not None
-            assert tag is not None
-        critic_losses = []
-        
-        # Get gradients
-        model = self.model_central
-        optimizer = self.optimizer_central
-        for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs, self.central_config)
-            if log:
-                critic_losses.append(info["critic_mse"])
-        if log:
-            logs = {tag+'central_critic_loss': np.mean(critic_losses)}
-            with writer.as_default():
-                for name, val in logs.items():
-                    tf.summary.scalar(name, val, step=step)
-                writer.flush()
-    
-    # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update(self, dataset_decentral, dataset_central, writer=None, log=False, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None
             assert tag is not None
         actor_losses = []
-        entropy = []
-        q_losses = []
+        critic_losses = []
 
         # Get gradients
         for i in range(self.num_agent_type):
-            dataset = datasets[i]
+            dataset = dataset_decentral[i]
             model = self.dec_models[i]
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
-                grad, info = get_gradient(model, loss_ppo, inputs, self.ppo_config)
-                optimizer.apply_gradients(zip(grad, model.trainable_variables))
+                _, info = train(model, loss_decentral, optimizer, inputs)
                 if log:
                     actor_losses.append(info['actor_loss'])
-                    entropy.append(info['entropy'])
-                    q_losses.append(info['q_loss'])
+        for inputs in dataset_central:
+            _, info = train(self.model_central, loss_central, self.optimizer_central, inputs)
+            if log:
+                critic_losses.append(info['critic_loss'])
         if log:
-            logs = {tag+'dec_actor_loss': np.mean(actor_losses),
-                    tag+'dec_entropy': np.mean(entropy),
-                    tag+'dec_q_loss': np.mean(q_losses),
-                    }
+            logs = {
+                tag+'dec_actor_loss': np.mean(actor_losses),
+                tag+'dec_critic_loss': np.mean(critic_losses),
+            }
             with writer.as_default():
                 self.log(step, logs=logs)
                 writer.flush()
