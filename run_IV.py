@@ -93,7 +93,7 @@ save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
 action_space = 5
-keep_frame = 1
+keep_frame = 4
 map_size = args.map_size
 vision_range = map_size - 1
 vision_dx, vision_dy = 2 * vision_range + 1, 2 * vision_range + 1
