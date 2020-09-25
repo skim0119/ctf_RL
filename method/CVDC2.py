@@ -24,7 +24,7 @@ class SF_CVDC:
         action_size,
         agent_type,
         save_path,
-        atoms=256,
+        atoms=128,
         lr=2e-4,
         **kwargs
     ):
@@ -41,7 +41,7 @@ class SF_CVDC:
         # Build Network (Central)
         self.model_central = Central(central_obs_shape[1:], atoms=atoms)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer_central = tf.keras.optimizers.Adam(5e-4)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -75,11 +75,11 @@ class SF_CVDC:
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.05, dtype=tf.float32),
-                'psi_beta': tf.constant(0.000, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-2, dtype=tf.float32),
-                'critic_beta': tf.constant(0.1, dtype=tf.float32),
-                'q_beta': tf.constant(0.1, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.0001, dtype=tf.float32),
+                'psi_beta': tf.constant(0.001, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'critic_beta': tf.constant(10, dtype=tf.float32),
+                'q_beta': tf.constant(10, dtype=tf.float32),
+                'learnability_beta': tf.constant(10, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
