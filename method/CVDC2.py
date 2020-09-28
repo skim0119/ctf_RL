@@ -24,7 +24,7 @@ class SF_CVDC:
         action_size,
         agent_type,
         save_path,
-        atoms=128,
+        atoms=512,
         lr=2e-4,
         **kwargs
     ):
@@ -75,11 +75,11 @@ class SF_CVDC:
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.05, dtype=tf.float32),
-                'psi_beta': tf.constant(0.001, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
                 'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
                 'critic_beta': tf.constant(10, dtype=tf.float32),
                 'q_beta': tf.constant(10, dtype=tf.float32),
-                'learnability_beta': tf.constant(10, dtype=tf.float32),
+                'learnability_beta': tf.constant(1, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -173,8 +173,6 @@ class SF_CVDC:
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
                 _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
-                #grad, info = get_gradient(model, loss_ppo, inputs, self.ppo_config)
-                #optimizer.apply_gradients(zip(grad, model.trainable_variables))
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])

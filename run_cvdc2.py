@@ -112,7 +112,7 @@ save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
 action_space = 5
-keep_frame = 4
+keep_frame = 1
 map_size = args.map_size
 vision_range = map_size - 1
 vision_dx, vision_dy = 2 * vision_range + 1, 2 * vision_range + 1
@@ -120,7 +120,7 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 2
 minimum_batch_size = 1024 * 4
 
@@ -467,8 +467,8 @@ while True:
                         vg1[idx],
                         psi1[idx],
                         reward[env_idx],
-                            #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
-                            #reward[env_idx]-reward_pred1[idx],
+                        #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                        #reward[env_idx]-reward_pred1[idx],
                         vc0[idx],
                         vc1[idx],
                         cent_s0[env_idx],

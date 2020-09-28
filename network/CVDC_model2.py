@@ -21,7 +21,7 @@ import numpy as np
 
 class Decentral(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_size=5, atoms=128,
+    def __init__(self, input_shape, action_size=5, atoms=512,
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
 
@@ -48,8 +48,8 @@ class Decentral(tf.keras.Model):
 
         # Phi
         self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.sf_v_weight = layers.Dense(units=1, activation='linear', use_bias=False,)
-        self.sf_q_weight = layers.Dense(units=action_size, activation='linear', use_bias=False,)
+        self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
+        self.sf_q_weight = layers.Dense(units=action_size, activation='linear') #, use_bias=False,)
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
@@ -144,7 +144,7 @@ class Decentral(tf.keras.Model):
               'critic': critic,
               'decoded_state': decoded_state,
               'Q': q,
-              'icritic': critic - inv_critic,
+              'icritic': critic - 0.1*inv_critic, # Corrected critic
               'psi_q_pos': psi_q_pos,
               'psi_v_neg': psi_v_neg,
               'filtered_decoded_state': _decoded_state
@@ -162,7 +162,7 @@ class Central(tf.keras.Model):
         self.feature_layer = V4(input_shape)
 
         # Critic
-        self.critic_dense1 = layers.Dense(units=256, activation='relu')
+        self.critic_dense1 = layers.Dense(units=512, activation='relu')
         self.successor_weight = layers.Dense(units=1, activation='linear')
 
         # Loss Operations
@@ -231,7 +231,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #reward_loss = 0.0
 
     # Decoder loss
-    generator_loss = model.mse_loss_sum(state, v['decoded_state'])
+    generator_loss = model.mse_loss_sum(next_state[...,-6:], v['decoded_state'])
     #generator_loss = 0.0
 
     # Entropy
