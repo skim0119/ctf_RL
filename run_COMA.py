@@ -120,7 +120,7 @@ cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 256
 epoch = 2
-minimum_batch_size = 1024 
+minimum_batch_size = 1024
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -194,7 +194,7 @@ def train_decentral(
     # Agent trajectory processing
     traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
     traj_buffer_central = defaultdict(list)
-    for traj in agent_trajs:
+    for traj_i,traj in enumerate(agent_trajs):
         meta_state = np.array(traj[0], dtype=np.float32) # [#, num_agent, lx, ly, ch]
         actions = np.array(traj[1], dtype=int) # [#, num_agent]
         reward = np.array(traj[2], dtype=np.float32) # [#]
@@ -225,9 +225,14 @@ def train_decentral(
         # Central : Compute central difference
         td_target = reward + gamma * np.sum(meta_pi * Q_ext[1:], axis=1)
 
-        traj_buffer_central["metastate"].extend(meta_state.tolist())
-        traj_buffer_central["metaaction"].extend(meta_action.tolist())
-        traj_buffer_central["td_target"].extend(td_target.tolist())
+        if traj_i == 0:
+            traj_buffer_central["metastate"] = meta_state
+            traj_buffer_central["metaaction"] = meta_action
+            traj_buffer_central["td_target"] = td_target
+        else:
+            traj_buffer_central["metastate"] = np.concatenate((traj_buffer_central["metastate"],meta_state))
+            traj_buffer_central["metaaction"] = np.concatenate((traj_buffer_central["metaaction"],meta_action))
+            traj_buffer_central["td_target"] = np.concatenate((traj_buffer_central["td_target"],td_target))
 
         # Decentral : Compute advantage V
         for idx in range(num_agent): # Target specific agent
@@ -246,9 +251,17 @@ def train_decentral(
 
             atype = agent_type_index[idx]
             traj_buffer = traj_buffer_list[atype]
-            traj_buffer["state"].extend(meta_state[:,idx,...].tolist())
-            traj_buffer["action"].extend(actions[:,idx].tolist())
-            traj_buffer["advantage"].extend(indiv_adv.tolist())
+            # traj_buffer["state"].extend(meta_state[:,idx,...].tolist())
+            # traj_buffer["action"].extend(actions[:,idx].tolist())
+            # traj_buffer["advantage"].extend(indiv_adv.tolist())
+            if traj_i == 0:
+                traj_buffer["state"] = meta_state[:,idx,...]
+                traj_buffer["action"] = actions[:,idx]
+                traj_buffer["advantage"] = indiv_adv
+            else:
+                traj_buffer["state"] = np.concatenate((traj_buffer["state"],meta_state[:,idx,...]))
+                traj_buffer["action"] = np.concatenate((traj_buffer["action"], actions[:,idx]))
+                traj_buffer["advantage"] = np.concatenate((traj_buffer["advantage"],indiv_adv))
 
     dataset_decentral = []
     for atype in range(num_type):
