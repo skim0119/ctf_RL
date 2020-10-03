@@ -26,7 +26,7 @@ import gym_cap
 import gym_cap.heuristic as policy
 import numpy as np
 
-from method.ActorCritic import IV_Module as Network
+from method.VDN import VDN_Module as Network
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.gae import gae

@@ -7,9 +7,10 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.PPO import V4PPO, train, get_gradient, loss
+from network.VDN import train_actor, train_critic
 
-class PPO_Module:
+
+class VDN_Module:
     @store_args
     def __init__(
         self,
@@ -50,31 +51,44 @@ class PPO_Module:
             results.append([actions, critics, log_logits])
         return results
 
-    def update_network(self, train_datasets, log=False, writer=None, step=None, tag=None):
+    def update_network(self, datasets_actor, datasets_critic, agent_type_index, log=False, writer=None, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None
             assert tag is not None
 
+        # Train Actor
         for i in range(self.num_agent_type):
-            dataset = train_datasets[i]
+            dataset = datasets_actor[i]
             model = self.models[i]
             optimizer = self.optimizers[i]
-            actor_losses, critic_losses, entropies = [], [], []
+            actor_losses, entropies = [], []
             for inputs in dataset:
-                _, info = train(model, optimizer, inputs)
+                _, info = train_actor(model, optimizer, inputs)
                 if log:
                     actor_losses.append(info['actor_loss'])
-                    critic_losses.append(info['critic_loss'])
                     entropies.append(info['entropy'])
 
             if log:
                 logs = {f'actor_loss/agent{i}': np.mean(actor_losses),
-                        f'critic_loss/agent{i}': np.mean(critic_losses),
                         f'entropy/agent{i}': np.mean(entropies)}
                 with writer.as_default():
                     for name, val in logs.items():
                         tf.summary.scalar(tag+name, val, step=step)
+
+        # Train Critic
+        critic_losses = []
+        for inputs in datasets_critic:
+            inputs['agent_type_index'] = agent_type_index
+            _, info = train_critic(self.models, self.central_optimizer, inputs)
+            if log:
+                critic_losses.append(info['critic_loss'])
+
+        if log:
+            logs = {f'critic_loss/agent{i}': np.mean(critic_losses)}
+            with writer.as_default():
+                for name, val in logs.items():
+                    tf.summary.scalar(tag+name, val, step=step)
 
     def initiate(self, verbose=1):
         for manager in self.managers:
@@ -94,4 +108,3 @@ class PPO_Module:
     def save(self, checkpoint_number):
         for manager in self.managers:
             manager.save(checkpoint_number)
-        
