@@ -174,7 +174,6 @@ def train(
     traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
     for trajs in trajs:
         for idx, traj in enumerate(trajs):
-    #for idx, traj in enumerate(trajs):
             atype = agent_type_index[idx]
 
             reward = traj[2]
@@ -294,10 +293,6 @@ while True:
                 trajs[env_idx][agent_id].append(
                     [s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx], v1[idx]]
                 )
-        #for idx, agent in enumerate(envs.get_team_blue().flat):
-        #    env_idx = idx // num_blue
-            # if was_alive[idx] and not was_done[env_idx]:
-            #if not was_done[env_idx]:
 
         was_alive = is_alive
         was_done = done
@@ -307,7 +302,6 @@ while True:
     etime_roll = time.time()
 
     batch.extend(trajs)
-    #num_batch += sum([len(traj) for traj in trajs])
     num_batch = len(batch) * 200 * num_agent
     if num_batch >= minimum_batch_size:
         stime_train = time.time()

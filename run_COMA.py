@@ -225,6 +225,10 @@ def train_decentral(
         # Central : Compute central difference
         td_target = reward + gamma * np.sum(meta_pi * Q_ext[1:], axis=1)
 
+        traj_buffer_central["metastate"].extend(list(meta_state))
+        traj_buffer_central["metaaction"].extend(list(meta_action))
+        traj_buffer_central["td_target"].extend(list(td_target))
+        '''
         if traj_i == 0:
             traj_buffer_central["metastate"] = meta_state
             traj_buffer_central["metaaction"] = meta_action
@@ -233,6 +237,7 @@ def train_decentral(
             traj_buffer_central["metastate"] = np.concatenate((traj_buffer_central["metastate"],meta_state))
             traj_buffer_central["metaaction"] = np.concatenate((traj_buffer_central["metaaction"],meta_action))
             traj_buffer_central["td_target"] = np.concatenate((traj_buffer_central["td_target"],td_target))
+        '''
 
         # Decentral : Compute advantage V
         for idx in range(num_agent): # Target specific agent
@@ -251,9 +256,10 @@ def train_decentral(
 
             atype = agent_type_index[idx]
             traj_buffer = traj_buffer_list[atype]
-            # traj_buffer["state"].extend(meta_state[:,idx,...].tolist())
-            # traj_buffer["action"].extend(actions[:,idx].tolist())
-            # traj_buffer["advantage"].extend(indiv_adv.tolist())
+            traj_buffer["state"].extend(list(meta_state[:,idx,...]))
+            traj_buffer["action"].extend(list(actions[:,idx]))
+            traj_buffer["advantage"].extend(list(indiv_adv))
+            '''
             if traj_i == 0:
                 traj_buffer["state"] = meta_state[:,idx,...]
                 traj_buffer["action"] = actions[:,idx]
@@ -262,6 +268,7 @@ def train_decentral(
                 traj_buffer["state"] = np.concatenate((traj_buffer["state"],meta_state[:,idx,...]))
                 traj_buffer["action"] = np.concatenate((traj_buffer["action"], actions[:,idx]))
                 traj_buffer["advantage"] = np.concatenate((traj_buffer["advantage"],indiv_adv))
+            '''
 
     dataset_decentral = []
     for atype in range(num_type):

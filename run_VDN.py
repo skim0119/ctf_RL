@@ -101,8 +101,8 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 # Batch Replay Settings
 minibatch_size = 256
-epoch = 2
-minimum_batch_size = 4096
+epoch = 1
+minimum_batch_size = 2048
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -332,16 +332,9 @@ while global_episodes < total_episodes:
                 v0s[env_idx],
                 v1s[env_idx],
             ])
-        #for idx, agent in enumerate(envs.get_team_blue().flat):
-        #    env_idx = idx // num_blue
-            # if was_alive[idx] and not was_done[env_idx]:
-            #if not was_done[env_idx]:
 
         was_alive = is_alive
         was_done = done
-
-        #if np.all(done):
-        #    break
     etime_roll = time.time()
 
     batch.extend(trajs)

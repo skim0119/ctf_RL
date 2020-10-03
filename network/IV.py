@@ -67,9 +67,9 @@ def loss_critic(models, state, td_target, old_value, agent_type_index,
             central_critic += critic
 
     # Critic Loss
-    critic_loss = tf.reduce_mean(tf.square(central_critic- td_target))
+    critic_loss = tf.reduce_mean(tf.square(central_critic - td_target))
 
-    total_loss = critic_beta*critic_loss
+    total_loss = 0.5*critic_beta*critic_loss
 
     info = None
     if return_losses:

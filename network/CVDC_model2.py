@@ -79,7 +79,51 @@ class Decentral(tf.keras.Model):
     def print_summary(self):
         self.feature_layer.summary()
 
-    def call(self, inputs):
+    @tf.function
+    def action_call(self, obs):  # Short operation for forward pass
+        # Feature Encoding SF-phi
+        net = self.feature_layer(obs)
+        phi = self.phi_dense1(net)
+        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+
+        # Actor
+        net = self.pi_layer(obs)
+        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = self.actor_dense1(net)
+        net = self.actor_dense2(net)
+        softmax_logits = self.softmax(net)
+        log_logits = self.log_softmax(net)
+
+        # Non-grad psi
+        psi = self.psi_dense1(tf.stop_gradient(phi))
+        psi = self.psi_dense2(psi)
+
+        # Psi
+        net = self.psi_dense1(phi)
+        net = self.psi_dense2(net)
+        critic = self.sf_v_weight(net, training=True)
+        critic = tf.reshape(critic, [-1])
+        q = self.sf_q_weight(net, training=True)
+
+        beta = tf.math.abs(self.beta)
+        #wv = self.sf_v_weight.weights[0]
+        wv_neg = self.sf_v_weight.weights[0] * (1.0-beta)
+        reward_predict = tf.linalg.matmul(phi, wv_neg)
+        reward_predict = tf.reshape(reward_predict, [-1])
+        inv_critic = tf.linalg.matmul(psi, wv_neg)
+        inv_critic = tf.reshape(inv_critic, [-1])
+
+        actor = {'softmax': softmax_logits,
+                 'log_softmax': log_logits}
+        SF = {'reward_predict': reward_predict,
+              'phi': phi,
+              'psi': psi,
+              'critic': critic,
+              'icritic': critic - 0.1*inv_critic, # Corrected critic
+              }
+        return actor, SF
+
+    def call(self, inputs): # Full Operation of the method
         # Run full network
         obs = inputs[0]
         action = inputs[1] # Action is included for decoder
@@ -92,7 +136,7 @@ class Decentral(tf.keras.Model):
 
         # Actor
         net = self.pi_layer(obs)
-        net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
         softmax_logits = self.softmax(net)

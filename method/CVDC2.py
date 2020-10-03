@@ -24,7 +24,7 @@ class SF_CVDC:
         action_size,
         agent_type,
         save_path,
-        atoms=512,
+        atoms=256,
         lr=2e-4,
         **kwargs
     ):
@@ -77,9 +77,9 @@ class SF_CVDC:
                 'entropy_beta': tf.constant(0.05, dtype=tf.float32),
                 'psi_beta': tf.constant(0.0001, dtype=tf.float32),
                 'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
-                'critic_beta': tf.constant(10, dtype=tf.float32),
-                'q_beta': tf.constant(10, dtype=tf.float32),
-                'learnability_beta': tf.constant(1, dtype=tf.float32),
+                'critic_beta': tf.constant(0.5, dtype=tf.float32),
+                'q_beta': tf.constant(0.5, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.1, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -119,9 +119,7 @@ class SF_CVDC:
     def run_network_decentral(self, states_list):
         results = []
         for states, model in zip(states_list, self.dec_models):
-            num_sample = states.shape[0]
-            temp_action = np.zeros(num_sample, dtype=np.int32)
-            actor, SF = model([states, temp_action])
+            actor, SF = model.action_call(states)
             actions = tf.random.categorical(actor["log_softmax"], 1, dtype=tf.int32).numpy().ravel()
             results.append([actions, actor, SF])
         return results

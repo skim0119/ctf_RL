@@ -14,7 +14,7 @@ import threading
 import multiprocessing
 
 import tensorflow as tf
-
+#tf.config.experimental_run_functions_eagerly(True)
 physical_devices = tf.config.experimental.list_physical_devices("GPU")
 for device in physical_devices:
     tf.config.experimental.set_memory_growth(device, True)
@@ -121,7 +121,7 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 128
-epoch = 2
+epoch = 1
 minimum_batch_size = 1024 * 4
 
 ## Logger Initialization
@@ -296,9 +296,9 @@ def train_decentral(
                 discount_adv=False,
                 normalize=False,
             )
-            beta = max(min((-0.9/50000)*step + 1, 1.0),0.1)
-            #advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
-            #advantage_lists[atype].append(advantages)
+            beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
+            advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
+            advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
@@ -331,7 +331,7 @@ def train_decentral(
             .batch(batch_size)
         )
         train_datasets.append(train_dataset)
-
+        
     network.update_decentral(
         train_datasets, writer=writer, log=log, step=step, tag="losses/", log_image=log_image,
     )
@@ -387,8 +387,8 @@ def run_network(states):
 
 batch = []
 dec_batch = []
-#while global_episodes < total_episodes:
-while True:
+while global_episodes < total_episodes:
+#while True:
     # Flags
     log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")
 

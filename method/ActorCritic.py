@@ -18,7 +18,7 @@ class PPO_Module:
         action_size,
         agent_type,
         save_path,
-        lr=1e-3,
+        lr=1e-4,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
