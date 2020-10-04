@@ -32,7 +32,7 @@ class VDN_Module:
         self.target_models = []
         for i in range(self.num_agent_type):
             # Model defnition
-            model = V4PPO(input_shape[1:], action_size=action_size)
+            model = VDNNet(input_shape[1:], action_size=action_size)
             checkpoint = tf.train.Checkpoint(optimizer=self.central_optimizer, model=model)
             manager = tf.train.CheckpointManager(
                     checkpoint=checkpoint,
