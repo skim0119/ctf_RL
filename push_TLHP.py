@@ -1,2 +1,2 @@
-python runner.py --train_number 15 --map_size 30 --machine TV --nbg 2 --nba 1
+python runner.py --train_number 00 --map_size 30 --machine TV --nbg 4 --nba 3
 
