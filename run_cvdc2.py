@@ -241,6 +241,9 @@ def train_decentral(
     # Agent trajectory processing
     traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
     advantage_lists = [[] for _ in range(num_type)]
+    f1_list = []
+    f2_list = []
+    fc_list = []
     for trajs in agent_trajs:
         for idx, traj in enumerate(trajs):
             atype = agent_type_index[idx]
@@ -252,14 +255,22 @@ def train_decentral(
             psi = np.array(traj[8]).tolist()
             _critic = traj[9][-1]
             _psi = np.array(traj[10][-1])
-            '''
+
             cent_state = np.array(traj[14])
             env_critic, _ = network.run_network_central(cent_state)
             env_critic = env_critic["critic"].numpy()[:, 0].tolist()
-            cent_last_state = np.array(traj[15])[-1:, ...]
-            _env_critic, _ = network.run_network_central(cent_last_state)
-            _env_critic = _env_critic["critic"].numpy()[0, 0]
-            '''
+            #cent_last_state = np.array(traj[15])[-1:, ...]
+            #_env_critic, _ = network.run_network_central(cent_last_state)
+            #_env_critic = _env_critic["critic"].numpy()[0, 0]
+
+            icritic = traj[12]
+
+            dc = np.array(critic[1:])-np.array(critic[:-1])
+            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])
+            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])
+            f1_list.append(np.mean((dc * dc1)>0))
+            f2_list.append(np.mean((dc * dc2)>0))
+            fc_list.append(np.mean((dc * dc)>0))
 
             # Zero bootstrap because all trajectory terminates
             td_target_c, advantages_global = gae(
@@ -343,6 +354,9 @@ def train_decentral(
                 tb_log_histogram(
                     np.array(adv_list), tag + "dec_advantages_{}".format(idx), step=step
                 )
+            tf.summary.scalar('factoredness/f1', np.mean(f1_list), step=step)
+            tf.summary.scalar('factoredness/f2', np.mean(f2_list), step=step)
+            tf.summary.scalar('factoredness/fc', np.mean(fc_list), step=step)
             writer.flush()
 
 

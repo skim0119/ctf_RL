@@ -35,6 +35,13 @@ class Decentral(tf.keras.Model):
             self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder = V4INVDecentral()
+
+            # Phi
+            self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+
+            # Psi
+            self.psi_dense1 = layers.Dense(units=atoms, activation='relu')
+            self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
         else:
             # Feature Encoding
             self.feature_layer = prebuilt_layers.feature_layer
@@ -46,8 +53,14 @@ class Decentral(tf.keras.Model):
             self.decoder_dense1 = prebuilt_layers.decoder_dense1
             self.decoder = prebuilt_layers.decoder
 
-        # Phi
-        self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+            # Phi
+            self.phi_dense1 = prebuilt_layers.phi_dense1
+
+            # Psi
+            self.psi_dense1 = prebuilt_layers.psi_dense1
+            self.psi_dense2 = prebuilt_layers.psi_dense2
+
+        # Critic weights
         self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
         self.sf_q_weight = layers.Dense(units=action_size, activation='linear') #, use_bias=False,)
 
@@ -57,9 +70,6 @@ class Decentral(tf.keras.Model):
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
-        # Psi
-        self.psi_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
         self.smoothed_pseudo_H = tf.Variable(1.0)
 
         # Learnabilty Maximizer
@@ -75,6 +85,8 @@ class Decentral(tf.keras.Model):
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
         self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
                 reduction=tf.keras.losses.Reduction.SUM)
+
+        self._built = False
 
     def print_summary(self):
         self.feature_layer.summary()
@@ -193,6 +205,8 @@ class Decentral(tf.keras.Model):
               'psi_v_neg': psi_v_neg,
               'filtered_decoded_state': _decoded_state
               }
+
+        self._built = True
 
         return actor, SF
 

@@ -56,7 +56,7 @@ class SF_CVDC:
                     decentral_obs_shape[1:],
                     action_size=5,
                     atoms=atoms,
-                    prebuilt_layers=None if i == 0 else self.dec_models[0])
+                    prebuilt_layers=None)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
             optimizer = tf.keras.optimizers.Adam(lr)
             checkpoint = tf.train.Checkpoint(
@@ -79,7 +79,7 @@ class SF_CVDC:
                 'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
                 'q_beta': tf.constant(0.5, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.1, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.01, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -119,7 +119,12 @@ class SF_CVDC:
     def run_network_decentral(self, states_list):
         results = []
         for states, model in zip(states_list, self.dec_models):
-            actor, SF = model.action_call(states)
+            if model._built:
+                actor, SF = model.action_call(states)
+            else:
+                num_sample = states.shape[0]
+                temp_action = np.ones([num_sample], dtype=int)
+                actor, SF = model([states, temp_action])
             actions = tf.random.categorical(actor["log_softmax"], 1, dtype=tf.int32).numpy().ravel()
             results.append([actions, actor, SF])
         return results
