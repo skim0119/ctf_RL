@@ -4,13 +4,13 @@ import sys
 import time
 
 RUNNING_SCRIPT = [
-    #"run_multiagent_ppo.py",
-    "run_multiagent_ppo_SF.py", # Ablation 3
+    "run_multiagent_ppo.py",
+    #"run_multiagent_ppo_SF.py", # Ablation 3
     #"run_COMA.py",
     #"run_cvdc.py",
-    "run_cvdc2.py",
-    "run_cvdc_sharedSF.py", # Ablation 1
-    "run_cvdc_decOnly.py", # Ablation 2
+    #"run_cvdc2.py",
+    #"run_cvdc_sharedSF.py", # Ablation 1
+    #"run_cvdc_decOnly.py", # Ablation 2
     #"run_VDN.py",
     #"run_cvdc_comp.py",
     #"run_cvdc3.py", # drawing filtered decoded image

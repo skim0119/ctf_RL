@@ -15,82 +15,62 @@ from utility.tf_utils import tf_clipped_log as tf_log
 
 import numpy as np
 
-def loss_ppo(model, state, old_log_logit, action, advantage, 
-         eps=0.2, entropy_beta=0.05, return_losses=False):
-    num_sample = state.shape[0]
+class VDNNet(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, action_size=5,
+            trainable=True, name='VDN'):
+        super(V4PPO, self).__init__(name=name)
 
-    # Run Model
-    actor, critic, log_logits = model(state)
+        # Feature Encoding
+        self.feature_layer = V4(input_shape, action_size)
 
-    # Entropy
-    H = -tf.reduce_mean(actor * tf_log(actor), axis=-1)
-    mean_entropy = tf.reduce_mean(H)
-    pseudo_H = tf.stop_gradient(
-            tf.reduce_sum(actor*(1-actor), axis=-1))
-    mean_pseudo_H = tf.reduce_mean(pseudo_H)
-    smoothed_pseudo_H = model.smoothed_pseudo_H
+        # Advantage
+        self.advantage_dense1 = layers.Dense(256, activation='relu')
+        self.advantage_dense2 = layers.Dense(action_size, activation='linear')
 
-    # Actor Loss
-    action_OH = tf.one_hot(action, model.action_size, dtype=tf.float32)
-    log_prob = tf.reduce_sum(log_logits * action_OH, 1)
-    old_log_prob = tf.reduce_sum(old_log_logit * action_OH, 1)
+        # Critic
+        self.critic_dense1 = layers.Dense(256, activation='relu')
+        self.critic_dense2 = layers.Dense(1, activation='linear', use_bias=False)
 
-    # Clipped surrogate function
-    ratio = tf.exp(log_prob - old_log_prob) # precision
-    #ratio = log_prob / old_log_prob
-    surrogate = ratio * advantage
-    clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
-    surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
-    actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
+    def call(self, inputs):
+        shared_net = self.feature_layer(inputs)
 
-    total_loss = actor_loss - entropy_beta*mean_entropy
+        # Advantage
+        net = self.advantage_dense1(shared)
+        adv = self.advantage_dense2(net)
 
-    info = None
-    if return_losses:
-        info = {'actor_loss': actor_loss,
-                'entropy': mean_entropy}
+        # Critic
+        net = self.critic_dense1(shared)
+        critic = self.critic_dense2(net)
 
-    return total_loss, info
+        qvals = critic + (adv - tf.reduce_mean(adv, axis=1))
 
-def loss_critic(models, state, td_target, old_value, agent_type_index,
-        eps=0.2, critic_beta=0.5, return_losses=False):
-    num_sample = state.shape[0]
+        action = tf.math.argmax(qvals, axis=1)
+        critic = tf.math.max(qvals, axis=1)
 
+        return action, qvals, critic
+
+def loss_critic(models, state, td_target, agent_type_index, gamma=0.98):
     # Run Model
     central_critic = None
     for idx, atype in enumerate(agent_type_index):
         model = models[atype]
-        _, critic, _= model(state[:,idx,...])
+        _, _, critic = model(state[:,idx,...])
+
         if central_critic is None:
             central_critic = critic
         else:
             central_critic += critic
 
     # Critic Loss
-    critic_loss = tf.reduce_mean(tf.square(central_critic - td_target))
+    loss = tf.reduce_mean(tf.square(central_critic - td_target))
+    info = {'critic_loss': loss}
 
-    total_loss = 0.5*critic_beta*critic_loss
+    return loss, info
 
-    info = None
-    if return_losses:
-        info = {'critic_loss': critic_loss}
-
-    return total_loss, info
-
-def train_actor(model, optimizer, inputs, **hyperparameters):
+def train_critic(models, optimizer, inputs):
     with tf.GradientTape() as tape:
-        total_loss, info = loss_ppo(model, **inputs, **hyperparameters, return_losses=True)
-    grads = tape.gradient(total_loss, model.trainable_variables)
-    optimizer.apply_gradients([
-        (grad, var)
-        for (grad,var) in zip(grads, model.trainable_variables)
-        if grad is not None])
-
-    return total_loss, info
-
-def train_critic(model, optimizer, inputs, **hyperparameters):
-    with tf.GradientTape() as tape:
-        total_loss, info = loss_critic(model, **inputs, **hyperparameters, return_losses=True)
+        total_loss, info = loss_critic(models, **inputs)
     variables = []
     for t in model:
         variables += t.trainable_variables

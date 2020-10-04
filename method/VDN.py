@@ -7,7 +7,8 @@ import numpy as np
 
 from utility.utils import store_args
 
-from network.VDN import train_actor, train_critic
+from network.VDN import VDNNet
+from network.VDN import train_critic
 
 
 class VDN_Module:
@@ -27,12 +28,12 @@ class VDN_Module:
         
         # Build model
         self.central_optimizer = tf.keras.optimizers.Adam(lr)
-        self.models, self.optimizers, self.checkpoints, self.managers = [], [], [], []
+        self.models, self.checkpoints, self.managers = [], [], []
+        self.target_models = []
         for i in range(self.num_agent_type):
             # Model defnition
             model = V4PPO(input_shape[1:], action_size=action_size)
-            optimizer = tf.keras.optimizers.Adam(lr)
-            checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+            checkpoint = tf.train.Checkpoint(optimizer=self.central_optimizer, model=model)
             manager = tf.train.CheckpointManager(
                     checkpoint=checkpoint,
                     directory=os.path.join(save_path, f'agent_{i}'),
@@ -46,35 +47,15 @@ class VDN_Module:
     def run_network(self, states_list):
         results = []
         for states, model in zip(states_list, self.models):
-            actor, critics, log_logits = model(states)
-            actions = tf.random.categorical(log_logits, 1, dtype=tf.int32).numpy().ravel()
-            results.append([actions, critics, log_logits])
+            actions, qvals, critic = model(states)
+            results.append([actions, critic])
         return results
 
-    def update_network(self, datasets_actor, datasets_critic, agent_type_index, log=False, writer=None, step=None, tag=None):
+    def update_network(self, datasets_critic, agent_type_index, log=False, writer=None, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None
             assert tag is not None
-
-        # Train Actor
-        for i in range(self.num_agent_type):
-            dataset = datasets_actor[i]
-            model = self.models[i]
-            optimizer = self.optimizers[i]
-            actor_losses, entropies = [], []
-            for inputs in dataset:
-                _, info = train_actor(model, optimizer, inputs)
-                if log:
-                    actor_losses.append(info['actor_loss'])
-                    entropies.append(info['entropy'])
-
-            if log:
-                logs = {f'actor_loss/agent{i}': np.mean(actor_losses),
-                        f'entropy/agent{i}': np.mean(entropies)}
-                with writer.as_default():
-                    for name, val in logs.items():
-                        tf.summary.scalar(tag+name, val, step=step)
 
         # Train Critic
         critic_losses = []
@@ -85,7 +66,7 @@ class VDN_Module:
                 critic_losses.append(info['critic_loss'])
 
         if log:
-            logs = {f'critic_loss/agent{i}': np.mean(critic_losses)}
+            logs = {'critic_loss': np.mean(critic_losses)}
             with writer.as_default():
                 for name, val in logs.items():
                     tf.summary.scalar(tag+name, val, step=step)

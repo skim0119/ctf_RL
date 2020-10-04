@@ -26,13 +26,14 @@ import gym_cap
 import gym_cap.heuristic as policy
 import numpy as np
 
-from method.VDN import VDN_Module as Network
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.gae import gae
 from utility.logger import *
 from utility.multiprocessing import SubprocVecEnv
 from utility.utils import MovingAverage, interval_flag, path_create
+
+from method.VDN import VDN_Module as Network
 
 parser = argparse.ArgumentParser(description="PPO trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number")
@@ -50,7 +51,7 @@ args = parser.parse_args()
 PROGBAR = args.silence
 
 ## Training Directory Reset
-TRAIN_NAME = "IV_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format(
+TRAIN_NAME = "VDN_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format(
     args.machine,
     args.train_number,
     args.nbg,
@@ -160,7 +161,6 @@ writer = tf.summary.create_file_writer(LOG_PATH)
 ### TRAINING ###
 def train(
     network,
-    trajs_actor,
     trajs_critic,
     bootstrap=0.0,
     epoch=epoch,
@@ -169,48 +169,7 @@ def train(
     log=False,
     step=None,
 ):
-    datasets_actor = []
     datasets_critic = []
-
-    # Prepare actor loss dataset
-    advantage_list = []
-    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
-    for trajs in trajs_actor:
-        for idx, traj in enumerate(trajs):
-    #for idx, traj in enumerate(trajs):
-            atype = agent_type_index[idx]
-
-            reward = traj[2]
-            critic = traj[3]
-            _critic = traj[5][-1]
-
-            td_target, advantages = gae(
-                reward, critic, _critic,
-                gamma, lambd, normalize=False
-            )
-            advantage_list.append(advantages)
-
-            traj_buffer = traj_buffer_list[atype]
-            traj_buffer["state"].extend(traj[0])
-            traj_buffer["action"].extend(traj[1])
-            traj_buffer["advantage"].extend(advantages)
-            traj_buffer["old_log_logit"].extend(traj[4])
-    for atype in range(num_type):
-        traj_buffer = traj_buffer_list[atype]
-        train_dataset = (
-            tf.data.Dataset.from_tensor_slices(
-                {
-                    "state": np.stack(traj_buffer["state"]).astype(np.float32),
-                    "old_log_logit": np.stack(traj_buffer["old_log_logit"]).astype(np.float32),
-                    "advantage": np.stack(traj_buffer["advantage"]).astype(np.float32),
-                    "action": np.stack(traj_buffer["action"]),
-                }
-            )
-            .shuffle(64)
-            .repeat(epoch)
-            .batch(batch_size)
-        )
-        datasets_actor.append(train_dataset)
 
     # Prepare critic loss dataset
     traj_buffer = defaultdict(list)
@@ -226,14 +185,12 @@ def train(
 
         traj_buffer["state"].extend(traj[0])
         traj_buffer["td_target"].extend(td_target)
-        traj_buffer["old_value"].extend(traj[2])
 
     train_dataset = (
         tf.data.Dataset.from_tensor_slices(
             {
                 "state": np.stack(traj_buffer["state"]).astype(np.float32),
                 "td_target": np.stack(traj_buffer["td_target"]).astype(np.float32),
-                "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
             }
         )
         .shuffle(64)
@@ -243,7 +200,7 @@ def train(
     datasets_critic = train_dataset
 
     network.update_network(
-        datasets_actor, datasets_critic, agent_type_index, writer=writer, step=step, tag="losses/", log=log
+        datasets_critic, agent_type_index, writer=writer, step=step, tag="losses/", log=log
     )
     if log:
         with writer.as_default():
@@ -267,18 +224,15 @@ def get_action(states):
     # Container
     a1 = np.empty([NENV * num_blue], dtype=np.int32)
     v1 = np.empty([NENV * num_blue], dtype=np.float32)
-    p1 = np.empty([NENV * num_blue, action_space], dtype=np.float32)
 
     # Postprocessing
-    for (a, v, p), mask in zip(results, agent_type_masking):
+    for (a, v), mask in zip(results, agent_type_masking):
         a1[mask] = a
         v1[mask] = v
-        p1[mask, :] = p
     actions = np.reshape(a1, [NENV, num_blue])
-    return actions, a1, v1, p1
+    return actions, a1, v1
 
 
-batch = []
 batch2 = []
 num_batch = 0
 while global_episodes < total_episodes:
@@ -288,8 +242,6 @@ while global_episodes < total_episodes:
     was_alive = [True for agent in envs.get_team_blue().flat]
     was_done = [False for env in range(NENV)]
 
-    #trajs = [Trajectory(depth=6) for _ in range(num_blue * NENV)]
-    trajs = [[Trajectory(depth=6) for _ in range(num_agent)] for _ in range(NENV)]
     trajs_team = [Trajectory(depth=4) for _ in range(NENV)]
 
     # Bootstrap
@@ -300,29 +252,22 @@ while global_episodes < total_episodes:
         policy_red=policy.Roomba,
     )
     s1 = s1.astype(np.float32)
-    actions, a1, v1, p1 = get_action(s1)
+    actions, a1, v1 = get_action(s1)
 
     # Rollout
     stime_roll = time.time()
     for step in range(max_ep):
         s0 = s1
         a0, v0 = a1, v1
-        p0 = p1
 
         s1, reward, done, info = envs.step(actions)
         s1 = s1.astype(np.float32)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         episode_rew += reward
 
-        actions, a1, v1, p1 = get_action(s1)
+        actions, a1, v1 = get_action(s1)
 
         # push to buffer
-        for env_idx in range(NENV):
-            for agent_id in range(num_agent):
-                idx = env_idx * num_agent + agent_id
-                trajs[env_idx][agent_id].append(
-                    [s0[idx], a0[idx], reward[env_idx], v0[idx], p0[idx], v1[idx]]
-                )
         v0s = v0.reshape([NENV, num_agent]).sum(axis=1)
         v1s = v1.reshape([NENV, num_agent]).sum(axis=1)
         for env_idx in range(NENV):
@@ -337,16 +282,13 @@ while global_episodes < total_episodes:
         was_done = done
     etime_roll = time.time()
 
-    batch.extend(trajs)
     batch2.extend(trajs_team)
-    #num_batch += sum([len(traj) for traj in trajs])
-    num_batch = len(batch) * 200 * num_agent
+    num_batch = len(batch2) * 200 * num_agent
     if num_batch >= minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, "im_log")
         train(
             network,
-            batch,
             batch2,
             0,
             epoch,
@@ -356,7 +298,6 @@ while global_episodes < total_episodes:
             global_episodes,
         )
         etime_train = time.time()
-        batch = []
         batch2 = []
         num_batch = 0
         log_traintime.append(etime_train - stime_train)
