@@ -110,7 +110,7 @@ save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
 action_space = 5
-keep_frame = 4
+keep_frame = 1
 map_size = args.map_size
 vision_range = map_size - 1
 vision_dx, vision_dy = 2 * vision_range + 1, 2 * vision_range + 1
@@ -119,7 +119,7 @@ input_size = [None, vision_dx, vision_dy, nchannel]
 cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 256
-epoch = 2
+epoch = 1
 minimum_batch_size = 1024
 
 ## Logger Initialization
@@ -167,9 +167,11 @@ agent_type_masking = np.tile(agent_type_masking, NENV)
 atoms = 128
 network = Network(
     state_shape=input_size,
+    cent_state_shape=cent_input_size,
     action_size=action_space,
     num_agent=num_agent,
     agent_type=agent_type,
+    agent_type_index=agent_type_index,
     atoms=atoms,
     save_path=MODEL_PATH,
 )
@@ -182,7 +184,7 @@ print(global_episodes)
 writer = tf.summary.create_file_writer(LOG_PATH)
 
 ### TRAINING ###
-def train_decentral(
+def train(
     agent_trajs,
     epoch=epoch,
     batch_size=minibatch_size,
@@ -192,121 +194,29 @@ def train_decentral(
 ):
 
     # Agent trajectory processing
-    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
-    traj_buffer_central = defaultdict(list)
+    rep_buffer = defaultdict(list)
     for traj_i,traj in enumerate(agent_trajs):
-        meta_state = np.array(traj[0], dtype=np.float32) # [#, num_agent, lx, ly, ch]
-        actions = np.array(traj[1], dtype=int) # [#, num_agent]
-        reward = np.array(traj[2], dtype=np.float32) # [#]
-        pi = np.array(traj[3], dtype=np.float32) # [#, num_agent, num_action]
-        length = meta_state.shape[0]
+        rep_buffer["env_states"].extend(traj[4])
+        rep_buffer["metastates"].extend(traj[0])
+        rep_buffer["metaactions"].extend(traj[1])
+        rep_buffer["rewards"].extend(traj[2])
 
-        meta_action = np.zeros(length, dtype=int)
-        #meta_pi = np.ones(meta_state.shape[0], dtype=np.float32)
-        for i in range(num_agent):
-            meta_action += actions[:,i]*(5**i)
-            #meta_pi *= np.take(pi[:,i], actions[:,i], axis=1)
-        Q, Q_s_a = network.run_network_central(meta_state, meta_action)
-        Q = Q.numpy()
-        Q_s_a = Q_s_a.numpy()
-        Q_ext = np.concatenate([Q, np.zeros_like(Q[0:1,:])], axis=0)
-
-        meta_pi = None
-        for i in range(num_agent):
-            new_shape = [length] + [1] * num_agent
-            new_shape[1+i] = action_space
-            pi_i = pi[:,i].reshape(new_shape)
-            if meta_pi is None:
-                meta_pi = pi_i
-            else:
-                meta_pi = pi_i * meta_pi
-        meta_pi = meta_pi.reshape([length, -1])
-
-        # Central : Compute central difference
-        td_target = reward + gamma * np.sum(meta_pi * Q_ext[1:], axis=1)
-
-        traj_buffer_central["metastate"].extend(list(meta_state))
-        traj_buffer_central["metaaction"].extend(list(meta_action))
-        traj_buffer_central["td_target"].extend(list(td_target))
-        '''
-        if traj_i == 0:
-            traj_buffer_central["metastate"] = meta_state
-            traj_buffer_central["metaaction"] = meta_action
-            traj_buffer_central["td_target"] = td_target
-        else:
-            traj_buffer_central["metastate"] = np.concatenate((traj_buffer_central["metastate"],meta_state))
-            traj_buffer_central["metaaction"] = np.concatenate((traj_buffer_central["metaaction"],meta_action))
-            traj_buffer_central["td_target"] = np.concatenate((traj_buffer_central["td_target"],td_target))
-        '''
-
-        # Decentral : Compute advantage V
-        for idx in range(num_agent): # Target specific agent
-            indiv_Q = np.zeros([length, action_space])
-            for fix_act in range(action_space):
-                meta_action_fix_agent = np.zeros(length, dtype=int)
-                for i in range(num_agent):
-                    if i == idx:
-                        meta_action_fix_agent += fix_act*(5**i)
-                    else:
-                        meta_action_fix_agent += actions[:,i]*(5**i)
-                for e in range(length):
-                    indiv_Q[e,fix_act] = Q[e,meta_action_fix_agent[e]]
-                #indiv_Q[:,fix_act] = np.take(Q, meta_action_fix_agent, axis=1)
-            indiv_adv = Q_s_a - np.sum(indiv_Q * pi[:,idx,:], axis=1)
-
-            atype = agent_type_index[idx]
-            traj_buffer = traj_buffer_list[atype]
-            traj_buffer["state"].extend(list(meta_state[:,idx,...]))
-            traj_buffer["action"].extend(list(actions[:,idx]))
-            traj_buffer["advantage"].extend(list(indiv_adv))
-            '''
-            if traj_i == 0:
-                traj_buffer["state"] = meta_state[:,idx,...]
-                traj_buffer["action"] = actions[:,idx]
-                traj_buffer["advantage"] = indiv_adv
-            else:
-                traj_buffer["state"] = np.concatenate((traj_buffer["state"],meta_state[:,idx,...]))
-                traj_buffer["action"] = np.concatenate((traj_buffer["action"], actions[:,idx]))
-                traj_buffer["advantage"] = np.concatenate((traj_buffer["advantage"],indiv_adv))
-            '''
-
-    dataset_decentral = []
-    for atype in range(num_type):
-        traj_buffer = traj_buffer_list[atype]
-        train_dataset = (
-            tf.data.Dataset.from_tensor_slices(
-                {
-                    "state": np.stack(traj_buffer["state"]).astype(np.float32),
-                    "action": np.stack(traj_buffer["action"]).astype(int),
-                    "advantage": np.stack(traj_buffer["advantage"]).astype(np.float32),
-                }
-            )
-            .shuffle(64)
-            .repeat(epoch)
-            .batch(batch_size)
-        )
-        dataset_decentral.append(train_dataset)
-    dataset_central = (
+    dataset = (
         tf.data.Dataset.from_tensor_slices(
             {
-                "metastate": np.stack(traj_buffer_central["metastate"]).astype(np.float32),
-                "metaaction": np.stack(traj_buffer_central["metaaction"]).astype(int),
-                "td_target": np.stack(traj_buffer_central["td_target"]).astype(np.float32),
+                "env_states": np.stack(rep_buffer["env_states"]).astype(np.float32),
+                "metastates": np.stack(rep_buffer["metastates"]).astype(np.float32),
+                "metaactions": np.stack(rep_buffer["metaactions"]).astype(int),
+                "rewards": np.stack(rep_buffer["rewards"]).astype(np.float32),
             }
         )
-        .shuffle(64)
+        .batch(max_ep)
         .repeat(epoch)
-        .batch(batch_size)
     )
 
     network.update(
-        dataset_decentral, dataset_central, writer=writer, log=log, step=step, tag="losses/"
+        dataset, writer=writer, log=log, step=step, tag="losses/"
     )
-    '''
-    if log:
-        with writer.as_default():
-            writer.flush()
-    '''
 
 def run_network(states):
     states_list = []
@@ -332,9 +242,7 @@ def run_network(states):
     return a1, action, logits1
 
 
-batch = []
 dec_batch = []
-num_batch = 0
 dec_batch_size = 0
 #while global_episodes < total_episodes:
 while True:
@@ -348,6 +256,7 @@ while True:
     # Bootstrap
     s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)
     s1 = s1.astype(np.float32)
+    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
 
     a1, action, logits1 = run_network(s1)
 
@@ -360,11 +269,13 @@ while True:
         logits0 = logits1
         was_alive = is_alive
         was_done = is_done
+        cent_s0 = cent_s1
 
         # Run environment
         s1, reward, done, history = envs.step(action)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         s1 = s1.astype(np.float32)  # Decentralize observation
+        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
         episode_rew += reward
 
         # Run decentral network
@@ -379,6 +290,7 @@ while True:
                     a0[idx:idx+num_agent],
                     reward[env_idx], 
                     logits0[idx:idx+num_agent],
+                    cent_s0[env_idx]
                 ]
             )
 
@@ -390,7 +302,7 @@ while True:
     if dec_batch_size > minimum_batch_size:
         stime_train = time.time()
         log_image_on = interval_flag(global_episodes, save_image_frequency, "im_log")
-        train_decentral(
+        train(
             dec_batch,
             epoch=epoch,
             batch_size=minibatch_size,

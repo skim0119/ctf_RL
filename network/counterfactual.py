@@ -57,77 +57,118 @@ class V4COMA_d(tf.keras.Model):
 
 class V4COMA_c(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, num_agent, action_size=5, atoms=128,
+    def __init__(self, input_shape, indiv_models, agent_type_index, num_agent_type, action_size=5, atoms=512,
                  trainable=True):
         super(V4COMA_c, self).__init__()
 
-        # Feature Encoding
-        self.feature_layer = V4(input_shape)
-        self.action_space = action_size**num_agent
+        # Share feature layer 
+        self.feature_layer = V4(input_shape, action_size)
+        self.feature_dense1 = layers.Dense(units=128, activation='relu')
+
+        # Action net
+        self.action_dense1 = layers.Dense(units=64, activation='relu')
 
         # Critic
         self.critic_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.critic_dense2 = layers.Dense(units=self.action_space)
+        self.critic_dense2 = layers.Dense(units=atoms, activation='relu')
+        critic_layers = []
+        for i in range(num_agent_type):
+            critic_layers.append(layers.Dense(units=action_size, activation='linear'))
+
+        self.critic_layers = []
+        for t in agent_type_index:
+            self.critic_layers.append(critic_layers[t])
 
         # Loss Operations
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
-        #self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
-        #        reduction=tf.keras.losses.Reduction.SUM)
 
-    def print_summary(self):
-        self.feature_layer.print_summary()
+    def call(self, env_state, indiv_states, indiv_actions):
+        # dim[env_state] : [num_batch, ex, ey, ch]
+        # dim[indiv_states] : [num_batch, num_agent, lx, ly, ch]
+        # dim[indiv_actions] : [num_batch, num_agent]
+        indiv_states = tf.unstack(indiv_states, axis=1)
+        indiv_actions = tf.unstack(indiv_actions, axis=1)
 
-    def call(self, inputs, actions):
-        # dim[inputs] : [num_batch, num_agent, lx, ly, ch]
-        states = tf.unstack(inputs, axis=1)
+        env_net = self.feature_layer(env_state)
+        arr = [env_net]
+        for state, action, model in zip(indiv_states, indiv_actions, self.indiv_models):
+            feature_net = model.feature_layer(state)
+            feature_net = tf.stop_gradient(feature_net)
+            feature_net = self.feature_dense1(feature_net)
+            arr.append(feature_net)
 
-        arr = []
-        for idx in range(self.num_agent):
-            net = self.feature_layer(states[idx])
-            arr.append(net)
-
+            action_onehot = tf.one_hot(action, 5)
+            action_net = self.action_dense1(action_onehot)
+            arr.append(action_net)
         net = tf.concat(arr, axis=1)
 
         # Critic  
         net = self.critic_dense1(net)
-        critic = self.critic_dense2(net)
+        net = self.critic_dense2(net)
+        qvals = []
+        for clayer in self.critic_layers:
+            qval = clayer(net)
+            qvals.append(qval)
 
-        action_one_hot = tf.one_hot(actions, self.action_space)
-        critic_a = tf.reduce_sum(critic * action_one_hot, axis=1)
+        return qvals
 
-        return critic, critic_a
-
-@tf.function
-def loss_central(model, metastate, metaaction, td_target):
-    Q, Q_s_a = model(metastate, metaaction)
-
-    # Critic - TD Difference
-    critic_mse = model.mse_loss_mean(Q_s_a, td_target)
-
-    info = {'critic_loss': critic_mse}
-
-    return critic_mse, info
 
 @tf.function
-def loss_decentral(model, state, action, advantage):
-    # Run Model
-    actor = model(state)
-    pi = actor['softmax']
+def loss(cent_model, dec_models, env_states, metastates, metaactions, rewards):
+    critic_loss = None
+    actor_loss = None
+    qvals = cent_model(env_states, metastates, metaactions)
+    for idx, qval in enumerate(qvals):
+        # Centralized Network Loss
+        qmax = tf.math.reduce_max(qval, axis=1)
+        action = metaactions[:,idx]
+        action_onehot = tf.one_hot(action, 5)
+        q_a = tf.reduce_sum(qval * action_onehot, axis=1)
+        qmax = tf.concat([qmax, [0]], axis=0)
+        td_target = rewards + 0.98 * qmax[1:]
+        mse = cent_model.mse_loss_mean(q_a, tf.stop_gradient(td_target))
+        if critic_loss is None:
+            critic_loss = mse
+        else:
+            critic_loss += mse
 
-    # Actor Loss
-    action_one_hot = tf.one_hot(action, model.action_size)
-    pi_a = tf.reduce_sum(pi * action_one_hot, axis=1)
-    actor_loss = -tf.reduce_sum(advantage * tf_log(pi_a))
+        # Decentralized Netowork Loss
+        model = dec_models[idx]
+        pi = model(metastates[:,idx,...])['softmax']
 
-    info = {'actor_loss': actor_loss}
+        pi_rev = pi * (1-action_onehot) # remove own action
+        Q_a_rev = tf.reduce_sum(qval * pi_rev, axis=1)
+        #advantage = tf.stop_gradient(q_a - Q_a_rev)
+        advantage = tf.stop_gradient(q_a)
+        
+        pi_a = tf.reduce_sum(pi * action_onehot, axis=1)
+        pg_loss = -tf.reduce_mean(advantage * tf_log(pi_a))
+        if actor_loss is None:
+            actor_loss = pg_loss
+        else:
+            actor_loss += pg_loss
 
-    return actor_loss, info
+    total_loss = actor_loss + critic_loss*0.5
+    info = {
+        'actor_loss': actor_loss,
+        'critic_loss': critic_loss,
+    }
 
-def train(model, loss, optimizer, inputs, hyperparameters={}):
+    return total_loss, info
+
+def train(cent_model, dec_models, optimizer, inputs):
     with tf.GradientTape() as tape:
-        loss_val, info = loss(model, **inputs, **hyperparameters)
-    grads = tape.gradient(loss_val, model.trainable_variables,
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return loss_val, info
+        total_loss, info = loss(cent_model, dec_models, **inputs)
+
+    variables = cent_model.trainable_variables
+    for t in dec_models:
+        variables += t.trainable_variables
+    # train central
+    grads = tape.gradient(total_loss, variables)
+    optimizer.apply_gradients([
+        (grad, var)
+        for (grad,var) in zip(grads, variables)
+        if grad is not None])
+    
+    return total_loss, info
 

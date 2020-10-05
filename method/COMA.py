@@ -9,7 +9,6 @@ from utility.logger import *
 
 from network.counterfactual import V4COMA_d, V4COMA_c
 from network.counterfactual import train
-from network.counterfactual import loss_central, loss_decentral
 
 
 class COMA:
@@ -19,9 +18,11 @@ class COMA:
     def __init__(
         self,
         state_shape,
+        cent_state_shape,
         action_size,
         num_agent,
         agent_type,
+        agent_type_index,
         save_path,
         atoms=4,
         lr=1e-4,
@@ -36,10 +37,36 @@ class COMA:
         self.dec_checkpoints = []
         self.dec_managers = []
 
+
+        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+
+        # Build Network (Decentral)
+        for i in range(self.num_agent_type):
+            model = V4COMA_d(state_shape[1:], action_size=5, atoms=atoms)
+            save_directory = os.path.join(save_path, 'decentral{}'.format(i))
+            checkpoint = tf.train.Checkpoint(
+                   optimizer=self.optimizer_central, model=model)
+            manager = tf.train.CheckpointManager(
+                    checkpoint=checkpoint,
+                    directory=save_directory,
+                    max_to_keep=3,
+                    keep_checkpoint_every_n_hours=1)
+            self.dec_models.append(model)
+            self.dec_optimizers.append(self.optimizer_central)
+            self.dec_checkpoints.append(checkpoint)
+            self.dec_managers.append(manager)
+
+        self.dec_models_iter = [self.dec_models[i] for i in agent_type_index]
+        self.dec_optimizers_iter = [self.dec_optimizers[i] for i in agent_type_index]
+
         # Build Network (Central)
-        self.model_central = V4COMA_c(state_shape[1:], atoms=atoms, num_agent=num_agent)
+        self.model_central = V4COMA_c(
+            cent_state_shape[1:], 
+            self.dec_models_iter,
+            agent_type_index,
+            self.num_agent_type,
+        )
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr*10)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -47,23 +74,6 @@ class COMA:
                 directory=self.save_directory_central,
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
-
-        # Build Network (Decentral)
-        for i in range(self.num_agent_type):
-            model = V4COMA_d(state_shape[1:], action_size=5, atoms=atoms)
-            save_directory = os.path.join(save_path, 'decentral{}'.format(i))
-            optimizer = tf.keras.optimizers.Adam(lr)
-            checkpoint = tf.train.Checkpoint(
-                   optimizer=optimizer, model=model)
-            manager = tf.train.CheckpointManager(
-                    checkpoint=checkpoint,
-                    directory=save_directory,
-                    max_to_keep=3,
-                    keep_checkpoint_every_n_hours=1)
-            self.dec_models.append(model)
-            self.dec_optimizers.append(optimizer)
-            self.dec_checkpoints.append(checkpoint)
-            self.dec_managers.append(manager)
 
     def log(self, step, log_weights=True, logs=None):
         # Log weights
@@ -80,10 +90,6 @@ class COMA:
             for name, val in logs.items():
                 tf.summary.scalar(name, val, step=step)
 
-    def run_network_central(self, meta_state, meta_action):
-        Q, Q_s_a = self.model_central(meta_state, meta_action)
-        return Q, Q_s_a
-
     def run_network_decentral(self, states_list):
         results = []
         for states, model in zip(states_list, self.dec_models):
@@ -91,7 +97,7 @@ class COMA:
             results.append(actor)
         return results
 
-    def update(self, dataset_decentral, dataset_central, writer=None, log=False, step=None, tag=None):
+    def update(self, dataset, writer=None, log=False, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None
@@ -99,18 +105,12 @@ class COMA:
         actor_losses = []
         critic_losses = []
 
-        # Get gradients
-        for i in range(self.num_agent_type):
-            dataset = dataset_decentral[i]
-            model = self.dec_models[i]
-            optimizer = self.dec_optimizers[i]
-            for inputs in dataset:
-                _, info = train(model, loss_decentral, optimizer, inputs)
-                if log:
-                    actor_losses.append(info['actor_loss'])
-        for inputs in dataset_central:
-            _, info = train(self.model_central, loss_central, self.optimizer_central, inputs)
+        for inputs in dataset:
+            _, info = train(self.model_central, self.dec_models_iter,
+                    self.optimizer_central,
+                    inputs)
             if log:
+                actor_losses.append(info['actor_loss'])
                 critic_losses.append(info['critic_loss'])
         if log:
             logs = {

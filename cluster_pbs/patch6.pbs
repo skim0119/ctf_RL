@@ -21,4 +21,4 @@ which python
 which pip
 pwd
 
-python runner.py --train_number 9 --machine CL --nbg 2 --nba 1 --silence
+python runner.py --train_number 10 --machine CL --nbg 2 --nba 1 --silence
