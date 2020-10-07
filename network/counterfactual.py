@@ -126,7 +126,7 @@ def loss(cent_model, dec_models, env_states, metastates, metaactions, rewards):
         # Decentralized Netowork Loss
         model = dec_models[idx]
         pi = model(metastates[:,idx,...])['softmax']
-        counter = tf.one_hot(action, 5, dtype=tf.float32) - 0.3&pi
+        counter = tf.one_hot(action, 5, dtype=tf.float32) - 0.3*pi
         advantage = tf.stop_gradient(tf.reduce_sum(qval * counter, axis=1))
         
         pi_a = tf.reduce_sum(pi * action_onehot, axis=1)
