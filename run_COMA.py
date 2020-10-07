@@ -118,9 +118,9 @@ nchannel = 6 * keep_frame
 input_size = [None, vision_dx, vision_dy, nchannel]
 cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 1
-minimum_batch_size = 1024*2
+minimum_batch_size = 1024
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)

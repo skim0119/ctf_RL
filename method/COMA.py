@@ -25,7 +25,7 @@ class COMA:
         agent_type_index,
         save_path,
         atoms=4,
-        lr=2e-4,
+        lr=1e-4,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"

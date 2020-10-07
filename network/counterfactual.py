@@ -63,7 +63,7 @@ class V4COMA_c(tf.keras.Model):
 
         # Share feature layer 
         self.feature_layer = V4(input_shape, action_size)
-        self.feature_dense1 = layers.Dense(units=128, activation='relu')
+        #self.feature_dense1 = layers.Dense(units=128, activation='relu')
 
         # Action net
         self.action_dense1 = layers.Dense(units=8, activation='softmax')
@@ -84,12 +84,12 @@ class V4COMA_c(tf.keras.Model):
         indiv_actions = tf.unstack(indiv_actions, axis=1)
 
         qvals = []
-        env_net = self.feature_layer(env_state)
+        #env_net = self.feature_layer(env_state)
         for state, action, model in zip(indiv_states, indiv_actions, self.indiv_models):
             # Feature
             feature_net = model.feature_layer(state)
             #feature_net = tf.stop_gradient(feature_net)
-            feature_net = self.feature_dense1(feature_net)
+            #feature_net = self.feature_dense1(feature_net)
             # Action
             action_onehot = tf.one_hot(action, 5)
             action_net = self.action_dense1(action_onehot)
@@ -107,6 +107,7 @@ def loss(cent_model, dec_models, env_states, metastates, metaactions, rewards):
     critic_loss = None
     actor_loss = None
     qvals = cent_model(env_states, metastates, metaactions)
+    alosses = []
     for idx, qval in enumerate(qvals):
         # Centralized Network Loss
         qmax = tf.math.reduce_max(qval, axis=1)
@@ -124,17 +125,14 @@ def loss(cent_model, dec_models, env_states, metastates, metaactions, rewards):
         # Decentralized Netowork Loss
         model = dec_models[idx]
         pi = model(metastates[:,idx,...])['softmax']
-        counter = tf.one_hot(action, 5, dtype=tf.float32) - pi
+        counter = tf.one_hot(action, 5, dtype=tf.float32) - 0.3&pi
         advantage = tf.stop_gradient(tf.reduce_sum(qval * counter, axis=1))
         
         pi_a = tf.reduce_sum(pi * action_onehot, axis=1)
         pg_loss = -tf.reduce_sum(advantage * tf_log(pi_a))
-        if actor_loss is None:
-            actor_loss = pg_loss
-        else:
-            actor_loss += pg_loss
-
-    total_loss = actor_loss + critic_loss*0.5
+        alosses.append(pg_loss)
+    actor_loss = tf.reduce_mean(alosses)
+    total_loss = actor_loss + critic_loss*10.0
     info = {
         'actor_loss': actor_loss,
         'critic_loss': critic_loss,
