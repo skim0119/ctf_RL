@@ -94,7 +94,8 @@ class V4COMA_c(tf.keras.Model):
             action_onehot = tf.one_hot(action, 5)
             action_net = self.action_dense1(action_onehot)
             # Critic  
-            net = tf.concat([env_net, feature_net, action_net], axis=1)
+            #net = tf.concat([env_net, feature_net, action_net], axis=1)
+            net = feature_net
             net = self.critic_dense1(net)
             qval = self.critic_layer(net)
             qvals.append(qval)
