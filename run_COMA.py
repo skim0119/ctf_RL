@@ -120,7 +120,7 @@ cent_input_size = [None, map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 256
 epoch = 1
-minimum_batch_size = 1024
+minimum_batch_size = 1024*2
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -131,8 +131,6 @@ log_traintime = MovingAverage(moving_average_step)
 
 ## Environment Initialization
 # map_list = [os.path.join(MAP_PATH, path) for path in os.listdir(MAP_PATH) if path[:5]=='board']
-_qenv = gym.make("cap-v0", map_size=map_size, config_path=game_config)
-
 
 def make_env(map_size):
     return lambda: gym.make("cap-v0", map_size=map_size, config_path=game_config)

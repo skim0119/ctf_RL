@@ -57,7 +57,7 @@ class V4COMA_d(tf.keras.Model):
 
 class V4COMA_c(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, indiv_models, agent_type_index, num_agent_type, action_size=5, atoms=512,
+    def __init__(self, input_shape, indiv_models, agent_type_index, num_agent_type, action_size=5, atoms=128,
                  trainable=True):
         super(V4COMA_c, self).__init__()
 
@@ -66,18 +66,12 @@ class V4COMA_c(tf.keras.Model):
         self.feature_dense1 = layers.Dense(units=128, activation='relu')
 
         # Action net
-        self.action_dense1 = layers.Dense(units=64, activation='relu')
+        self.action_dense1 = layers.Dense(units=8, activation='softmax')
 
         # Critic
         self.critic_dense1 = layers.Dense(units=atoms, activation='relu')
-        self.critic_dense2 = layers.Dense(units=atoms, activation='relu')
-        critic_layers = []
-        for i in range(num_agent_type):
-            critic_layers.append(layers.Dense(units=action_size, activation='linear'))
-
-        self.critic_layers = []
-        for t in agent_type_index:
-            self.critic_layers.append(critic_layers[t])
+        #self.critic_dense2 = layers.Dense(units=atoms, activation='relu')
+        self.critic_layer = layers.Dense(units=action_size, activation='linear')
 
         # Loss Operations
         self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
@@ -89,25 +83,20 @@ class V4COMA_c(tf.keras.Model):
         indiv_states = tf.unstack(indiv_states, axis=1)
         indiv_actions = tf.unstack(indiv_actions, axis=1)
 
+        qvals = []
         env_net = self.feature_layer(env_state)
-        arr = [env_net]
         for state, action, model in zip(indiv_states, indiv_actions, self.indiv_models):
+            # Feature
             feature_net = model.feature_layer(state)
-            feature_net = tf.stop_gradient(feature_net)
+            #feature_net = tf.stop_gradient(feature_net)
             feature_net = self.feature_dense1(feature_net)
-            arr.append(feature_net)
-
+            # Action
             action_onehot = tf.one_hot(action, 5)
             action_net = self.action_dense1(action_onehot)
-            arr.append(action_net)
-        net = tf.concat(arr, axis=1)
-
-        # Critic  
-        net = self.critic_dense1(net)
-        net = self.critic_dense2(net)
-        qvals = []
-        for clayer in self.critic_layers:
-            qval = clayer(net)
+            # Critic  
+            net = tf.concat([env_net, feature_net, action_net], axis=1)
+            net = self.critic_dense1(net)
+            qval = self.critic_layer(net)
             qvals.append(qval)
 
         return qvals
@@ -135,14 +124,11 @@ def loss(cent_model, dec_models, env_states, metastates, metaactions, rewards):
         # Decentralized Netowork Loss
         model = dec_models[idx]
         pi = model(metastates[:,idx,...])['softmax']
-
-        pi_rev = pi * (1-action_onehot) # remove own action
-        Q_a_rev = tf.reduce_sum(qval * pi_rev, axis=1)
-        #advantage = tf.stop_gradient(q_a - Q_a_rev)
-        advantage = tf.stop_gradient(q_a)
+        counter = tf.one_hot(action, 5, dtype=tf.float32) - pi
+        advantage = tf.stop_gradient(tf.reduce_sum(qval * counter, axis=1))
         
         pi_a = tf.reduce_sum(pi * action_onehot, axis=1)
-        pg_loss = -tf.reduce_mean(advantage * tf_log(pi_a))
+        pg_loss = -tf.reduce_sum(advantage * tf_log(pi_a))
         if actor_loss is None:
             actor_loss = pg_loss
         else:
