@@ -39,7 +39,7 @@ from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
 from utility.multiprocessing import SubprocVecEnv
 from utility.logger import *
-from utility.gae import gae
+from utility.gae import gae, discount
 
 # from utility.slack import SlackAssist
 
@@ -194,10 +194,11 @@ def train(
     # Agent trajectory processing
     rep_buffer = defaultdict(list)
     for traj_i,traj in enumerate(agent_trajs):
+        rewards = discount(traj[2], 0.98)
         rep_buffer["env_states"].extend(traj[4])
         rep_buffer["metastates"].extend(traj[0])
         rep_buffer["metaactions"].extend(traj[1])
-        rep_buffer["rewards"].extend(traj[2])
+        rep_buffer["rewards"].extend(rewards)
 
     dataset = (
         tf.data.Dataset.from_tensor_slices(

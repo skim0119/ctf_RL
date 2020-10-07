@@ -15,6 +15,7 @@ eval*
 *.swp
 .*.swp
 *.pkl
+*.ipynb
 
 
 # Byte-compiled / optimized / DLL files
