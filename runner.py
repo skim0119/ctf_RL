@@ -6,7 +6,7 @@ import time
 RUNNING_SCRIPT = [
     #"run_multiagent_ppo.py",
     #"run_multiagent_ppo_SF.py", # Ablation 3
-    "run_COMA.py",
+    #"run_COMA.py",
     #"run_cvdc.py",
     #"run_cvdc2.py",
     #"run_cvdc_sharedSF.py", # Ablation 1
@@ -14,6 +14,7 @@ RUNNING_SCRIPT = [
     #"run_VDN.py",
     #"run_cvdc_comp.py",
     #"run_cvdc3.py", # drawing filtered decoded image
+    "run_multiagent_pg.py",
 ]
 
 parser = argparse.ArgumentParser(description="PPO trainer for convoy")
