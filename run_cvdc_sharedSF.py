@@ -298,8 +298,6 @@ def train_decentral(
                 normalize=False,
             )
             beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
-            advantages = [beta*a1+(1-beta)*a2 for a1, a2 in zip(advantages_global, advantages)]
-            advantage_lists[atype].append(advantages)
 
             traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
