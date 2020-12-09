@@ -294,7 +294,7 @@ class Central(tf.keras.Model):
 
         return SF, feature
 
-@tf.function
+@tf.function(experimental_relax_shapes=True)
 def loss_central(model, state, td_target_c):
     inputs = state
     SF, feature = model(inputs)
@@ -307,7 +307,7 @@ def loss_central(model, state, td_target_c):
 
     return total_loss, info
 
-@tf.function
+@tf.function(experimental_relax_shapes=True)
 def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):
     # Critic Loss
     _, v = model([state, action])
@@ -319,7 +319,7 @@ def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c)
 
     return total_loss, info
 
-@tf.function
+@tf.function(experimental_relax_shapes=True)
 def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,
         eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta,):
     num_sample = state.shape[0]

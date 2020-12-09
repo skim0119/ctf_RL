@@ -89,11 +89,10 @@ save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
 keep_frame = 1
-nchannel = 6 * keep_frame
 # Batch Replay Settings
 minibatch_size = 128
 epoch = 2
-minimum_batch_size = 4096
+minimum_batch_size = 1024
 num_agent = 8
 
 ## Logger Initialization
@@ -166,7 +165,7 @@ def train_central(
     for idx, traj in enumerate(trajs):
         # Forward
         states = np.array(traj[0])
-        last_state = np.array(traj[3])[-1:, :, :, :]
+        last_state = np.array(traj[3])[-1:, :]
         reward = traj[2]
 
         env_critic, _ = network.run_network_central(states)
@@ -438,28 +437,29 @@ while global_episodes < total_episodes:
                 idx = env_idx * num_agent + agent_id
                 # if not was_done[env_idx] and was_alive[idx]: # fixed length
                 # Decentral trajectory
-                trajs[env_idx][agent_id].append(
-                    [
-                        s0[idx],
-                        a0[idx],
-                        reward,  # + reward_pred1[idx], # Advantage
-                        was_alive[idx],  # done[env_idx],masking
-                        s1[idx],
-                        vg0[idx],  # Advantage
-                        log_logits0[idx],  # PPO
-                        phi0[idx],  # phi: one-step ahead
-                        psi0[idx],
-                        vg1[idx],
-                        psi1[idx],
-                        reward,
-                        #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
-                        #reward[env_idx]-reward_pred1[idx],
-                        vc0[idx],
-                        vc1[idx],
-                        cent_s0[env_idx],
-                        cent_s1[env_idx],
-                    ]
-                )
+                if was_alive[idx]:
+                    trajs[env_idx][agent_id].append(
+                        [
+                            s0[idx],
+                            a0[idx],
+                            reward,  # + reward_pred1[idx], # Advantage
+                            was_alive[idx],  # done[env_idx],masking
+                            s1[idx],
+                            vg0[idx],  # Advantage
+                            log_logits0[idx],  # PPO
+                            phi0[idx],  # phi: one-step ahead
+                            psi0[idx],
+                            vg1[idx],
+                            psi1[idx],
+                            reward,
+                            #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                            #reward[env_idx]-reward_pred1[idx],
+                            vc0[idx],
+                            vc1[idx],
+                            cent_s0[env_idx],
+                            cent_s1[env_idx],
+                        ]
+                    )
             # Central trajectory
             cent_trajs[env_idx].append([
                 cent_s0[env_idx],
@@ -478,7 +478,7 @@ while global_episodes < total_episodes:
                 _agent2_o[env_idx].append(_qenv._env2rgb(s0[env_idx * 3 + 1]))
                 _agent3_o[env_idx].append(_qenv._env2rgb(s0[env_idx * 3 + 2]))
         if done.all():
-            continue
+            break
     etime_roll = time.time()
 
     # decentralize training

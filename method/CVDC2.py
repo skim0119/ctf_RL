@@ -248,6 +248,8 @@ class SF_CVDC:
 from network.CVDC_model2_sc2 import Central as Central_sc2
 from network.CVDC_model2_sc2 import Decentral as Decentral_sc2
 from network.CVDC_model2_sc2 import loss_ppo as loss_ppo_sc2
+from network.CVDC_model2_sc2 import train as train_sc2
+from network.CVDC_model2_sc2 import loss_central as loss_central_sc2
 
 class SF_CVDC_SC2:
     # Full architecture for centralized value training and
@@ -362,7 +364,8 @@ class SF_CVDC_SC2:
                 temp_action = np.ones([num_sample], dtype=int)
                 actor, SF = model([states, temp_action])
 
-            filtered_log_logits =actor["log_softmax"] +(1-np.asarray(validActions))*-100
+            # print(SF["phi"])
+            filtered_log_logits =actor["log_softmax"] +(1-np.asarray(validActions))*-10000
             actions = tf.random.categorical(filtered_log_logits, 1, dtype=tf.int32).numpy().ravel()
             results.append([actions, actor, SF])
         return results
@@ -379,7 +382,7 @@ class SF_CVDC_SC2:
         model = self.model_central
         optimizer = self.optimizer_central
         for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs)
+            _, info = train_sc2(model, loss_central_sc2, optimizer, inputs)
             if log:
                 critic_losses.append(info["critic_mse"])
         if log:
@@ -413,7 +416,8 @@ class SF_CVDC_SC2:
             model = self.dec_models[i]
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
-                _, info = train(model, loss_ppo_sc2, optimizer, inputs, self.ppo_config)
+                # print(inputs)
+                _, info = train_sc2(model, loss_ppo_sc2, optimizer, inputs, self.ppo_config)
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])
