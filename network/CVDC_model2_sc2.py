@@ -10,14 +10,61 @@ import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 import tensorflow_probability as tfp
 
-from network.attention import Non_local_nn
-from network.model_V4_30 import V4, V4INV
-from network.model_V4_30 import V4Decentral, V4INVDecentral
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
 
 import numpy as np
 
+class V4(tf.keras.Model):
+    STATIC_CHANNEL = [0,1,3]
+    DYNAMIC_CHANNEL = [2,4,5]
+    LATENT_DIM = 256
+
+    @store_args
+    def __init__(self, input_shape, action_size=5,
+                 trainable=True, name='FeatureNN'):
+        super(V4, self).__init__(name=name)
+
+        # Feature Encoder
+        self.dynamic_network = keras.Sequential([
+            layers.Input(shape=input_shape),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),], name='dynamic_network')
+        self.dense1 = layers.Dense(units=256, activation='elu')
+
+    def print_summary(self):
+        self.dynamic_network.summary()
+
+    def call(self, inputs):
+        dynamic_net = self.dynamic_network(inputs)
+
+        net = self.dense1(dynamic_net)
+
+        return net
+
+class V4INV(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, trainable=True, name='FeatureNN_Inverse'):
+        super(V4INV, self).__init__(name=name)
+
+        # Feature Encoder
+        self.dynamic_network = keras.Sequential([
+            layers.Input(shape=[128]),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=input_shape[0], activation='elu'),
+
+            ],
+            name='dynamic_network')
+
+    def print_summary(self):
+        self.dynamic_network.summary()
+
+    def call(self, inputs):
+        dynamic = self.dynamic_network(inputs)
+        return dynamic
 
 class Decentral(tf.keras.Model):
     @store_args
@@ -34,7 +81,7 @@ class Decentral(tf.keras.Model):
             self.action_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder_dense1 = layers.Dense(units=128, activation='elu')
-            self.decoder = V4INVDecentral()
+            self.decoder = V4INV(input_shape)
 
             # Phi
             self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
@@ -289,7 +336,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #reward_loss = 0.0
 
     # Decoder loss
-    generator_loss = model.mse_loss_sum(next_state[...,-6:], v['decoded_state'])
+    generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
     #generator_loss = 0.0
 
     # Entropy

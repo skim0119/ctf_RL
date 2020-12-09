@@ -8,6 +8,7 @@ import numpy as np
 from utility.utils import store_args
 
 from network.PPO import V4PPO, train, get_gradient, loss
+from network.SC2 import V4PPO as V4PPO_SC2
 
 class PPO_Module:
     @store_args
@@ -23,7 +24,7 @@ class PPO_Module:
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
 
         self.num_agent_type = len(agent_type)
-        
+
         # Build model
         self.central_optimizer = tf.keras.optimizers.Adam(lr)
         self.models, self.optimizers, self.checkpoints, self.managers = [], [], [], []
@@ -94,4 +95,45 @@ class PPO_Module:
     def save(self, checkpoint_number):
         for manager in self.managers:
             manager.save(checkpoint_number)
-        
+
+class PPO_Module_SC2(PPO_Module):
+    @store_args
+    def __init__(
+        self,
+        input_shape,
+        action_size,
+        agent_type,
+        save_path,
+        lr=1e-4,
+        **kwargs
+    ):
+        assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
+
+        self.num_agent_type = len(agent_type)
+
+        # Build model
+        self.central_optimizer = tf.keras.optimizers.Adam(lr)
+        self.models, self.optimizers, self.checkpoints, self.managers = [], [], [], []
+        for i in range(self.num_agent_type):
+            # Model defnition
+            model = V4PPO_SC2(input_shape[1:], action_size=action_size)
+            optimizer = tf.keras.optimizers.Adam(lr)
+            checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(
+                    checkpoint=checkpoint,
+                    directory=os.path.join(save_path, f'agent_{i}'),
+                    max_to_keep=3,
+                    keep_checkpoint_every_n_hours=1)
+            self.models.append(model)
+            self.optimizers.append(optimizer)
+            self.checkpoints.append(checkpoint)
+            self.managers.append(manager)
+
+    def run_network(self, states_list,validActions):
+        results = []
+        for states, model in zip(states_list, self.models):
+            actor, critics, log_logits = model(states)
+            filtered_log_logits =log_logits +(1-np.asarray(validActions))*-100
+            actions = tf.random.categorical(filtered_log_logits, 1, dtype=tf.int32).numpy().ravel()
+            results.append([actions, critics, log_logits])
+        return results
