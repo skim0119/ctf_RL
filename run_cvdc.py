@@ -26,8 +26,6 @@ import random
 import math
 from collections import defaultdict
 from functools import partial
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 from smac.env import StarCraft2Env
 
