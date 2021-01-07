@@ -169,7 +169,7 @@ def train_central(
         )
         .shuffle(64)
         .repeat(epoch)
-        .batch(batch_size)
+        #.batch(batch_size)
     )
 
     network.update_central(
@@ -281,7 +281,7 @@ def train_decentral(
             )
             .shuffle(64)
             .repeat(epoch)
-            .batch(batch_size)
+            #.batch(batch_size)
         )
         train_datasets.append(train_dataset)
         
