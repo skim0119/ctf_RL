@@ -160,7 +160,7 @@ class SF_CVDC:
                 writer.flush()
     
     # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):
+    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None

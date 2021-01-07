@@ -53,6 +53,7 @@ parser.add_argument(
 parser.add_argument('--difficulty', type=str, default='7', help='the difficulty of the game')
 parser.add_argument('--seed', type=int, default=100, help='random seed')
 parser.add_argument('--step_mul', type=int, default=8, help='how many steps to make an action')
+parser.add_argument('--training_episodes', type=int, default=1000000, help='number of training episodes')
 args = parser.parse_args()
 
 PROGBAR = args.silence
@@ -63,16 +64,12 @@ TRAIN_NAME = "CVDC_{}_{}_{:02d}".format(
     args.map,
     args.train_number,
 )
+#slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
 TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME
 GPU_CAPACITY = 0.95
-
-# slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
-
-NENV = multiprocessing.cpu_count() // 4
-print("Number of cpu_count : {}".format(NENV))
 
 ## Data Path
 path_create(LOG_PATH)
@@ -80,7 +77,7 @@ path_create(MODEL_PATH)
 path_create(SAVE_PATH)
 
 # Training
-total_episodes = 100000
+total_episodes = args.training_episodes
 gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
 
@@ -114,8 +111,6 @@ minimum_batch_size = 1024 * 4
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
-log_winrate = MovingAverage(moving_average_step)
-log_redwinrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
@@ -192,7 +187,6 @@ def train_decentral(
     writer=None,
     log=False,
     step=None,
-    log_image=False,
 ):
     train_datasets = []
 
@@ -300,7 +294,7 @@ def train_decentral(
         train_datasets.append(train_dataset)
         
     network.update_decentral(
-        train_datasets, writer=writer, log=log, step=step, tag="losses/", log_image=log_image,
+        train_datasets, writer=writer, log=log, step=step, tag="losses/", 
     )
     if log:
         with writer.as_default():
@@ -322,22 +316,30 @@ def run_network(observations, env):
     for i in range(num_agent):
         avail_action = env.get_avail_agent_actions(i)
         avail_actions.append(avail_action)
+    avail_actions = np.asarray(avail_actions)
 
     # Run decentral network
     observations = np.asarray(observations)
-    dec_results = network.run_network_decentral(observations)
+    actor, critic = network.run_network_decentral(observations)
     # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
 
+    # Get action
+    action_probs = actor['softmax'] * avail_action
+    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
+
     # Container
-    a1 = np.empty([NENV * num_agent], dtype=np.int32)
-    vg1 = np.empty([NENV * num_agent], dtype=np.float32)
-    vc1 = np.empty([NENV * num_agent], dtype=np.float32)
-    phi1 = np.empty([NENV * num_agent, atoms], dtype=np.float32)
-    psi1 = np.empty([NENV * num_agent, atoms], dtype=np.float32)
-    log_logits1 = np.empty([NENV * num_agent, action_space], dtype=np.float32)
-    reward_pred1 = np.empty([NENV * num_agent], dtype=np.float32)
+    '''
+    a1 = np.empty([num_agent], dtype=np.int32)
+    vg1 = np.empty([num_agent], dtype=np.float32)
+    vc1 = np.empty([num_agent], dtype=np.float32)
+    phi1 = np.empty([num_agent, atoms], dtype=np.float32)
+    psi1 = np.empty([num_agent, atoms], dtype=np.float32)
+    log_logits1 = np.empty([num_agent, action_space], dtype=np.float32)
+    reward_pred1 = np.empty([num_agent], dtype=np.float32)
+    '''
 
     # Postprocessing
+    '''
     for (a, actor, critic), mask in zip(results, agent_type_masking):
         vg = critic["critic"]
         vc = critic["icritic"]
@@ -354,16 +356,23 @@ def run_network(observations, env):
         log_logits1[mask, :] = log_logits
         reward_pred1[mask] = reward_pred
     action = np.reshape(a1, [NENV, num_blue])
-    return action, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1
+    '''
+    vg1 = critic["critic"]
+    vc1 = critic["icritic"]
+    phi1 = critic["phi"]
+    psi1 = critic["psi"]
+    log_logits1 = actor["log_softmax"]
+    reward_pred1 = critic["reward_predict"]
+
+    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1
 
 
 batch = []
+batch_size = 0
 dec_batch = []
+dec_batch_size = 0
 while global_episodes < total_episodes:
 #while True:
-    # Flags
-    log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")
-
     # initialize parameters
     dec_trajs = [Trajectory(depth=16) for _ in range(num_agent)
     cent_trajs = Trajectory(depth=4)
@@ -376,10 +385,11 @@ while global_episodes < total_episodes:
     # Bootstrap
     s1 = env.get_state()
     o1 = env.get_obs()
-    actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
+    a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
 
     # Rollout
     stime_roll = time.time()
+    step = 0
     while not done:
         s0 = s1
         o0 = o1
@@ -389,18 +399,17 @@ while global_episodes < total_episodes:
         psi0 = psi1
         phi0 = phi1
         log_logits0 = log_logits1
-        was_alive = is_alive
-        was_done = is_done
-        cent_s0 = cent_s1
+        was_done = done
 
         # Run environment
-        reward, done, _ = env.step(actions)
+        reward, done, _ = env.step(a0)
+        step += 1
         episode_reward += reward
 
         # Run network
         s1 = env.get_state()
         o1 = env.get_obs()
-        actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
+        a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
 
         # Experience recording
         for idx in range(num_agent):
@@ -422,8 +431,8 @@ while global_episodes < total_episodes:
                     #reward[env_idx]-reward_pred1[idx],
                     vc0[idx],
                     vc1[idx],
-                    cent_s0,
-                    cent_s1,
+                    s0,
+                    s1,
                 ]
             )
         cent_trajs.append([
@@ -436,10 +445,10 @@ while global_episodes < total_episodes:
 
     # decentralize training
     dec_batch.extend(dec_trajs)
-    if len(dec_batch) * 200 * num_agent > minimum_batch_size:
+    dec_batch_size += len(dec_trajs) * step
+    if dec_batch_size > minimum_batch_size:
         stime_train = time.time()
         log = interval_flag(global_episodes, save_image_frequency, "im_log")
-        log_image = interval_flag(global_episodes, 1024, "ima_log")
         train_decentral(
             dec_batch,
             epoch=epoch,
@@ -447,41 +456,36 @@ while global_episodes < total_episodes:
             writer=writer,
             log=log,
             step=global_episodes,
-            log_image=log_image,
         )
-        etime_train = time.time()
         dec_batch = []
+        dec_batch_size = 0
+        etime_train = time.time()
         log_traintime.append(etime_train - stime_train)
+
     # centralize training
     batch.extend(cent_trajs)
-    if len(batch) * 200 >= minimum_batch_size // 2:
+    batch_size += step
+    if batch_size >= minimum_batch_size // 2:
         log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
         train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
         batch = []
+        batch_size = 0
 
     log_episodic_reward.extend(episode_rew.tolist())
-    log_winrate.extend(envs.blue_win())
-    log_redwinrate.extend(envs.red_win())
     log_looptime.append(etime_roll - stime_roll)
 
+    # Stepper
     global_episodes += 1
     if PROGBAR:
         progbar.update(global_episodes)
 
+    # Log
     log_on = interval_flag(global_episodes, save_stat_frequency, "log")
     if log_on:
         with writer.as_default():
             tag = "baseline_training/"
-            tf.summary.scalar(tag + "win-rate", log_winrate(), step=global_episodes)
-            tf.summary.scalar(
-                tag + "redwin-rate", log_redwinrate(), step=global_episodes
-            )
-            tf.summary.scalar(
-                tag + "env_reward", log_episodic_reward(), step=global_episodes
-            )
-            tf.summary.scalar(
-                tag + "rollout_time", log_looptime(), step=global_episodes
-            )
+            tf.summary.scalar(tag + "env_reward", log_episodic_reward(), step=global_episodes)
+            tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
             writer.flush()
 
@@ -490,5 +494,6 @@ while global_episodes < total_episodes:
         network.save(global_episodes)
 
     # Save Gameplay
+    log_save_analysis = interval_flag(global_episodes, 1024 * 4, "save_log")
     if log_save_analysis:
         pass
