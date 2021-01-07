@@ -482,7 +482,7 @@ while global_episodes < total_episodes:
         with writer.as_default():
             tag = "baseline_training/"
             tf.summary.scalar(tag + "env_reward", log_episodic_reward(), step=global_episodes)
-            tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes
+            tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
             writer.flush()
 
