@@ -310,7 +310,7 @@ def run_network(observations, env):
     for i in range(num_agent):
         avail_action = env.get_avail_agent_actions(i)
         avail_actions.append(avail_action)
-    avail_actions = np.asarray(avail_actions)
+    avail_actions = np.array(avail_actions)
 
     # Run decentral network
     observations = np.asarray(observations)
@@ -319,11 +319,8 @@ def run_network(observations, env):
 
     # Get action
     probs = actor['softmax'].numpy()
-    print(avail_action)
-    print(probs)
-    probs = probs * avail_action
+    probs = probs * avail_actions
     a1 = [np.random.choice(action_space, p=p/p.sum()) for p in probs]
-    print(a1)
 
     # Container
     '''
