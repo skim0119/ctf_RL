@@ -25,7 +25,8 @@ class CentralEnc(tf.keras.Model):
         self.static_network = keras.Sequential([
             layers.Input(shape=input_shape),
             layers.Dense(units=64, activation='elu'),
-            layers.GRU(64),
+            layers.Dense(units=64, activation='elu'),
+            #layers.GRU(64),
             layers.Dense(units=64, activation='elu'),
         ])
 
@@ -46,7 +47,8 @@ class DecentralEnc(tf.keras.Model):
         self.static_network = keras.Sequential([
             layers.Input(shape=input_shape),
             layers.Dense(units=64, activation='elu'),
-            layers.GRU(64),
+            layers.Dense(units=64, activation='elu'),
+            #layers.GRU(64),
             layers.Dense(units=64, activation='elu'),
         ])
         self.dense1 = layers.Dense(units=128, activation='elu')
