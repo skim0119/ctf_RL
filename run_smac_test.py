@@ -8,7 +8,7 @@ def main():
     n_actions = env_info["n_actions"]
     n_agents = env_info["n_agents"]
 
-    n_episodes = 10
+    n_episodes = 1000
 
     for e in range(n_episodes):
         env.reset()
