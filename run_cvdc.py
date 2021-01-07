@@ -371,7 +371,7 @@ dec_batch_size = 0
 while global_episodes < total_episodes:
 #while True:
     # initialize parameters
-    dec_trajs = [Trajectory(depth=16) for _ in range(num_agent)
+    dec_trajs = [Trajectory(depth=16) for _ in range(num_agent)]
     cent_trajs = Trajectory(depth=4)
 
     # Reset Game
