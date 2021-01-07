@@ -33,7 +33,6 @@ from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
 from utility.buffer import Trajectory
 from utility.buffer import expense_batch_sampling as batch_sampler
-from utility.multiprocessing import SubprocVecEnv
 from utility.logger import *
 from utility.gae import gae
 
