@@ -21,17 +21,15 @@ for device in physical_devices:
 
 import time
 import gym
-import gym_cap
 import numpy as np
 import random
 import math
 from collections import defaultdict
 from functools import partial
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-import gym_cap.heuristic as policy
+from smac.env import StarCraft2Env
 
 from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
@@ -48,11 +46,7 @@ from method.CVDC2 import SF_CVDC as Network
 parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number")
 parser.add_argument("--machine", type=str, help="training machine")
-parser.add_argument("--map_size", type=int, help="map size")
-parser.add_argument("--nbg", type=int, help="number of blue ground")
-parser.add_argument("--nba", type=int, help="number of blue air")
-parser.add_argument("--nrg", type=int, help="number of red air")
-parser.add_argument("--nra", type=int, help="number of red air")
+parser.add_argument("--map", type=str, help="map name")
 parser.add_argument(
     "--silence", action="store_false", help="call to disable the progress bar"
 )
@@ -61,20 +55,15 @@ args = parser.parse_args()
 PROGBAR = args.silence
 
 ## Training Directory Reset
-TRAIN_NAME = "CVDC_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format(
+TRAIN_NAME = "CVDC_{}_{}_{:02d}".format(
     args.machine,
+    args.map,
     args.train_number,
-    args.nbg,
-    args.nba,
-    args.nrg,
-    args.nra,
-    args.map_size,
 )
 TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME
-MAP_PATH = "./fair_3g_20"
 GPU_CAPACITY = 0.95
 
 # slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
@@ -82,34 +71,22 @@ GPU_CAPACITY = 0.95
 NENV = multiprocessing.cpu_count() // 4
 print("Number of cpu_count : {}".format(NENV))
 
-env_setting_path = "env_setting_convoy.ini"
-game_config = configparser.ConfigParser()
-game_config.read(env_setting_path)
-game_config["elements"]["NUM_BLUE"] = str(args.nbg)
-game_config["elements"]["NUM_BLUE_UAV"] = str(args.nba)
-game_config["elements"]["NUM_RED"] = str(args.nrg)
-game_config["elements"]["NUM_RED_UAV"] = str(args.nra)
-
 ## Data Path
 path_create(LOG_PATH)
 path_create(MODEL_PATH)
 path_create(SAVE_PATH)
 
-## Import Shared Training Hyperparameters
-config_path = "config.ini"
-config = configparser.ConfigParser()
-config.read(config_path)
-
 # Training
 total_episodes = 100000
-max_ep = 200
 gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
+
 # Log
 save_network_frequency = 1024
 save_stat_frequency = 128
 save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
+
 # Environment/Policy Settings
 action_space = 5
 keep_frame = 1
