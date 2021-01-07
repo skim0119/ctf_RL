@@ -17,7 +17,7 @@ import numpy as np
 
 class CentralEnc(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_shape,
+    def __init__(self, input_shape, action_space,
                  trainable=True, name='CentralEncoder'):
         super(CentralEnc, self).__init__(name=name)
 
@@ -38,7 +38,7 @@ class CentralEnc(tf.keras.Model):
 
 class DecentralEnc(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_shape,
+    def __init__(self, input_shape, action_space,
                  trainable=True, name='DecentralEnc'):
         super(DecentralEnc, self).__init__(name=name)
 

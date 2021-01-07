@@ -21,7 +21,7 @@ class SF_CVDC:
         self,
         state_shape,
         obs_shape,
-        action_shape,
+        action_space,
         save_path,
         atoms=256,
         lr=1e-4,
@@ -51,7 +51,7 @@ class SF_CVDC:
         for i in range(self.num_agent_type): 
             model = Decentral(
                     obs_shape,
-                    action_shape=action_shape,
+                    action_space=action_space,
                     atoms=atoms,
                     prebuilt_layers=None)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))

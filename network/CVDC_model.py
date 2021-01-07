@@ -21,14 +21,14 @@ import numpy as np
 
 class Decentral(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_shape, atoms=128,
+    def __init__(self, input_shape, action_space, atoms=128,
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
 
         if prebuilt_layers is None:
             # Feature Encoding
-            self.feature_layer = DecentralEnc(input_shape, action_shape)
-            self.pi_layer = DecentralEnc(input_shape, action_shape)
+            self.feature_layer = DecentralEnc(input_shape, action_space)
+            self.pi_layer = DecentralEnc(input_shape, action_space)
 
             # Decoder
             self.action_dense1 = layers.Dense(units=128, activation='elu')
@@ -62,11 +62,11 @@ class Decentral(tf.keras.Model):
 
         # Critic weights
         self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
-        self.sf_q_weight = layers.Dense(units=action_shape, activation='linear') #, use_bias=False,)
+        self.sf_q_weight = layers.Dense(units=action_space, activation='linear') #, use_bias=False,)
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_shape)
+        self.actor_dense2 = layers.Dense(action_space)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -139,7 +139,7 @@ class Decentral(tf.keras.Model):
         # Run full network
         obs = inputs[0]
         action = inputs[1] # Action is included for decoder
-        action_one_hot = tf.one_hot(action, self.action_shape, dtype=tf.float32)
+        action_one_hot = tf.one_hot(action, self.action_space, dtype=tf.float32)
 
         # Feature Encoding SF-phi
         net = self.feature_layer(obs)
@@ -313,7 +313,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #psi_mse = 0.0
 
     # Actor Loss
-    action_one_hot = tf.one_hot(action, model.action_shape, dtype=tf.float32)
+    action_one_hot = tf.one_hot(action, model.action_space, dtype=tf.float32)
     log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
     old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
