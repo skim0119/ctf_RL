@@ -7,10 +7,10 @@ import numpy as np
 from utility.utils import store_args
 from utility.logger import *
 
-from network.CVDC_model1 import Central, Decentral
-from network.CVDC_model1 import get_gradient, train
-from network.CVDC_model1 import loss_central
-from network.CVDC_model1 import loss_ppo
+from network.CVDC_model2 import Central, Decentral
+from network.CVDC_model2 import get_gradient, train
+from network.CVDC_model2 import loss_central
+from network.CVDC_model2 import loss_ppo
 
 
 class SF_CVDC:
@@ -19,29 +19,26 @@ class SF_CVDC:
     @store_args
     def __init__(
         self,
-        central_obs_shape,
-        decentral_obs_shape,
-        action_size,
-        agent_type,
+        state_shape,
+        obs_shape,
+        action_shape,
         save_path,
         atoms=256,
         lr=1e-4,
+        clr=5e-4,
         **kwargs
     ):
-        assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
-        self.num_agent_type = len(agent_type)
-
         # Set Model
+        self.num_agent_type = 1 #(TODO) heterogeneous agent
         self.dec_models = []
         self.dec_optimizers = []
         self.dec_checkpoints = []
         self.dec_managers = []
 
-
         # Build Network (Central)
-        self.model_central = Central(central_obs_shape[1:], atoms=atoms)
+        self.model_central = Central(state_shape, atoms=atoms)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(lr)
+        self.optimizer_central = tf.keras.optimizers.Adam(clr)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -51,8 +48,12 @@ class SF_CVDC:
                 keep_checkpoint_every_n_hours=1)
 
         # Build Network (Decentral)
-        for i in range(self.num_agent_type):
-            model = Decentral(decentral_obs_shape[1:], action_size=5, atoms=atoms)
+        for i in range(self.num_agent_type): 
+            model = Decentral(
+                    obs_shape,
+                    action_shape=action_shape,
+                    atoms=atoms,
+                    prebuilt_layers=None)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
             optimizer = tf.keras.optimizers.Adam(lr)
             checkpoint = tf.train.Checkpoint(
@@ -70,20 +71,12 @@ class SF_CVDC:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
-                'psi_beta': tf.constant(0.1, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-2, dtype=tf.float32),
-                'critic_beta': tf.constant(1, dtype=tf.float32),
-                'q_beta': tf.constant(1, dtype=tf.float32),
-                'learnability_beta': tf.constant(1.0, dtype=tf.float32),
-                }
-        # Critic Training Configuration
-        self.central_config = {
-                'psi_beta': tf.constant(0.55),
-                'beta_kl': tf.constant(1e-2),
-                'recon_beta': tf.constant(1e-4),
-                'critic_beta': tf.constant(1.0),
-                'unreal_rp_beta': tf.constant(0.01),
+                'entropy_beta': tf.constant(0.05, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'critic_beta': tf.constant(0.5, dtype=tf.float32),
+                'q_beta': tf.constant(0.5, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.01, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -120,15 +113,29 @@ class SF_CVDC:
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature 
 
-    def run_network_decentral(self, states_list):
+    def run_network_decentral(self, observations):
+        #(TODO) heterogeneous agent
+        model = self.dec_models[0]
+        if model._built:
+            actor, SF = model.action_call(observations)
+        else:
+            num_sample = observations.shape[0]
+            temp_action = np.ones([num_sample], dtype=int)
+            actor, SF = model([observations, temp_action])
+        return actor, SF
+        '''
         results = []
-        for states, model in zip(states_list, self.dec_models):
-            num_sample = states.shape[0]
-            temp_action = np.zeros(num_sample, dtype=np.int32)
-            actor, SF = model([states, temp_action])
+        for states, model in zip(observations, self.dec_models):
+            if model._built:
+                actor, SF = model.action_call(states)
+            else:
+                num_sample = states.shape[0]
+                temp_action = np.ones([num_sample], dtype=int)
+                actor, SF = model([states, temp_action])
             actions = tf.random.categorical(actor["log_softmax"], 1, dtype=tf.int32).numpy().ravel()
             results.append([actions, actor, SF])
         return results
+        '''
 
     # Centralize updater
     def update_central(self, datasets, writer=None, log=False, step=None, tag=None):
@@ -142,7 +149,7 @@ class SF_CVDC:
         model = self.model_central
         optimizer = self.optimizer_central
         for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs, self.central_config)
+            _, info = train(model, loss_central, optimizer, inputs)
             if log:
                 critic_losses.append(info["critic_mse"])
         if log:
@@ -153,7 +160,7 @@ class SF_CVDC:
                 writer.flush()
     
     # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):
         if log:
             assert writer is not None
             assert step is not None
@@ -177,8 +184,6 @@ class SF_CVDC:
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
                 _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
-                #grad, info = get_gradient(model, loss_ppo, inputs, self.ppo_config)
-                #optimizer.apply_gradients(zip(grad, model.trainable_variables))
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])

@@ -8,7 +8,6 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
-import tensorflow_probability as tfp
 
 from network.attention import Non_local_nn
 from network.model_V4_30 import V4, V4INV
@@ -21,7 +20,7 @@ import numpy as np
 
 class Decentral(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_size=5, atoms=512,
+    def __init__(self, input_shape, action_size=5, atoms=128,
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
 
