@@ -412,7 +412,7 @@ while global_episodes < total_episodes:
                     o0[idx],
                     a0[idx],
                     reward,  # + reward_pred1[idx], # Advantage
-                    done[env_idx],  # masking
+                    done,  # masking
                     o1[idx],
                     vg0[idx],  # Advantage
                     log_logits0[idx],  # PPO
