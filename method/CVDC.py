@@ -23,7 +23,7 @@ class SF_CVDC:
         obs_shape,
         action_space,
         save_path,
-        atoms=256,
+        atoms=128,
         lr=1e-4,
         clr=5e-4,
         **kwargs
@@ -73,10 +73,10 @@ class SF_CVDC:
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.05, dtype=tf.float32),
                 'psi_beta': tf.constant(0.0001, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'decoder_beta': tf.constant(0, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
-                'q_beta': tf.constant(0.5, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.01, dtype=tf.float32),
+                'q_beta': tf.constant(0.0, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.000, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
