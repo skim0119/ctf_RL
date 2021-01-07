@@ -46,14 +46,14 @@ from method.CVDC import SF_CVDC as Network
 parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number")
 parser.add_argument("--machine", type=str, help="training machine")
-parser.add_argument('--map', type=str, default='3m', help='the map of the game')
+parser.add_argument("--map", type=str, default='8m', help='the map of the game')
 parser.add_argument(
     "--silence", action="store_false", help="call to disable the progress bar"
 )
-parser.add_argument('--difficulty', type=str, default='7', help='the difficulty of the game')
-parser.add_argument('--seed', type=int, default=100, help='random seed')
-parser.add_argument('--step_mul', type=int, default=8, help='how many steps to make an action')
-parser.add_argument('--training_episodes', type=int, default=1000000, help='number of training episodes')
+parser.add_argument("--difficulty", type=str, default='7', help='the difficulty of the game')
+parser.add_argument("--seed", type=int, default=100, help='random seed')
+parser.add_argument("--step_mul", type=int, default=8, help='how many steps to make an action')
+parser.add_argument("--training_episodes", type=int, default=1000000, help='number of training episodes')
 args = parser.parse_args()
 
 PROGBAR = args.silence
