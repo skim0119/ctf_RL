@@ -25,7 +25,7 @@ class SF_CVDC:
         save_path,
         atoms=128,
         lr=1e-4,
-        clr=5e-4,
+        clr=1e-3,
         **kwargs
     ):
         # Set Model
@@ -72,7 +72,7 @@ class SF_CVDC:
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(0.05, dtype=tf.float32),
-                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0000, dtype=tf.float32),
                 'decoder_beta': tf.constant(0, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
                 'q_beta': tf.constant(0.0, dtype=tf.float32),

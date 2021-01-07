@@ -250,7 +250,6 @@ def train_decentral(
             discount_adv=False,
             normalize=False,
         )
-        beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
 
         traj_buffer["state"].extend(traj[0])
         traj_buffer["next_state"].extend(traj[4])
@@ -292,7 +291,6 @@ def train_decentral(
     if log:
         with writer.as_default():
             tag = "advantages/"
-            tf.summary.scalar('beta/adv_beta', beta, step=step)
             for idx, adv_list in enumerate(advantage_lists):
                 tb_log_histogram(
                     np.array(adv_list), tag + "dec_advantages_{}".format(idx), step=step
@@ -318,11 +316,13 @@ def run_network(observations, env):
 
     # Get action
     probs = actor['softmax'].numpy()
-    probs = probs * avail_actions
+    print(probs)
+    action_probs = probs * avail_actions
     try:
-        a1 = [np.random.choice(action_space, p=p/p.sum()) for p in probs]
+        a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
     except ValueError:
         print(probs)
+        print(action_probs)
         print(avail_actions)
         raise ValueError
 
