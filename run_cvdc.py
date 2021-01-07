@@ -102,7 +102,7 @@ obs_shape = env_info["obs_shape"]
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 1
 minimum_batch_size = 1024 * 4
 
@@ -169,7 +169,7 @@ def train_central(
         )
         .shuffle(64)
         .repeat(epoch)
-        #.batch(batch_size)
+        .batch(batch_size)
     )
 
     network.update_central(
@@ -281,7 +281,7 @@ def train_decentral(
             )
             .shuffle(64)
             .repeat(epoch)
-            #.batch(batch_size)
+            .batch(batch_size)
         )
         train_datasets.append(train_dataset)
         
