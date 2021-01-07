@@ -319,7 +319,12 @@ def run_network(observations, env):
     # Get action
     probs = actor['softmax'].numpy()
     probs = probs * avail_actions
-    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in probs]
+    try:
+        a1 = [np.random.choice(action_space, p=p/p.sum()) for p in probs]
+    except ValueError:
+        print(probs)
+        print(avail_actions)
+        raise ValueError
 
     # Container
     '''
