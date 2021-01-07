@@ -66,7 +66,7 @@ class Decentral(tf.keras.Model):
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_space)
+        self.actor_dense2 = layers.Dense(action_space, activation='relu')
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
