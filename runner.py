@@ -14,7 +14,6 @@ RUNNING_SCRIPT = [
     #"run_VDN.py",
     #"run_cvdc_comp.py",
     #"run_cvdc3.py", # drawing filtered decoded image
-    "run_multiagent_pg.py",
 ]
 
 parser = argparse.ArgumentParser(description="PPO trainer for convoy")
