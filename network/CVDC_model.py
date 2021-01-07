@@ -289,7 +289,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #reward_loss = 0.0
 
     # Decoder loss
-    generator_loss = model.mse_loss_sum(next_state[...,-6:], v['decoded_state'])
+    generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
     #generator_loss = 0.0
 
     # Entropy
