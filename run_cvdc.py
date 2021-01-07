@@ -134,7 +134,7 @@ print(global_episodes)
 
 writer = tf.summary.create_file_writer(LOG_PATH)
 
-### TRAINING ###
+# TRAINING 
 def train_central(
     network,
     trajs,
@@ -149,7 +149,7 @@ def train_central(
     for idx, traj in enumerate(trajs):
         # Forward
         states = np.array(traj[0])
-        last_state = np.array(traj[3])[-1:, :, :, :]
+        last_state = np.array(traj[3])[-1:, ...]
         reward = traj[2]
 
         env_critic, _ = network.run_network_central(states)
@@ -179,7 +179,6 @@ def train_central(
         train_dataset, writer=writer, log=log, step=step, tag="losses/"
     )
 
-
 def train_decentral(
     agent_trajs,
     epoch=epoch,
@@ -188,18 +187,14 @@ def train_decentral(
     log=False,
     step=None,
 ):
-    train_datasets = []
-
     # Agent trajectory processing
-    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]
-    advantage_lists = [[] for _ in range(num_type)]
+    traj_buffer = defaultdict(list)
+    advantage_lists = []
     f1_list = []
     f2_list = []
     fc_list = []
     for trajs in agent_trajs:
         for idx, traj in enumerate(trajs):
-            atype = agent_type_index[idx]
-
             reward = traj[2]
             mask = traj[3]
             critic = traj[5]
@@ -261,7 +256,6 @@ def train_decentral(
             )
             beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
 
-            traj_buffer = traj_buffer_list[atype]
             traj_buffer["state"].extend(traj[0])
             traj_buffer["next_state"].extend(traj[4])
             traj_buffer["log_logit"].extend(traj[6])
@@ -271,8 +265,11 @@ def train_decentral(
             traj_buffer["advantage"].extend(advantages)
             traj_buffer["td_target_c"].extend(td_target_c)
             traj_buffer["rewards"].extend(reward)
+
+    train_datasets = []
+    num_type = 1
     for atype in range(num_type):
-        traj_buffer = traj_buffer_list[atype]
+        #traj_buffer = traj_buffer_list[atype]
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
