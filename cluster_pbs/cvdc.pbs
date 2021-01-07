@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --partition=eng-research
+#SBATCH --job-name=sc2_test
+#SBATCH --time=00:30:00
+#SBATCH --mail-user=skim449@illinois.edu
+#SBATCH --output=sc2_test.out
+#SBATCH --error=cluster_error.out
+
+module load anaconda/3
+module load vim/8.1
+module load cuda/10.0
+module load git/2.19.0
+module load gcc
+
+module list
+
+conda activate /projects/tran-research-group/skim449/conda/SC2RL
+export SC2PATH="/projects/tran-research-group/skim449/StarCraftII"
+
+cd $SLURM_SUBMIT_DIR/../
+which python
+which pip
+pwd
+
+python run_cvdc.py --train_number 1 --machine cluster --map 8m --training_episodes 4096
