@@ -7,10 +7,10 @@ import numpy as np
 from utility.utils import store_args
 from utility.logger import *
 
-from network.CVDC_model2 import Central, Decentral
-from network.CVDC_model2 import get_gradient, train
-from network.CVDC_model2 import loss_central
-from network.CVDC_model2 import loss_ppo
+from network.CVDC_model import Central, Decentral
+from network.CVDC_model import get_gradient, train
+from network.CVDC_model import loss_central
+from network.CVDC_model import loss_ppo
 
 
 class SF_CVDC:

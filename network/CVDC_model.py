@@ -10,8 +10,9 @@ import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 
 from network.attention import Non_local_nn
-from network.model_V4_30 import V4, V4INV
-from network.model_V4_30 import V4Decentral, V4INVDecentral
+from network.model_SC2SMAC import CentralEnc
+from network.model_SC2SMAC import DecentralEnc, DecentralDec
+
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
 
@@ -20,20 +21,20 @@ import numpy as np
 
 class Decentral(tf.keras.Model):
     @store_args
-    def __init__(self, input_shape, action_size=5, atoms=128,
+    def __init__(self, input_shape, action_shape, atoms=128,
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
 
         if prebuilt_layers is None:
             # Feature Encoding
-            self.feature_layer = V4(input_shape, action_size)
-            self.pi_layer = V4(input_shape, action_size)
+            self.feature_layer = DecentralEnc(input_shape, action_shape)
+            self.pi_layer = DecentralEnc(input_shape, action_shape)
 
             # Decoder
             self.action_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
             self.decoder_dense1 = layers.Dense(units=128, activation='elu')
-            self.decoder = V4INVDecentral()
+            self.decoder = DecentralDec(input_shape)
 
             # Phi
             self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
@@ -61,11 +62,11 @@ class Decentral(tf.keras.Model):
 
         # Critic weights
         self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
-        self.sf_q_weight = layers.Dense(units=action_size, activation='linear') #, use_bias=False,)
+        self.sf_q_weight = layers.Dense(units=action_shape, activation='linear') #, use_bias=False,)
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_size)
+        self.actor_dense2 = layers.Dense(action_shape)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -138,7 +139,7 @@ class Decentral(tf.keras.Model):
         # Run full network
         obs = inputs[0]
         action = inputs[1] # Action is included for decoder
-        action_one_hot = tf.one_hot(action, self.action_size, dtype=tf.float32)
+        action_one_hot = tf.one_hot(action, self.action_shape, dtype=tf.float32)
 
         # Feature Encoding SF-phi
         net = self.feature_layer(obs)
@@ -216,10 +217,10 @@ class Central(tf.keras.Model):
         super(Central, self).__init__()
 
         # Feature Encoding
-        self.feature_layer = V4(input_shape)
+        self.feature_layer = CentralEnc(input_shape)
 
         # Critic
-        self.critic_dense1 = layers.Dense(units=512, activation='relu')
+        self.critic_dense1 = layers.Dense(units=atoms, activation='elu')
         self.successor_weight = layers.Dense(units=1, activation='linear')
 
         # Loss Operations
@@ -312,7 +313,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #psi_mse = 0.0
 
     # Actor Loss
-    action_one_hot = tf.one_hot(action, model.action_size, dtype=tf.float32)
+    action_one_hot = tf.one_hot(action, model.action_shape, dtype=tf.float32)
     log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
     old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
