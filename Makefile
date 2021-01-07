@@ -26,7 +26,7 @@ sc2:
 	$(call sc2,bash)
 
 tensorboard:
-	docker run -it --rm --name tensorboard \
+	docker run -it --rm \
 		--memory="2G" \
 		--network=host \
 		-v ${PWD}:${PWD} \

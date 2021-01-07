@@ -16,7 +16,7 @@ class SMACWrapper(gym.core.Wrapper):
 
     def reset(self,*args,**kwargs):
         obs, state = self.env.reset(*args,**kwargs)
-        return np.vstack(obs)
+        return np.vstack(obs),state
     def step(self,action,*args,**kwargs):
         reward, terminated, info = self.env.step(action)
         obs = self.get_obs()
@@ -32,6 +32,9 @@ class SMACWrapper(gym.core.Wrapper):
                 else:
                     done.append(False)
             done = np.asarray(done)
+
+        if "battle_won" not in info:
+            info["battle_won"]=False
 
         return np.vstack(obs),reward,done,info
 
@@ -89,3 +92,53 @@ class ActionFiltering(gym.core.Wrapper):
         observation, reward, done, info = self.env.step(action=action)
 
         return {"observation":observation,"validActions":self.env.get_avail_actions()}, reward, done, info
+
+class FrameStacking(gym.core.Wrapper):
+
+    def __init__(self,env,numFrames=3,lstm=False,**kwargs):
+        env.action_space = gym.spaces.Discrete(env.n_actions)
+        self.lstm=lstm
+        obs,state =env.reset()
+        env.observation_space = convert_observation_to_space(obs[0])
+        env.state_shape = convert_observation_to_space(state)
+        if not lstm:
+            env.observation_space.shape =  (env.observation_space.shape[0]*numFrames,)
+            env.state_shape.shape =  (env.state_shape.shape[0]*numFrames,)
+        self.stackedStates_obs = Stacked_state(numFrames, 1,lstm)
+        self.stackedStates_states = Stacked_state(numFrames, 1,lstm)
+        super().__init__(env)
+
+    def reset(self,*args,**kwargs):
+        obs, state = self.env.reset(*args,**kwargs)
+        self.stackedStates_obs.initiate(np.vstack(obs))
+        state=np.expand_dims(self.env.get_state().astype(np.float32),0)
+        self.stackedStates_states.initiate(np.vstack(state))
+
+        return self.stackedStates_obs(), self.stackedStates_states()
+
+    def step(self,action,*args,**kwargs):
+        obs, reward, done, info = self.env.step(action)
+        state=np.expand_dims(self.env.get_state().astype(np.float32),0)
+        return self.stackedStates_obs(np.vstack(obs)),reward,done,info,self.stackedStates_states(state)
+
+
+class Stacked_state:
+    def __init__(self, keep_frame, axis,lstm=False):
+        self.keep_frame = keep_frame
+        self.axis = axis
+        self.lstm=lstm
+        self.stack = []
+
+    def initiate(self, obj):
+        self.stack = [obj] * self.keep_frame
+
+    def __call__(self, obj=None):
+        if obj is None:
+            return np.concatenate(self.stack, axis=self.axis)
+        self.stack.append(obj)
+        self.stack.pop(0)
+        if self.lstm:
+            # print(np.stack(self.stack, axis=self.axis).shape)
+            return np.stack(self.stack, axis=self.axis)
+        else:
+            return np.concatenate(self.stack, axis=self.axis)

@@ -51,6 +51,7 @@ parser = argparse.ArgumentParser(description="PPO trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number",default = 1)
 parser.add_argument("--machine", type=str, help="training machine",default = "Neale")
 parser.add_argument("--map", type=str, help="map name", default = "8m", required=False)
+parser.add_argument("--entropy", type=float, help="map name", default = 0.01, required=False)
 parser.add_argument(
     "--silence", action="store_false", help="call to disable the progress bar"
 )
@@ -59,7 +60,7 @@ args = parser.parse_args()
 PROGBAR = args.silence
 
 ## Training Directory Reset
-TRAIN_NAME = "PPO_{}_{:02d}_map_{}".format(
+TRAIN_NAME = "CVDC_{}_{:02d}_map_{}".format(
     args.machine,
     args.train_number,
     args.map,
@@ -78,7 +79,7 @@ path_create(MODEL_PATH)
 
 ## Import Shared Training Hyperparameters
 # Training
-total_episodes = 100000
+total_episodes = 50000
 max_ep = 200
 gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
@@ -93,7 +94,6 @@ keep_frame = 1
 minibatch_size = 128
 epoch = 2
 minimum_batch_size = 1024
-num_agent = 8
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -107,12 +107,16 @@ def make_env():
     return lambda: StarCraft2Env(args.map)
 
 envs = StarCraft2Env(args.map)
-from SC2Wrappers import SMACWrapper
+from SC2Wrappers import SMACWrapper, FrameStacking
 envs = SMACWrapper(envs)
+envs = FrameStacking(envs)
 envs.reset()
 action_space = len(envs.env.get_avail_agent_actions(0))
-input_size = [None,envs.env.get_obs_size()]
-cent_input_size = [None,envs.env.get_state_size()]
+input_size = [None,envs.observation_space.shape[0]]
+cent_input_size = [None,envs.state_shape.shape[0]]
+
+print(input_size)
+print(cent_input_size)
 
 # envs = [make_env() for i in range(NENV)]
 # envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
@@ -121,10 +125,17 @@ if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
 # Agent Type Setup
-agent_type = [8]
+agent_type = []
+for s in args.map:
+    if s.isdigit():
+        agent_type.append(int(s))
+print(agent_type)
+num_agent = sum(agent_type)
+print(num_agent)
+# agent_type = [8]
 num_type = len(agent_type)
-agent_type_masking = np.zeros([num_type, 8], dtype=bool)
-agent_type_index = np.zeros([8], dtype=int)
+agent_type_masking = np.zeros([num_type, num_agent], dtype=bool)
+agent_type_index = np.zeros([num_agent], dtype=int)
 prev_i = 0
 for idx, i in enumerate(np.cumsum(agent_type)):
     agent_type_masking[idx, prev_i:i] = True
@@ -141,6 +152,7 @@ network = Network(
     agent_type=agent_type,
     atoms=atoms,
     save_path=MODEL_PATH,
+    entropy=args.entropy,
 )
 
 # Resotre / Initialize
@@ -330,12 +342,16 @@ def train_decentral(
 def run_network(states,validActions):
     # State Process
     states_list = []
+    validActions_list = []
     for mask in agent_type_masking:
         state = np.compress(mask, states, axis=0)
         states_list.append(state)
+        validAction = np.compress(mask, validActions, axis=0)
+        validActions_list.append(validAction)
 
     # Run network
-    results = network.run_network_decentral(states_list,validActions)
+    results = network.run_network_decentral(states_list,validActions_list)
+    # print(results)
 
     # Container
     a1 = np.empty([NENV * num_agent], dtype=np.int32)
@@ -363,6 +379,7 @@ def run_network(states,validActions):
         log_logits1[mask, :] = log_logits
         reward_pred1[mask] = reward_pred
     action = np.reshape(a1, [num_agent])
+
     return action, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1
 
 
@@ -383,13 +400,15 @@ while global_episodes < total_episodes:
 
     # Bootstrap
 
-    s1 = envs.reset()
+    s1,cent_s1 = envs.reset()
+
     s1 = np.stack(s1).astype(np.float32)
+    validActions = envs.get_avail_actions()
     validActions = envs.get_avail_actions()
 
     # actions, a1, v1, p1 = get_action(s1,validActions)
 
-    cent_s1 = np.expand_dims(envs.env.get_state().astype(np.float32),0)  # Centralized
+    # cent_s1 = np.expand_dims(envs.env.get_state().astype(np.float32),0)  # Centralized
     # cent_s1 = envs.env.get_state().astype(np.float32)  # Centralized
 
     actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(s1,validActions)
@@ -419,13 +438,15 @@ while global_episodes < total_episodes:
         cent_s0 = cent_s1
 
         # Run environment
-        s1, reward, done, info = envs.step(actions)
+        s1, reward, done, info,cent_s1 = envs.step(actions)
+
         is_alive = [not va[0] for va in envs.get_avail_actions()]
         s1 = s1.astype(np.float32)  # Decentralize observation
-        cent_s1 = np.expand_dims(envs.env.get_state().astype(np.float32),0)
+        # cent_s1 = np.expand_dims(envs.env.get_state().astype(np.float32),0)
         episode_rew += reward
 
         # Run decentral network
+        validActions = envs.get_avail_actions()
         validActions = envs.get_avail_actions()
         actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(s1,validActions)
 

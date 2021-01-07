@@ -115,6 +115,7 @@ class Decentral(tf.keras.Model):
         self.actor_dense1 = layers.Dense(128, activation='relu')
         self.actor_dense2 = layers.Dense(action_size)
         self.softmax = layers.Activation('softmax')
+        self.stop_nan = layers.Lambda(lambda x: tf.math.maximum(x,1E-9))
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
         self.smoothed_pseudo_H = tf.Variable(1.0)
@@ -150,6 +151,7 @@ class Decentral(tf.keras.Model):
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
+        # net = self.stop_nan(net)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 
@@ -198,6 +200,7 @@ class Decentral(tf.keras.Model):
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
         net = self.actor_dense2(net)
+        # net = self.stop_nan(net)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 
@@ -364,6 +367,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
     old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
+    ratio = tf.clip_by_value(ratio, -100000, 100000) * advantage
     surrogate = ratio * advantage # Clipped surrogate function
     clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')

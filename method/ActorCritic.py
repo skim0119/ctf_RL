@@ -129,11 +129,13 @@ class PPO_Module_SC2(PPO_Module):
             self.checkpoints.append(checkpoint)
             self.managers.append(manager)
 
-    def run_network(self, states_list,validActions):
+    def run_network(self, states_list,validActions_list):
         results = []
-        for states, model in zip(states_list, self.models):
+        for states,validActions, model in zip(states_list,validActions_list, self.models):
             actor, critics, log_logits = model(states)
-            filtered_log_logits =log_logits +(1-np.asarray(validActions))*-100
+            filtered_log_logits =log_logits +(1-np.asarray(validActions))*-1000
+            # print(filtered_log_logits)
             actions = tf.random.categorical(filtered_log_logits, 1, dtype=tf.int32).numpy().ravel()
+            # print(actions)
             results.append([actions, critics, log_logits])
         return results

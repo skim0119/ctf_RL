@@ -38,7 +38,7 @@ from smac.env import StarCraft2Env
 
 parser = argparse.ArgumentParser(description="PPO trainer for convoy")
 parser.add_argument("--train_number", type=int, help="training train_number",default = 1)
-parser.add_argument("--machine", type=str, help="training machine",default = "Neale")
+parser.add_argument("--machine", type=str, help="training machine",default = "Final")
 parser.add_argument("--map", type=str, help="map name", default = "8m", required=False)
 parser.add_argument(
     "--silence", action="store_false", help="call to disable the progress bar"
@@ -67,7 +67,7 @@ path_create(MODEL_PATH)
 
 ## Import Shared Training Hyperparameters
 # Training
-total_episodes = 100000
+total_episodes = 250000
 max_ep = 200
 gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
@@ -77,15 +77,11 @@ save_stat_frequency = 128
 save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
-action_space = 14
 keep_frame = 1
-nchannel = 6 * keep_frame
-input_size = [None, 30]
 # Batch Replay Settings
 minibatch_size = 128
 epoch = 2
 minimum_batch_size = 4096
-num_agent = 8
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -101,18 +97,29 @@ def make_env():
 envs = StarCraft2Env(args.map)
 from SC2Wrappers import SMACWrapper
 envs = SMACWrapper(envs)
-
-# envs = [make_env() for i in range(NENV)]
-# envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
+envs.reset()
+action_space = len(envs.env.get_avail_agent_actions(0))
+input_size = [None,envs.env.get_obs_size()]
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
 # Agent Type Setup
-agent_type = [8]
+agent_type_sc = []
+for i in range(len(envs.env.agents)):
+    agent_type_sc.append(envs.env.agents[i].unit_type)
+agent_type_list = agent_type_sc.copy()
+agent_type = [0]*len(set(agent_type_list))
+for i,val in enumerate(set(agent_type_sc)):
+    agent_type_list = [i if val==agent_t else agent_t for agent_t in agent_type_list ]
+for val in agent_type_list:
+    agent_type[val] += 1
+
+num_agent = sum(agent_type)
+# agent_type = [8]
 num_type = len(agent_type)
-agent_type_masking = np.zeros([num_type, 8], dtype=bool)
-agent_type_index = np.zeros([8], dtype=int)
+agent_type_masking = np.zeros([num_type, num_agent], dtype=bool)
+agent_type_index = np.zeros([num_agent], dtype=int)
 prev_i = 0
 for idx, i in enumerate(np.cumsum(agent_type)):
     agent_type_masking[idx, prev_i:i] = True
@@ -206,12 +213,15 @@ def train(
 def get_action(states,validActions):
     # State Process
     states_list = []
+    validActions_list = []
     for mask in agent_type_masking:
         state = np.compress(mask, states, axis=0)
         states_list.append(state)
+        validAction = np.compress(mask, validActions, axis=0)
+        validActions_list.append(validAction)
 
     # Run network
-    results = network.run_network(states_list,validActions)
+    results = network.run_network(states_list,validActions_list)
 
     # Container
     a1 = np.empty([NENV * num_agent], dtype=np.int32)
@@ -242,6 +252,7 @@ while True:
     s1 = envs.reset()
     s1 = np.stack(s1).astype(np.float32)
     validActions = envs.get_avail_actions()
+    validActions = envs.get_avail_actions()
 
     actions, a1, v1, p1 = get_action(s1,validActions)
 
@@ -254,7 +265,6 @@ while True:
 
         s1, reward, done, info = envs.step(actions)
         s1 = np.stack(s1).astype(np.float32)
-        exit()
         is_alive = [not va[0] for va in envs.get_avail_actions()]
         episode_rew += reward
 

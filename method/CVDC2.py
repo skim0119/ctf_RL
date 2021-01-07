@@ -264,6 +264,7 @@ class SF_CVDC_SC2:
         save_path,
         atoms=256,
         lr=2e-4,
+        entropy=0.02,
         **kwargs
     ):
         assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
@@ -312,9 +313,9 @@ class SF_CVDC_SC2:
         # PPO Configuration
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.05, dtype=tf.float32),
+                'entropy_beta': tf.constant(entropy, dtype=tf.float32),
                 'psi_beta': tf.constant(0.0001, dtype=tf.float32),
-                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-2, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
                 'q_beta': tf.constant(0.5, dtype=tf.float32),
                 'learnability_beta': tf.constant(0.01, dtype=tf.float32),
@@ -354,9 +355,9 @@ class SF_CVDC_SC2:
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature
 
-    def run_network_decentral(self, states_list,validActions):
+    def run_network_decentral(self, states_list,validActions_list):
         results = []
-        for states, model in zip(states_list, self.dec_models):
+        for states,validActions, model in zip(states_list,validActions_list, self.dec_models):
             if model._built:
                 actor, SF = model.action_call(states)
             else:
@@ -366,7 +367,9 @@ class SF_CVDC_SC2:
 
             # print(SF["phi"])
             filtered_log_logits =actor["log_softmax"] +(1-np.asarray(validActions))*-10000
+            # print(filtered_log_logits)
             actions = tf.random.categorical(filtered_log_logits, 1, dtype=tf.int32).numpy().ravel()
+
             results.append([actions, actor, SF])
         return results
 
