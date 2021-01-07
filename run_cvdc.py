@@ -318,8 +318,12 @@ def run_network(observations, env):
     # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
 
     # Get action
-    action_probs = actor['softmax'].numpy() * avail_action
-    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
+    probs = actor['softmax'].numpy()
+    print(avail_action)
+    print(probs)
+    probs = probs * avail_action
+    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in probs]
+    print(a1)
 
     # Container
     '''
