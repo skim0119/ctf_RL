@@ -190,78 +190,77 @@ def train_decentral(
     f1_list = []
     f2_list = []
     fc_list = []
-    for trajs in agent_trajs:
-        for idx, traj in enumerate(trajs):
-            reward = traj[2]
-            mask = traj[3]
-            critic = traj[5]
-            phi = np.array(traj[7]).tolist()
-            psi = np.array(traj[8]).tolist()
-            _critic = traj[9][-1]
-            _psi = np.array(traj[10][-1])
+    for traj in agent_trajs:
+        reward = traj[2]
+        mask = traj[3]
+        critic = traj[5]
+        phi = np.array(traj[7]).tolist()
+        psi = np.array(traj[8]).tolist()
+        _critic = traj[9][-1]
+        _psi = np.array(traj[10][-1])
 
-            cent_state = np.array(traj[14])
-            env_critic, _ = network.run_network_central(cent_state)
-            env_critic = env_critic["critic"].numpy()[:, 0].tolist()
-            #cent_last_state = np.array(traj[15])[-1:, ...]
-            #_env_critic, _ = network.run_network_central(cent_last_state)
-            #_env_critic = _env_critic["critic"].numpy()[0, 0]
+        cent_state = np.array(traj[14])
+        env_critic, _ = network.run_network_central(cent_state)
+        env_critic = env_critic["critic"].numpy()[:, 0]
+        #cent_last_state = np.array(traj[15])[-1:, ...]
+        #_env_critic, _ = network.run_network_central(cent_last_state)
+        #_env_critic = _env_critic["critic"].numpy()[0, 0]
 
-            icritic = traj[12]
+        icritic = traj[12]
 
-            dc = np.array(critic[1:])-np.array(critic[:-1])
-            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])
-            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])
-            f1_list.append(np.mean((dc * dc1)>0))
-            f2_list.append(np.mean((dc * dc2)>0))
-            fc_list.append(np.mean((dc * dc)>0))
+        dc = np.array(critic[1:])-np.array(critic[:-1])
+        dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])
+        dc2 = np.array(icritic[1:])-np.array(icritic[:-1])
+        f1_list.append(np.mean((dc * dc1)>0))
+        f2_list.append(np.mean((dc * dc2)>0))
+        fc_list.append(np.mean((dc * dc)>0))
 
-            # Zero bootstrap because all trajectory terminates
-            td_target_c, advantages_global = gae(
-                reward, critic, _critic,
-                gamma, lambd, # mask=mask,
-                normalize=False
-            )
-            _, advantages = gae(
-                traj[11],
-                traj[12],
-                traj[13][-1],
-                gamma,
-                lambd,
-               # mask=mask,
-                normalize=False,
-            )
-            '''
-            _, advantages = gae(
-                reward,
-                env_critic,
-                _env_critic,
-                gamma,
-                lambd,
-                normalize=False,
-            )
-            '''
-            td_target_psi, _ = gae(
-                phi,
-                psi,
-                _psi,  # np.zeros_like(phi[0]),
-                gamma,
-                lambd,
-               # mask=np.array(mask)[:, None],
-                discount_adv=False,
-                normalize=False,
-            )
-            beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
+        # Zero bootstrap because all trajectory terminates
+        td_target_c, advantages_global = gae(
+            reward, critic, _critic,
+            gamma, lambd, # mask=mask,
+            normalize=False
+        )
+        _, advantages = gae(
+            traj[11],
+            traj[12],
+            traj[13][-1],
+            gamma,
+            lambd,
+           # mask=mask,
+            normalize=False,
+        )
+        '''
+        _, advantages = gae(
+            reward,
+            env_critic,
+            _env_critic,
+            gamma,
+            lambd,
+            normalize=False,
+        )
+        '''
+        td_target_psi, _ = gae(
+            phi,
+            psi,
+            _psi,  # np.zeros_like(phi[0]),
+            gamma,
+            lambd,
+           # mask=np.array(mask)[:, None],
+            discount_adv=False,
+            normalize=False,
+        )
+        beta = max(min((-0.9/30000)*step + 1, 1.0),0.1)
 
-            traj_buffer["state"].extend(traj[0])
-            traj_buffer["next_state"].extend(traj[4])
-            traj_buffer["log_logit"].extend(traj[6])
-            traj_buffer["action"].extend(traj[1])
-            traj_buffer["old_value"].extend(critic)
-            traj_buffer["td_target_psi"].extend(td_target_psi)
-            traj_buffer["advantage"].extend(advantages)
-            traj_buffer["td_target_c"].extend(td_target_c)
-            traj_buffer["rewards"].extend(reward)
+        traj_buffer["state"].extend(traj[0])
+        traj_buffer["next_state"].extend(traj[4])
+        traj_buffer["log_logit"].extend(traj[6])
+        traj_buffer["action"].extend(traj[1])
+        traj_buffer["old_value"].extend(critic)
+        traj_buffer["td_target_psi"].extend(td_target_psi)
+        traj_buffer["advantage"].extend(advantages)
+        traj_buffer["td_target_c"].extend(td_target_c)
+        traj_buffer["rewards"].extend(reward)
 
     train_datasets = []
     num_type = 1
