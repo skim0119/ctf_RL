@@ -469,7 +469,7 @@ while global_episodes < total_episodes:
         batch = []
         batch_size = 0
 
-    log_episodic_reward.extend(episode_rew.tolist())
+    log_episodic_reward.extend(episode_reward.tolist())
     log_looptime.append(etime_roll - stime_roll)
 
     # Stepper
