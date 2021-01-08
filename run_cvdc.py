@@ -324,6 +324,7 @@ def run_network(observations, env):
         print(probs)
         print(action_probs)
         print(avail_actions)
+        print(observations)
         raise ValueError
 
     # Container
