@@ -79,10 +79,10 @@ gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
 
 # Log
-save_network_frequency = 1024
-save_stat_frequency = 128
-save_image_frequency = 128
-moving_average_step = 256  # MA for recording episode statistics
+save_network_frequency = 4#1024
+save_stat_frequency = 4#128
+save_image_frequency = 4#128
+moving_average_step = 4#256  # MA for recording episode statistics
 
 ## Environment
 env = StarCraft2Env(
@@ -104,7 +104,7 @@ episode_limit = env_info["episode_limit"]
 ## Batch Replay Settings
 minibatch_size = 256
 epoch = 1
-minimum_batch_size = 1024 * 4
+minimum_batch_size = 256
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -124,6 +124,12 @@ network = Network(
     atoms=atoms,
     save_path=MODEL_PATH,
 )
+observations = np.zeros([8,80], dtype=np.float32)
+actor, critic = network.run_network_decentral(observations)
+print(critic['critic'])
+print(critic['phi'])
+print(critic['psi'])
+sys.exit()
 
 # Resotre / Initialize
 global_episodes = network.initiate()
@@ -250,7 +256,7 @@ def train_decentral(
             discount_adv=False,
             normalize=False,
         )
-
+        print(np.array(advantages).mean(), np.array(advantages).max(), np.array(advantages).min())
         traj_buffer["state"].extend(traj[0])
         traj_buffer["next_state"].extend(traj[4])
         traj_buffer["log_logit"].extend(traj[6])
@@ -307,6 +313,9 @@ def run_network(observations, env):
     for i in range(num_agent):
         avail_action = env.get_avail_agent_actions(i)
         avail_actions.append(avail_action)
+        if i == 0:
+            print(observations[0])
+            print(avail_action)
     avail_actions = np.array(avail_actions)
 
     # Run decentral network
@@ -316,16 +325,8 @@ def run_network(observations, env):
 
     # Get action
     probs = actor['softmax'].numpy()
-    print(probs)
     action_probs = probs * avail_actions
-    try:
-        a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
-    except ValueError:
-        print(probs)
-        print(action_probs)
-        print(avail_actions)
-        print(observations)
-        raise ValueError
+    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
 
     # Container
     '''
@@ -450,6 +451,8 @@ while global_episodes < total_episodes:
     dec_batch.extend(dec_trajs)
     dec_batch_size += len(dec_trajs) * step
     if dec_batch_size > minimum_batch_size:
+        if PRINT:
+            print('training: {}'.format(dec_batch_size))
         stime_train = time.time()
         log = interval_flag(global_episodes, save_image_frequency, "im_log")
         train_decentral(
@@ -465,14 +468,18 @@ while global_episodes < total_episodes:
         etime_train = time.time()
         log_traintime.append(etime_train - stime_train)
 
+    '''
     # centralize training
     batch.extend(cent_trajs)
     batch_size += step
     if batch_size >= minimum_batch_size // 2:
+        if PRINT:
+            print('training(central): {}'.format(batch_size))
         log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
         train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
         batch = []
         batch_size = 0
+    '''
 
     log_episodic_reward.append(episode_reward)
     log_looptime.append(etime_roll - stime_roll)

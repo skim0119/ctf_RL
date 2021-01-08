@@ -24,9 +24,9 @@ class CentralEnc(tf.keras.Model):
         # Feature Encoder
         self.static_network = keras.Sequential([
             layers.Input(shape=input_shape),
-            layers.Dense(units=64, activation='elu'),
+            layers.Dense(units=128, activation='relu'),
             #layers.GRU(64),
-            layers.Dense(units=64, activation='elu'),
+            layers.Dense(units=128, activation='relu'),
         ])
 
     def print_summary(self):
@@ -45,18 +45,16 @@ class DecentralEnc(tf.keras.Model):
         # Feature Encoder
         self.static_network = keras.Sequential([
             layers.Input(shape=input_shape),
-            layers.Dense(units=64, activation='elu'),
+            layers.Dense(units=128, activation='relu'),
             #layers.GRU(64),
-            layers.Dense(units=64, activation='elu'),
+            layers.Dense(units=128, activation='relu'),
         ])
-        self.dense1 = layers.Dense(units=128, activation='elu')
 
     def print_summary(self):
         self.static_network.summary()
 
     def call(self, inputs):
         net = self.static_network(inputs)
-        net = self.dense1(net)
 
         return net
 

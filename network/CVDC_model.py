@@ -66,7 +66,7 @@ class Decentral(tf.keras.Model):
 
         # Actor
         self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_space, activation='relu')
+        self.actor_dense2 = layers.Dense(action_space)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -96,7 +96,8 @@ class Decentral(tf.keras.Model):
         # Feature Encoding SF-phi
         net = self.feature_layer(obs)
         phi = self.phi_dense1(net)
-        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+        phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
+        phi = tf.math.divide_no_nan(phi, phi_norm)
 
         # Actor
         net = self.pi_layer(obs)
@@ -144,7 +145,8 @@ class Decentral(tf.keras.Model):
         # Feature Encoding SF-phi
         net = self.feature_layer(obs)
         phi = self.phi_dense1(net)
-        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+        phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
+        phi = tf.math.divide_no_nan(phi, phi_norm)
 
         # Actor
         net = self.pi_layer(obs)
