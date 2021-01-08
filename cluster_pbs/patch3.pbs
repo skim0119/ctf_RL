@@ -22,4 +22,4 @@ which python
 which pip
 pwd
 
-python run_cvdc.py --train_number 1 --machine cluster --map 1c3s5z --silence
+python run_cvdc.py --train_number 3 --machine cluster --map 5m_vs_6m --silence
