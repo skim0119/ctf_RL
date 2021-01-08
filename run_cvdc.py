@@ -79,10 +79,10 @@ gamma = 0.98  # GAE - discount
 lambd = 0.98  # GAE - lambda
 
 # Log
-save_network_frequency = 4#1024
-save_stat_frequency = 4#128
-save_image_frequency = 4#128
-moving_average_step = 4#256  # MA for recording episode statistics
+save_network_frequency = 1024
+save_stat_frequency = 128
+save_image_frequency = 128
+moving_average_step = 256  # MA for recording episode statistics
 
 ## Environment
 env = StarCraft2Env(
@@ -104,7 +104,7 @@ episode_limit = env_info["episode_limit"]
 ## Batch Replay Settings
 minibatch_size = 256
 epoch = 1
-minimum_batch_size = 256
+minimum_batch_size = 4096
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -124,12 +124,6 @@ network = Network(
     atoms=atoms,
     save_path=MODEL_PATH,
 )
-observations = np.zeros([8,80], dtype=np.float32)
-actor, critic = network.run_network_decentral(observations)
-print(critic['critic'])
-print(critic['phi'])
-print(critic['psi'])
-sys.exit()
 
 # Resotre / Initialize
 global_episodes = network.initiate()
@@ -256,7 +250,6 @@ def train_decentral(
             discount_adv=False,
             normalize=False,
         )
-        print(np.array(advantages).mean(), np.array(advantages).max(), np.array(advantages).min())
         traj_buffer["state"].extend(traj[0])
         traj_buffer["next_state"].extend(traj[4])
         traj_buffer["log_logit"].extend(traj[6])
@@ -313,9 +306,6 @@ def run_network(observations, env):
     for i in range(num_agent):
         avail_action = env.get_avail_agent_actions(i)
         avail_actions.append(avail_action)
-        if i == 0:
-            print(observations[0])
-            print(avail_action)
     avail_actions = np.array(avail_actions)
 
     # Run decentral network
@@ -326,7 +316,23 @@ def run_network(observations, env):
     # Get action
     probs = actor['softmax'].numpy()
     action_probs = probs * avail_actions
-    a1 = [np.random.choice(action_space, p=p/p.sum()) for p in action_probs]
+    try:
+        a1 = []
+        for idx, p in enumerate(action_probs):
+            if np.isclose(p.sum(), 0):
+                avail_actions = env.get_avail_agent_actions(idx)
+                avail_actions_ind = np.nonzero(avail_actions)[0]
+                action = np.random.choice(avail_actions_ind)
+                a1.append(action)
+            else:
+                p = p/p.sum()
+                action = np.random.choice(action_space, p=p)
+                a1.append(action)
+    except ValueError:
+        print(probs)
+        print(action_probs)
+        print(observations)
+        raise ValueError
 
     # Container
     '''
