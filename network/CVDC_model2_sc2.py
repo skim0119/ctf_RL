@@ -65,6 +65,28 @@ class V4INV(tf.keras.Model):
     def call(self, inputs):
         dynamic = self.dynamic_network(inputs)
         return dynamic
+class V4INV_lstm(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, trainable=True, name='FeatureNN_Inverse'):
+        super(V4INV_lstm, self).__init__(name=name)
+
+        # Feature Encoder
+        self.dynamic_network = keras.Sequential([
+            layers.Input(shape=[128]),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=256, activation='elu'),
+            layers.Dense(units=input_shape[1], activation='elu'),
+
+            ],
+            name='dynamic_network')
+
+    def print_summary(self):
+        self.dynamic_network.summary()
+
+    def call(self, inputs):
+        dynamic = self.dynamic_network(inputs)
+        return dynamic
 
 class Decentral(tf.keras.Model):
     @store_args
@@ -339,7 +361,10 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     #reward_loss = 0.0
 
     # Decoder loss
-    generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
+    if len(next_state.shape) == 3:
+        generator_loss = model.mse_loss_sum(next_state[:,-1,:], v['decoded_state'])
+    else:
+        generator_loss = model.mse_loss_sum(next_state, v['decoded_state'])
     #generator_loss = 0.0
 
     # Entropy
@@ -428,3 +453,263 @@ def train(model, loss, optimizer, inputs, hyperparameters={}):
         for (grad,var) in zip(grads, model.trainable_variables)
         if grad is not None])
     return total_loss, info
+
+class V4_lstm(tf.keras.Model):
+    STATIC_CHANNEL = [0,1,3]
+    DYNAMIC_CHANNEL = [2,4,5]
+    LATENT_DIM = 256
+
+    @store_args
+    def __init__(self, input_shape, action_size=5,
+                 trainable=True, name='FeatureNN'):
+        super(V4_lstm, self).__init__(name=name)
+
+        # Feature Encoder
+        self.dynamic_network = keras.Sequential([
+            layers.Input(shape=input_shape),
+            layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+            layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+            layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+            layers.LSTM(256)], name='dynamic_network')
+        self.dense1 = layers.Dense(units=256, activation='elu')
+
+    def print_summary(self):
+        self.dynamic_network.summary()
+
+    def call(self, inputs):
+        dynamic_net = self.dynamic_network(inputs)
+
+        net = self.dense1(dynamic_net)
+
+        return net
+
+class Decentral_lstm(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, action_size=5, atoms=512,
+            prebuilt_layers=None, trainable=True):
+        super(Decentral_lstm, self).__init__()
+
+        if prebuilt_layers is None:
+            # Feature Encoding
+            self.feature_layer = V4_lstm(input_shape, action_size)
+            self.pi_layer = V4_lstm(input_shape, action_size)
+
+            # Decoder
+            self.action_dense1 = layers.Dense(units=128, activation='elu')
+            self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
+            self.decoder_dense1 = layers.Dense(units=128, activation='elu')
+            self.decoder = V4INV_lstm(input_shape)
+
+            # Phi
+            self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+
+            # Psi
+            self.psi_dense1 = layers.Dense(units=atoms, activation='relu')
+            self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
+        else:
+            # Feature Encoding
+            self.feature_layer = prebuilt_layers.feature_layer
+            self.pi_layer = prebuilt_layers.pi_layer
+
+            # Decoder
+            self.action_dense1 = prebuilt_layers.action_dense1
+            self.decoder_pre_dense1 = prebuilt_layers.decoder_pre_dense1
+            self.decoder_dense1 = prebuilt_layers.decoder_dense1
+            self.decoder = prebuilt_layers.decoder
+
+            # Phi
+            self.phi_dense1 = prebuilt_layers.phi_dense1
+
+            # Psi
+            self.psi_dense1 = prebuilt_layers.psi_dense1
+            self.psi_dense2 = prebuilt_layers.psi_dense2
+
+        # Critic weights
+        self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
+        self.sf_q_weight = layers.Dense(units=action_size, activation='linear') #, use_bias=False,)
+
+        # Actor
+        self.actor_dense1 = layers.Dense(128, activation='relu')
+        self.actor_dense2 = layers.Dense(action_size)
+        self.softmax = layers.Activation('softmax')
+        self.stop_nan = layers.Lambda(lambda x: tf.math.maximum(x,1E-9))
+        self.log_softmax = layers.Activation(tf.nn.log_softmax)
+
+        self.smoothed_pseudo_H = tf.Variable(1.0)
+
+        # Learnabilty Maximizer
+        beta = np.ones([atoms,1], dtype=np.float32)
+        self.beta = tf.Variable(
+                initial_value=beta,
+                name='feature_scale',
+                dtype=tf.float32,
+                constraint=tf.keras.constraints.MinMaxNorm(rate=0.99, axis=1),
+            )
+
+        # Loss
+        self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
+        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
+                reduction=tf.keras.losses.Reduction.SUM)
+
+        self._built = False
+
+    def print_summary(self):
+        self.feature_layer.summary()
+
+    @tf.function
+    def action_call(self, obs):  # Short operation for forward pass
+        # Feature Encoding SF-phi
+        net = self.feature_layer(obs)
+        phi = self.phi_dense1(net)
+        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+
+        # Actor
+        net = self.pi_layer(obs)
+        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = self.actor_dense1(net)
+        net = self.actor_dense2(net)
+        # net = self.stop_nan(net)
+        softmax_logits = self.softmax(net)
+        log_logits = self.log_softmax(net)
+
+        # Non-grad psi
+        psi = self.psi_dense1(tf.stop_gradient(phi))
+        psi = self.psi_dense2(psi)
+
+        # Psi
+        net = self.psi_dense1(phi)
+        net = self.psi_dense2(net)
+        critic = self.sf_v_weight(net, training=True)
+        critic = tf.reshape(critic, [-1])
+        q = self.sf_q_weight(net, training=True)
+
+        beta = tf.math.abs(self.beta)
+        #wv = self.sf_v_weight.weights[0]
+        wv_neg = self.sf_v_weight.weights[0] * (1.0-beta)
+        reward_predict = tf.linalg.matmul(phi, wv_neg)
+        reward_predict = tf.reshape(reward_predict, [-1])
+        inv_critic = tf.linalg.matmul(psi, wv_neg)
+        inv_critic = tf.reshape(inv_critic, [-1])
+
+        actor = {'softmax': softmax_logits,
+                 'log_softmax': log_logits}
+        SF = {'reward_predict': reward_predict,
+              'phi': phi,
+              'psi': psi,
+              'critic': critic,
+              'icritic': critic - 0.1*inv_critic, # Corrected critic
+              }
+        return actor, SF
+
+    def call(self, inputs): # Full Operation of the method
+        # Run full network
+        obs = inputs[0]
+        action = inputs[1] # Action is included for decoder
+        action_one_hot = tf.one_hot(action, self.action_size, dtype=tf.float32)
+
+        # Feature Encoding SF-phi
+        net = self.feature_layer(obs)
+        phi = self.phi_dense1(net)
+        phi = phi / tf.norm(phi, ord=1, axis=1, keepdims=True)
+
+        # Actor
+        net = self.pi_layer(obs)
+        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
+        net = self.actor_dense1(net)
+        net = self.actor_dense2(net)
+        # net = self.stop_nan(net)
+        softmax_logits = self.softmax(net)
+        log_logits = self.log_softmax(net)
+
+        # Decoder
+        dec_net = self.decoder_pre_dense1(phi)
+        act_net = self.action_dense1(action_one_hot)
+        net = tf.math.multiply(dec_net, act_net)
+        net = self.decoder_dense1(net)
+        decoded_state = self.decoder(net)
+
+        psi = self.psi_dense1(tf.stop_gradient(phi))
+        psi = self.psi_dense2(psi)
+
+        net = self.psi_dense1(phi)
+        net = self.psi_dense2(net)
+        critic = self.sf_v_weight(net, training=True)
+        critic = tf.reshape(critic, [-1])
+        q = self.sf_q_weight(net, training=True)
+
+        beta = tf.math.abs(self.beta)
+        wv = self.sf_v_weight.weights[0]
+        wq = self.sf_q_weight.weights[0]
+        wv_neg = wv * (1.0-beta)
+        reward_predict = tf.linalg.matmul(phi, wv_neg)
+        reward_predict = tf.reshape(reward_predict, [-1])
+        inv_critic = tf.linalg.matmul(psi, wv_neg)
+        inv_critic = tf.reshape(inv_critic, [-1])
+
+        # For learnability update
+        wq_pos = tf.stop_gradient(wq) * beta
+        wv_neg = tf.stop_gradient(wv) * (1.0-beta)
+        psi_q_pos = tf.linalg.matmul(tf.stop_gradient(psi), wq_pos)
+        psi_v_neg = tf.linalg.matmul(tf.stop_gradient(psi), wv_neg)
+
+        # Filtered decoder
+        _phi = phi*tf.transpose(beta)
+        _dec_net = self.decoder_pre_dense1(_phi)
+        _net = tf.math.multiply(_dec_net, act_net)
+        _net = self.decoder_dense1(_net)
+        _decoded_state = self.decoder(_net)
+
+        actor = {'softmax': softmax_logits,
+                 'log_softmax': log_logits}
+        SF = {'reward_predict': reward_predict,
+              'phi': phi,
+              'psi': psi,
+              'critic': critic,
+              'decoded_state': decoded_state,
+              'Q': q,
+              'icritic': critic - 0.1*inv_critic, # Corrected critic
+              'psi_q_pos': psi_q_pos,
+              'psi_v_neg': psi_v_neg,
+              'filtered_decoded_state': _decoded_state
+              }
+
+        self._built = True
+
+        return actor, SF
+
+class Central_lstm(tf.keras.Model):
+    @store_args
+    def __init__(self, input_shape, atoms,
+                 trainable=True):
+        super(Central_lstm, self).__init__()
+
+        # Feature Encoding
+        self.feature_layer = V4_lstm(input_shape)
+
+        # Critic
+        self.critic_dense1 = layers.Dense(units=512, activation='relu')
+        self.successor_weight = layers.Dense(units=1, activation='linear')
+
+        # Loss Operations
+        self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
+        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
+                reduction=tf.keras.losses.Reduction.SUM)
+
+    def print_summary(self):
+        self.feature_layer.print_summary()
+
+    def call(self, inputs):
+        state = inputs
+
+        # Encoder
+        n_sample = state.shape[0]
+        net = self.feature_layer(state)
+
+        # Critic
+        net = self.critic_dense1(net)
+        critic = self.successor_weight(net)
+
+        feature = {'latent': net}
+        SF = {'critic': critic}
+
+        return SF, feature

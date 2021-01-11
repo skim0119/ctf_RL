@@ -99,13 +99,16 @@ class FrameStacking(gym.core.Wrapper):
         env.action_space = gym.spaces.Discrete(env.n_actions)
         self.lstm=lstm
         obs,state =env.reset()
-        env.observation_space = convert_observation_to_space(obs[0])
-        env.state_shape = convert_observation_to_space(state)
         if not lstm:
             env.observation_space.shape =  (env.observation_space.shape[0]*numFrames,)
             env.state_shape.shape =  (env.state_shape.shape[0]*numFrames,)
-        self.stackedStates_obs = Stacked_state(numFrames, 1,lstm)
-        self.stackedStates_states = Stacked_state(numFrames, 1,lstm)
+            self.stackedStates_obs = Stacked_state(numFrames, 1,lstm)
+            self.stackedStates_states = Stacked_state(numFrames, 1,lstm)
+        else:
+            env.observation_space = convert_observation_to_space(obs[0])
+            env.state_shape = convert_observation_to_space(state)
+            self.stackedStates_obs = Stacked_state(numFrames, 1,lstm)
+            self.stackedStates_states = Stacked_state(numFrames, 1,lstm)
         super().__init__(env)
 
     def reset(self,*args,**kwargs):
@@ -134,7 +137,11 @@ class Stacked_state:
 
     def __call__(self, obj=None):
         if obj is None:
-            return np.concatenate(self.stack, axis=self.axis)
+            if self.lstm:
+                # print(np.stack(self.stack, axis=self.axis).shape)
+                return np.stack(self.stack, axis=self.axis)
+            else:
+                return np.concatenate(self.stack, axis=self.axis)
         self.stack.append(obj)
         self.stack.pop(0)
         if self.lstm:

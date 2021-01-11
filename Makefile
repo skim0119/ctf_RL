@@ -12,14 +12,14 @@ define sc2
 			-v /dev:/dev \
 			-e HOME=${HOME} \
 			-v ~/StarCraftII:${PWD}/StarCraftII \
-			tf2-sc2 \
+			tf2-sc2-1 \
 			$(1)
 endef
 
 
 #Can't be the same name as a directory
 image:
-	docker build --rm -t tf2-sc2 -f docker/tf2-sc2/Dockerfile docker/tf2-sc2
+	docker build --rm -t tf2-sc2-1 -f docker/tf2-sc2/Dockerfile docker/tf2-sc2
 
 sc2:
 	xhost +local:docker
@@ -31,7 +31,7 @@ tensorboard:
 		--network=host \
 		-v ${PWD}:${PWD} \
 		-w ${PWD} \
-		tf2-sc2 \
+		tf2-sc2-1 \
 		tensorboard --logdir=logs
 
 clean:

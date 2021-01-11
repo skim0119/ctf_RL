@@ -43,16 +43,17 @@ from utility.gae import gae
 
 # from utility.slack import SlackAssist
 
-from method.CVDC2 import SF_CVDC as Network
+from method.CVDC2 import SF_CVDC_lstm as Network
+from CTFWrappers import FrameStacking
 
 parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")
-parser.add_argument("--train_number", type=int, help="training train_number")
-parser.add_argument("--machine", type=str, help="training machine")
-parser.add_argument("--map_size", type=int, help="map size")
-parser.add_argument("--nbg", type=int, help="number of blue ground")
-parser.add_argument("--nba", type=int, help="number of blue air")
-parser.add_argument("--nrg", type=int, help="number of red air")
-parser.add_argument("--nra", type=int, help="number of red air")
+parser.add_argument("--train_number", type=int, help="training train_number", default = 1)
+parser.add_argument("--machine", type=str, help="training machine",default = "Neale")
+parser.add_argument("--map_size", type=int, help="map size",default=30)
+parser.add_argument("--nbg", type=int, help="number of blue ground", default=3)
+parser.add_argument("--nba", type=int, help="number of blue air", default=0)
+parser.add_argument("--nrg", type=int, help="number of red air", default=3)
+parser.add_argument("--nra", type=int, help="number of red air", default=0)
 parser.add_argument(
     "--silence", action="store_false", help="call to disable the progress bar"
 )
@@ -112,13 +113,13 @@ save_image_frequency = 128
 moving_average_step = 256  # MA for recording episode statistics
 # Environment/Policy Settings
 action_space = 5
-keep_frame = 1
+keep_frame = 3
 map_size = args.map_size
 vision_range = map_size - 1
 vision_dx, vision_dy = 2 * vision_range + 1, 2 * vision_range + 1
-nchannel = 6 * keep_frame
-input_size = [None, vision_dx, vision_dy, nchannel]
-cent_input_size = [None, map_size, map_size, nchannel]
+nchannel = 6
+input_size = [None, keep_frame,vision_dx, vision_dy, nchannel]
+cent_input_size = [None, keep_frame,map_size, map_size, nchannel]
 ## Batch Replay Settings
 minibatch_size = 128
 epoch = 1
@@ -139,10 +140,13 @@ def make_env(map_size):
 
 
 envs = [make_env(map_size) for i in range(NENV)]
-envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)
+envs = SubprocVecEnv(envs, keep_frame=1, size=vision_dx)
+envs = FrameStacking(envs,keep_frame)
+t= envs.reset(config_path=game_config, policy_red=policy.Roomba,)
 num_blue = len(envs.get_team_blue()[0])
 num_red = len(envs.get_team_red()[0])
 num_agent = num_blue  # +num_red
+
 
 if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
@@ -419,7 +423,7 @@ while global_episodes < total_episodes:
         game_config["experiments"]["SAVE_BOARD_RGB"] = "False"
     s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)
     s1 = s1.astype(np.float32)
-    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
+    cent_s1 = envs.GetCentralState()  # Centralized
 
     actions, a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(s1)
 
@@ -451,7 +455,7 @@ while global_episodes < total_episodes:
         s1, reward, done, history = envs.step(actions)
         is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]
         s1 = s1.astype(np.float32)  # Decentralize observation
-        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized
+        cent_s1 = envs.GetCentralState() # Centralized
         episode_rew += reward
 
         # Run decentral network

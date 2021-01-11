@@ -42,5 +42,5 @@ RUN chmod -R 755 /opt/StarCraftII
 
 RUN pip install gitpython
 RUN pip install gym gym_minigrid
-RUN pip install git+https://github.com/raide-project/ctf_public.git@wip/gazebo2
-RUN pip install tensorflow_probability
+RUN pip install 'git+https://vanstrn:Glavendel!845@github.com/raide-project/ctf_research.git@game/convoy'
+RUN pip install tensorflow_probability==0.11

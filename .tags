@@ -95,26 +95,6 @@ save	/home/neale/ctf_RL/method/ActorCritic.py	/^    def save(self, checkpoint_nu
 PPO_Module_SC2	/home/neale/ctf_RL/method/ActorCritic.py	/^class PPO_Module_SC2(PPO_Module):$/;"	class	line:99
 __init__	/home/neale/ctf_RL/method/ActorCritic.py	/^    def __init__($/;"	member	line:101	class:PPO_Module_SC2
 run_network	/home/neale/ctf_RL/method/ActorCritic.py	/^    def run_network(self, states_list,validActions_list):$/;"	member	line:132	class:PPO_Module_SC2
-SF_CVDC	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC:$/;"	class	line:16
-__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:20	class:SF_CVDC
-log	/home/neale/ctf_RL/method/CVDC2.py	/^    def log(self, step, log_weights=True, logs=None):$/;"	member	line:85	class:SF_CVDC
-run_network_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_central(self, states):$/;"	member	line:113	class:SF_CVDC
-run_network_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_decentral(self, states_list):$/;"	member	line:119	class:SF_CVDC
-update_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):$/;"	member	line:133	class:SF_CVDC
-update_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):$/;"	member	line:155	class:SF_CVDC
-initiate	/home/neale/ctf_RL/method/CVDC2.py	/^    def initiate(self, verbose=1):$/;"	member	line:220	class:SF_CVDC
-restore	/home/neale/ctf_RL/method/CVDC2.py	/^    def restore(self):$/;"	member	line:235	class:SF_CVDC
-save	/home/neale/ctf_RL/method/CVDC2.py	/^    def save(self, checkpoint_number):$/;"	member	line:242	class:SF_CVDC
-SF_CVDC_SC2	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC_SC2:$/;"	class	line:254
-__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:258	class:SF_CVDC_SC2
-log	/home/neale/ctf_RL/method/CVDC2.py	/^    def log(self, step, log_weights=True, logs=None):$/;"	member	line:324	class:SF_CVDC_SC2
-run_network_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_central(self, states):$/;"	member	line:352	class:SF_CVDC_SC2
-run_network_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_decentral(self, states_list,validActions_list):$/;"	member	line:358	class:SF_CVDC_SC2
-update_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):$/;"	member	line:377	class:SF_CVDC_SC2
-update_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):$/;"	member	line:399	class:SF_CVDC_SC2
-initiate	/home/neale/ctf_RL/method/CVDC2.py	/^    def initiate(self, verbose=1):$/;"	member	line:465	class:SF_CVDC_SC2
-restore	/home/neale/ctf_RL/method/CVDC2.py	/^    def restore(self):$/;"	member	line:480	class:SF_CVDC_SC2
-save	/home/neale/ctf_RL/method/CVDC2.py	/^    def save(self, checkpoint_number):$/;"	member	line:487	class:SF_CVDC_SC2
 TDCentral	/home/neale/ctf_RL/method/td.py	/^class TDCentral:$/;"	class	line:9
 __init__	/home/neale/ctf_RL/method/td.py	/^    def __init__($/;"	member	line:11	class:TDCentral
 run_network	/home/neale/ctf_RL/method/td.py	/^    def run_network(self, states):$/;"	member	line:44	class:TDCentral
@@ -744,29 +724,6 @@ policy	/home/neale/ctf_RL/policy/roomba.py	/^    def policy(self, agent, obs, ag
 blocking	/home/neale/ctf_RL/policy/roomba.py	/^        def blocking(x,y,d):$/;"	function	line:98	function:Roomba.policy
 obj_in_range	/home/neale/ctf_RL/policy/roomba.py	/^    def obj_in_range(self, x, y, r, obs, chn, elem=-1):$/;"	member	line:166	class:Roomba
 center_pad	/home/neale/ctf_RL/policy/roomba.py	/^    def center_pad(self, m, width, padder=8):$/;"	member	line:178	class:Roomba
-sc2	/home/neale/ctf_RL/Makefile	/^define sc2$/;"	macro	line:2
-SMACWrapper	/home/neale/ctf_RL/SC2Wrappers.py	/^class SMACWrapper(gym.core.Wrapper):$/;"	class	line:4
-__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env,**kwargs):$/;"	member	line:9	class:SMACWrapper
-reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self,*args,**kwargs):$/;"	member	line:17	class:SMACWrapper
-step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self,action,*args,**kwargs):$/;"	member	line:20	class:SMACWrapper
-get_avail_actions	/home/neale/ctf_RL/SC2Wrappers.py	/^    def get_avail_actions(self):$/;"	member	line:41	class:SMACWrapper
-convert_observation_to_space	/home/neale/ctf_RL/SC2Wrappers.py	/^def convert_observation_to_space(observation):$/;"	function	line:54
-ActionFiltering	/home/neale/ctf_RL/SC2Wrappers.py	/^class ActionFiltering(gym.core.Wrapper):$/;"	class	line:70
-__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env, **kwargs):$/;"	member	line:71	class:ActionFiltering
-reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self, **kwargs):$/;"	member	line:74	class:ActionFiltering
-step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self, action):$/;"	member	line:78	class:ActionFiltering
-ActionFiltering	/home/neale/ctf_RL/SC2Wrappers.py	/^class ActionFiltering(gym.core.Wrapper):$/;"	class	line:83
-__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env, **kwargs):$/;"	member	line:84	class:ActionFiltering
-reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self, **kwargs):$/;"	member	line:87	class:ActionFiltering
-step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self, action):$/;"	member	line:91	class:ActionFiltering
-FrameStacking	/home/neale/ctf_RL/SC2Wrappers.py	/^class FrameStacking(gym.core.Wrapper):$/;"	class	line:96
-__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env,numFrames=3,lstm=False,**kwargs):$/;"	member	line:98	class:FrameStacking
-reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self,*args,**kwargs):$/;"	member	line:111	class:FrameStacking
-step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self,action,*args,**kwargs):$/;"	member	line:119	class:FrameStacking
-Stacked_state	/home/neale/ctf_RL/SC2Wrappers.py	/^class Stacked_state:$/;"	class	line:125
-__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self, keep_frame, axis,lstm=False):$/;"	member	line:126	class:Stacked_state
-initiate	/home/neale/ctf_RL/SC2Wrappers.py	/^    def initiate(self, obj):$/;"	member	line:132	class:Stacked_state
-__call__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __call__(self, obj=None):$/;"	member	line:135	class:Stacked_state	file:
 physical_devices	/home/neale/ctf_RL/run_multiagent_ppo.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:15
 parser	/home/neale/ctf_RL/run_multiagent_ppo.py	/^parser = argparse.ArgumentParser(description="PPO trainer for convoy")$/;"	variable	line:37
 args	/home/neale/ctf_RL/run_multiagent_ppo.py	/^args = parser.parse_args()$/;"	variable	line:48
@@ -1034,20 +991,6 @@ _log	/home/neale/ctf_RL/network/C51.py	/^def _log(val):$/;"	function	line:64
 get_action	/home/neale/ctf_RL/network/C51.py	/^def get_action(model, state):$/;"	function	line:67
 loss	/home/neale/ctf_RL/network/C51.py	/^def loss(model, state, action, td_target, advantage, old_log_logit, reward, done, next_state,$/;"	function	line:74
 train	/home/neale/ctf_RL/network/C51.py	/^def train(model, optimizer, inputs, **hyperparameters):$/;"	function	line:119
-Decentral	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Decentral(tf.keras.Model):$/;"	class	line:22
-__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:24	class:Decentral
-print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:91	class:Decentral
-action_call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:95	class:Decentral
-call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:138	class:Decentral
-Central	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Central(tf.keras.Model):$/;"	class	line:213
-__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:215	class:Central
-print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:231	class:Central
-call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs):$/;"	member	line:234	class:Central
-loss_central	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_central(model, state, td_target_c):$/;"	function	line:251
-loss_decentral_critic_only	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):$/;"	function	line:264
-loss_ppo	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,$/;"	function	line:276
-get_gradient	/home/neale/ctf_RL/network/CVDC_model2.py	/^def get_gradient(model, loss, inputs, hyperparameters={}):$/;"	function	line:364
-train	/home/neale/ctf_RL/network/CVDC_model2.py	/^def train(model, loss, optimizer, inputs, hyperparameters={}):$/;"	function	line:371
 V4	/home/neale/ctf_RL/network/model_V4.py	/^class V4(tf.keras.Model):$/;"	class	line:18
 STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:19	class:V4
 DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:20	class:V4
@@ -1126,79 +1069,6 @@ print_summary	/home/neale/ctf_RL/network/C51_Central.py	/^    def print_summary(
 call	/home/neale/ctf_RL/network/C51_Central.py	/^    def call(self, inputs):$/;"	member	line:71	class:V2Dist
 loss	/home/neale/ctf_RL/network/C51_Central.py	/^def loss(model, target_model, state, reward, done, next_state,$/;"	function	line:85
 train	/home/neale/ctf_RL/network/C51_Central.py	/^def train(model, target_model, optimizer, inputs, **hyperparameters):$/;"	function	line:119
-V4	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4(tf.keras.Model):$/;"	class	line:18
-STATIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:19	class:V4
-DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:20	class:V4
-LATENT_DIM	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    LATENT_DIM = 256$/;"	variable	line:21	class:V4
-__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:24	class:V4
-print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:36	class:V4
-call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:39	class:V4
-V4INV	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4INV(tf.keras.Model):$/;"	class	line:46
-__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, trainable=True, name='FeatureNN_Inverse'):$/;"	member	line:48	class:V4INV
-print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:62	class:V4INV
-call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:65	class:V4INV
-Decentral	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Decentral(tf.keras.Model):$/;"	class	line:69
-__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:71	class:Decentral
-print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:139	class:Decentral
-action_call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:143	class:Decentral
-call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:187	class:Decentral
-Central	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Central(tf.keras.Model):$/;"	class	line:263
-__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:265	class:Central
-print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:281	class:Central
-call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:284	class:Central
-loss_central	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_central(model, state, td_target_c):$/;"	function	line:301
-loss_decentral_critic_only	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):$/;"	function	line:314
-loss_ppo	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,$/;"	function	line:326
-get_gradient	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def get_gradient(model, loss, inputs, hyperparameters={}):$/;"	function	line:415
-train	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def train(model, loss, optimizer, inputs, hyperparameters={}):$/;"	function	line:422
-V4	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4(tf.keras.Model):$/;"	class	line:18
-STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:19	class:V4
-DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:20	class:V4
-LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:21	class:V4
-__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:24	class:V4
-print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:51	class:V4
-call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:55	class:V4
-V4INV	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4INV(tf.keras.Model):$/;"	class	line:67
-__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, trainable=True, name='FeatureNN_Inverse'):$/;"	member	line:69	class:V4INV
-print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:91	class:V4INV
-call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:95	class:V4INV
-V4Decentral	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4Decentral(tf.keras.Model):$/;"	class	line:106
-STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:107	class:V4Decentral
-DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:108	class:V4Decentral
-LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:109	class:V4Decentral
-__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5, $/;"	member	line:112	class:V4Decentral
-print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:137	class:V4Decentral
-call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:141	class:V4Decentral
-V4INVDecentral	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4INVDecentral(tf.keras.Model):$/;"	class	line:154
-__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, trainable=True, name='FeatureNN_Inverse', **kwargs):$/;"	member	line:156	class:V4INVDecentral
-print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:178	class:V4INVDecentral
-call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:182	class:V4INVDecentral
-physical_devices	/home/neale/ctf_RL/network/model_V4_30.py	/^    physical_devices = tf.config.experimental.list_physical_devices('GPU')$/;"	variable	line:194	class:V4INVDecentral
-config	/home/neale/ctf_RL/network/model_V4_30.py	/^    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)$/;"	variable	line:196	class:V4INVDecentral
-sample_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_size = 32$/;"	variable	line:199	class:V4INVDecentral
-map_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    map_size = 30$/;"	variable	line:200	class:V4INVDecentral
-map_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    map_size = map_size*2-1$/;"	variable	line:201	class:V4INVDecentral
-image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [map_size,map_size,6]$/;"	variable	line:202	class:V4INVDecentral
-sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:203	class:V4INVDecentral
-latent_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_size = 128$/;"	variable	line:204	class:V4INVDecentral
-latent_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_shape = [sample_size]+[latent_size]$/;"	variable	line:205	class:V4INVDecentral
-model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4(image_shape, 5)$/;"	variable	line:208	class:V4INVDecentral
-sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:211	class:V4INVDecentral
-output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:212	class:V4INVDecentral
-model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4INV()$/;"	variable	line:217	class:V4INVDecentral
-sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(latent_shape).astype(np.float32)$/;"	variable	line:220	class:V4INVDecentral
-output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:221	class:V4INVDecentral
-sample_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_size = 32$/;"	variable	line:226	class:V4INVDecentral
-image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [map_size,map_size,6]$/;"	variable	line:228	class:V4INVDecentral
-sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:229	class:V4INVDecentral
-latent_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_size = 128$/;"	variable	line:230	class:V4INVDecentral
-latent_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_shape = [sample_size]+[latent_size]$/;"	variable	line:231	class:V4INVDecentral
-model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4Decentral(image_shape, 5)$/;"	variable	line:234	class:V4INVDecentral
-sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:237	class:V4INVDecentral
-output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:238	class:V4INVDecentral
-model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4INVDecentral()$/;"	variable	line:243	class:V4INVDecentral
-sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(latent_shape).astype(np.float32)$/;"	variable	line:246	class:V4INVDecentral
-output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:247	class:V4INVDecentral
 physical_devices	/home/neale/ctf_RL/run_multiagent_ppo_sc2.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:15
 parser	/home/neale/ctf_RL/run_multiagent_ppo_sc2.py	/^parser = argparse.ArgumentParser(description="PPO trainer for convoy")$/;"	variable	line:39
 args	/home/neale/ctf_RL/run_multiagent_ppo_sc2.py	/^args = parser.parse_args()$/;"	variable	line:46
@@ -1674,185 +1544,6 @@ Specification	/home/neale/ctf_RL/README.md	/^### Specification$/;"	function	line
 Contents	/home/neale/ctf_RL/README.md	/^### Contents$/;"	function	line:11
 Example usage	/home/neale/ctf_RL/README.md	/^### Example usage$/;"	function	line:16
 Note:	/home/neale/ctf_RL/README.md	/^# Note:$/;"	function	line:24
-physical_devices	/home/neale/ctf_RL/run_cvdc2.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:18
-parser	/home/neale/ctf_RL/run_cvdc2.py	/^parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")$/;"	variable	line:48
-args	/home/neale/ctf_RL/run_cvdc2.py	/^args = parser.parse_args()$/;"	variable	line:59
-PROGBAR	/home/neale/ctf_RL/run_cvdc2.py	/^PROGBAR = args.silence$/;"	variable	line:61
-TRAIN_NAME	/home/neale/ctf_RL/run_cvdc2.py	/^TRAIN_NAME = "CVDC_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format($/;"	variable	line:64
-TRAIN_TAG	/home/neale/ctf_RL/run_cvdc2.py	/^TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME$/;"	variable	line:73
-LOG_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^LOG_PATH = ".\/logs\/" + TRAIN_NAME$/;"	variable	line:74
-MODEL_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^MODEL_PATH = ".\/model\/" + TRAIN_NAME$/;"	variable	line:75
-SAVE_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^SAVE_PATH = ".\/save\/" + TRAIN_NAME$/;"	variable	line:76
-MAP_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^MAP_PATH = ".\/fair_3g_20"$/;"	variable	line:77
-GPU_CAPACITY	/home/neale/ctf_RL/run_cvdc2.py	/^GPU_CAPACITY = 0.95$/;"	variable	line:78
-NENV	/home/neale/ctf_RL/run_cvdc2.py	/^NENV = multiprocessing.cpu_count() \/\/ 4$/;"	variable	line:82
-env_setting_path	/home/neale/ctf_RL/run_cvdc2.py	/^env_setting_path = "env_setting_convoy.ini"$/;"	variable	line:85
-game_config	/home/neale/ctf_RL/run_cvdc2.py	/^game_config = configparser.ConfigParser()$/;"	variable	line:86
-config_path	/home/neale/ctf_RL/run_cvdc2.py	/^config_path = "config.ini"$/;"	variable	line:99
-config	/home/neale/ctf_RL/run_cvdc2.py	/^config = configparser.ConfigParser()$/;"	variable	line:100
-total_episodes	/home/neale/ctf_RL/run_cvdc2.py	/^total_episodes = 100000$/;"	variable	line:104
-max_ep	/home/neale/ctf_RL/run_cvdc2.py	/^max_ep = 200$/;"	variable	line:105
-gamma	/home/neale/ctf_RL/run_cvdc2.py	/^gamma = 0.98  # GAE - discount$/;"	variable	line:106
-lambd	/home/neale/ctf_RL/run_cvdc2.py	/^lambd = 0.98  # GAE - lambda$/;"	variable	line:107
-save_network_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_network_frequency = 1024$/;"	variable	line:109
-save_stat_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_stat_frequency = 128$/;"	variable	line:110
-save_image_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_image_frequency = 128$/;"	variable	line:111
-moving_average_step	/home/neale/ctf_RL/run_cvdc2.py	/^moving_average_step = 256  # MA for recording episode statistics$/;"	variable	line:112
-action_space	/home/neale/ctf_RL/run_cvdc2.py	/^action_space = 5$/;"	variable	line:114
-keep_frame	/home/neale/ctf_RL/run_cvdc2.py	/^keep_frame = 1$/;"	variable	line:115
-map_size	/home/neale/ctf_RL/run_cvdc2.py	/^map_size = args.map_size$/;"	variable	line:116
-vision_range	/home/neale/ctf_RL/run_cvdc2.py	/^vision_range = map_size - 1$/;"	variable	line:117
-nchannel	/home/neale/ctf_RL/run_cvdc2.py	/^nchannel = 6 * keep_frame$/;"	variable	line:119
-input_size	/home/neale/ctf_RL/run_cvdc2.py	/^input_size = [None, vision_dx, vision_dy, nchannel]$/;"	variable	line:120
-cent_input_size	/home/neale/ctf_RL/run_cvdc2.py	/^cent_input_size = [None, map_size, map_size, nchannel]$/;"	variable	line:121
-minibatch_size	/home/neale/ctf_RL/run_cvdc2.py	/^minibatch_size = 128$/;"	variable	line:123
-epoch	/home/neale/ctf_RL/run_cvdc2.py	/^epoch = 1$/;"	variable	line:124
-minimum_batch_size	/home/neale/ctf_RL/run_cvdc2.py	/^minimum_batch_size = 1024 * 4$/;"	variable	line:125
-log_episodic_reward	/home/neale/ctf_RL/run_cvdc2.py	/^log_episodic_reward = MovingAverage(moving_average_step)$/;"	variable	line:128
-log_winrate	/home/neale/ctf_RL/run_cvdc2.py	/^log_winrate = MovingAverage(moving_average_step)$/;"	variable	line:129
-log_redwinrate	/home/neale/ctf_RL/run_cvdc2.py	/^log_redwinrate = MovingAverage(moving_average_step)$/;"	variable	line:130
-log_looptime	/home/neale/ctf_RL/run_cvdc2.py	/^log_looptime = MovingAverage(moving_average_step)$/;"	variable	line:131
-log_traintime	/home/neale/ctf_RL/run_cvdc2.py	/^log_traintime = MovingAverage(moving_average_step)$/;"	variable	line:132
-_qenv	/home/neale/ctf_RL/run_cvdc2.py	/^_qenv = gym.make("cap-v0", map_size=map_size, config_path=game_config)$/;"	variable	line:136
-make_env	/home/neale/ctf_RL/run_cvdc2.py	/^def make_env(map_size):$/;"	function	line:137
-envs	/home/neale/ctf_RL/run_cvdc2.py	/^envs = [make_env(map_size) for i in range(NENV)]$/;"	variable	line:141
-envs	/home/neale/ctf_RL/run_cvdc2.py	/^envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)$/;"	variable	line:142
-num_blue	/home/neale/ctf_RL/run_cvdc2.py	/^num_blue = len(envs.get_team_blue()[0])$/;"	variable	line:143
-num_red	/home/neale/ctf_RL/run_cvdc2.py	/^num_red = len(envs.get_team_red()[0])$/;"	variable	line:144
-num_agent	/home/neale/ctf_RL/run_cvdc2.py	/^num_agent = num_blue  # +num_red$/;"	variable	line:145
-agent_type	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type = []$/;"	variable	line:151
-num_type	/home/neale/ctf_RL/run_cvdc2.py	/^num_type = len(agent_type)$/;"	variable	line:156
-agent_type_masking	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_masking = np.zeros([num_type, num_blue], dtype=bool)$/;"	variable	line:157
-agent_type_index	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_index = np.zeros([num_blue], dtype=int)$/;"	variable	line:158
-prev_i	/home/neale/ctf_RL/run_cvdc2.py	/^prev_i = 0$/;"	variable	line:159
-prev_i	/home/neale/ctf_RL/run_cvdc2.py	/^    prev_i = i$/;"	variable	line:163
-agent_type_masking	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_masking = np.tile(agent_type_masking, NENV)$/;"	variable	line:164
-atoms	/home/neale/ctf_RL/run_cvdc2.py	/^atoms = 256$/;"	variable	line:167
-network	/home/neale/ctf_RL/run_cvdc2.py	/^network = Network($/;"	variable	line:168
-central_obs_shape	/home/neale/ctf_RL/run_cvdc2.py	/^    central_obs_shape=cent_input_size,$/;"	variable	line:169
-decentral_obs_shape	/home/neale/ctf_RL/run_cvdc2.py	/^    decentral_obs_shape=input_size,$/;"	variable	line:170
-action_size	/home/neale/ctf_RL/run_cvdc2.py	/^    action_size=action_space,$/;"	variable	line:171
-agent_type	/home/neale/ctf_RL/run_cvdc2.py	/^    agent_type=agent_type,$/;"	variable	line:172
-atoms	/home/neale/ctf_RL/run_cvdc2.py	/^    atoms=atoms,$/;"	variable	line:173
-save_path	/home/neale/ctf_RL/run_cvdc2.py	/^    save_path=MODEL_PATH,$/;"	variable	line:174
-global_episodes	/home/neale/ctf_RL/run_cvdc2.py	/^global_episodes = network.initiate()$/;"	variable	line:178
-writer	/home/neale/ctf_RL/run_cvdc2.py	/^writer = tf.summary.create_file_writer(LOG_PATH)$/;"	variable	line:182
-train_central	/home/neale/ctf_RL/run_cvdc2.py	/^def train_central($/;"	function	line:185
-traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^    traj_buffer = defaultdict(list)$/;"	variable	line:195
-states	/home/neale/ctf_RL/run_cvdc2.py	/^        states = np.array(traj[0])$/;"	variable	line:198
-last_state	/home/neale/ctf_RL/run_cvdc2.py	/^        last_state = np.array(traj[3])[-1:, :, :, :]$/;"	variable	line:199
-reward	/home/neale/ctf_RL/run_cvdc2.py	/^        reward = traj[2]$/;"	variable	line:200
-critic	/home/neale/ctf_RL/run_cvdc2.py	/^        critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:204
-_critic	/home/neale/ctf_RL/run_cvdc2.py	/^        _critic = _env_critic["critic"].numpy()[0, 0]$/;"	variable	line:205
-train_dataset	/home/neale/ctf_RL/run_cvdc2.py	/^    train_dataset = ($/;"	variable	line:213
-train_decentral	/home/neale/ctf_RL/run_cvdc2.py	/^def train_decentral($/;"	function	line:230
-train_datasets	/home/neale/ctf_RL/run_cvdc2.py	/^    train_datasets = []$/;"	variable	line:239
-traj_buffer_list	/home/neale/ctf_RL/run_cvdc2.py	/^    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]$/;"	variable	line:242
-advantage_lists	/home/neale/ctf_RL/run_cvdc2.py	/^    advantage_lists = [[] for _ in range(num_type)]$/;"	variable	line:243
-f1_list	/home/neale/ctf_RL/run_cvdc2.py	/^    f1_list = []$/;"	variable	line:244
-f2_list	/home/neale/ctf_RL/run_cvdc2.py	/^    f2_list = []$/;"	variable	line:245
-fc_list	/home/neale/ctf_RL/run_cvdc2.py	/^    fc_list = []$/;"	variable	line:246
-atype	/home/neale/ctf_RL/run_cvdc2.py	/^            atype = agent_type_index[idx]$/;"	variable	line:249
-reward	/home/neale/ctf_RL/run_cvdc2.py	/^            reward = traj[2]$/;"	variable	line:251
-mask	/home/neale/ctf_RL/run_cvdc2.py	/^            mask = traj[3]$/;"	variable	line:252
-critic	/home/neale/ctf_RL/run_cvdc2.py	/^            critic = traj[5]$/;"	variable	line:253
-phi	/home/neale/ctf_RL/run_cvdc2.py	/^            phi = np.array(traj[7]).tolist()$/;"	variable	line:254
-psi	/home/neale/ctf_RL/run_cvdc2.py	/^            psi = np.array(traj[8]).tolist()$/;"	variable	line:255
-_critic	/home/neale/ctf_RL/run_cvdc2.py	/^            _critic = traj[9][-1]$/;"	variable	line:256
-_psi	/home/neale/ctf_RL/run_cvdc2.py	/^            _psi = np.array(traj[10][-1])$/;"	variable	line:257
-cent_state	/home/neale/ctf_RL/run_cvdc2.py	/^            cent_state = np.array(traj[14])$/;"	variable	line:259
-env_critic	/home/neale/ctf_RL/run_cvdc2.py	/^            env_critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:261
-icritic	/home/neale/ctf_RL/run_cvdc2.py	/^            icritic = traj[12]$/;"	variable	line:266
-dc	/home/neale/ctf_RL/run_cvdc2.py	/^            dc = np.array(critic[1:])-np.array(critic[:-1])$/;"	variable	line:268
-dc1	/home/neale/ctf_RL/run_cvdc2.py	/^            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])$/;"	variable	line:269
-dc2	/home/neale/ctf_RL/run_cvdc2.py	/^            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])$/;"	variable	line:270
-normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False$/;"	variable	line:279
-normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False,$/;"	variable	line:288
-discount_adv	/home/neale/ctf_RL/run_cvdc2.py	/^                discount_adv=False,$/;"	variable	line:307
-normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False,$/;"	variable	line:308
-beta	/home/neale/ctf_RL/run_cvdc2.py	/^            beta = max(min((-0.9\/30000)*step + 1, 1.0),0.1)$/;"	variable	line:310
-traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^            traj_buffer = traj_buffer_list[atype]$/;"	variable	line:312
-traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^        traj_buffer = traj_buffer_list[atype]$/;"	variable	line:323
-train_dataset	/home/neale/ctf_RL/run_cvdc2.py	/^        train_dataset = ($/;"	variable	line:324
-tag	/home/neale/ctf_RL/run_cvdc2.py	/^            tag = "advantages\/"$/;"	variable	line:349
-run_network	/home/neale/ctf_RL/run_cvdc2.py	/^def run_network(states):$/;"	function	line:361
-batch	/home/neale/ctf_RL/run_cvdc2.py	/^batch = []$/;"	variable	line:400
-dec_batch	/home/neale/ctf_RL/run_cvdc2.py	/^dec_batch = []$/;"	variable	line:401
-log_save_analysis	/home/neale/ctf_RL/run_cvdc2.py	/^    log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")$/;"	variable	line:405
-episode_rew	/home/neale/ctf_RL/run_cvdc2.py	/^    episode_rew = np.zeros(NENV)$/;"	variable	line:408
-is_alive	/home/neale/ctf_RL/run_cvdc2.py	/^    is_alive = [True for agent in envs.get_team_blue().flat]$/;"	variable	line:409
-is_done	/home/neale/ctf_RL/run_cvdc2.py	/^    is_done = [False for env in range(NENV * num_agent)]$/;"	variable	line:410
-trajs	/home/neale/ctf_RL/run_cvdc2.py	/^    trajs = [[Trajectory(depth=16) for _ in range(num_agent)] for _ in range(NENV)]$/;"	variable	line:412
-cent_trajs	/home/neale/ctf_RL/run_cvdc2.py	/^    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]$/;"	variable	line:413
-s1	/home/neale/ctf_RL/run_cvdc2.py	/^    s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)$/;"	variable	line:420
-s1	/home/neale/ctf_RL/run_cvdc2.py	/^    s1 = s1.astype(np.float32)$/;"	variable	line:421
-cent_s1	/home/neale/ctf_RL/run_cvdc2.py	/^    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized$/;"	variable	line:422
-reward_pred_list	/home/neale/ctf_RL/run_cvdc2.py	/^    reward_pred_list = []$/;"	variable	line:426
-stime_roll	/home/neale/ctf_RL/run_cvdc2.py	/^    stime_roll = time.time()$/;"	variable	line:429
-_states	/home/neale/ctf_RL/run_cvdc2.py	/^    _states = [[] for _ in range(NENV)]$/;"	variable	line:430
-_agent1_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent1_r = [[] for _ in range(NENV)]$/;"	variable	line:431
-_agent2_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent2_r = [[] for _ in range(NENV)]$/;"	variable	line:432
-_agent3_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent3_r = [[] for _ in range(NENV)]$/;"	variable	line:433
-_agent1_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent1_o = [[] for _ in range(NENV)]$/;"	variable	line:434
-_agent2_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent2_o = [[] for _ in range(NENV)]$/;"	variable	line:435
-_agent3_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent3_o = [[] for _ in range(NENV)]$/;"	variable	line:436
-s0	/home/neale/ctf_RL/run_cvdc2.py	/^        s0 = s1$/;"	variable	line:439
-a0	/home/neale/ctf_RL/run_cvdc2.py	/^        a0 = a1$/;"	variable	line:440
-vg0	/home/neale/ctf_RL/run_cvdc2.py	/^        vg0 = vg1$/;"	variable	line:441
-vc0	/home/neale/ctf_RL/run_cvdc2.py	/^        vc0 = vc1$/;"	variable	line:442
-psi0	/home/neale/ctf_RL/run_cvdc2.py	/^        psi0 = psi1$/;"	variable	line:443
-phi0	/home/neale/ctf_RL/run_cvdc2.py	/^        phi0 = phi1$/;"	variable	line:444
-log_logits0	/home/neale/ctf_RL/run_cvdc2.py	/^        log_logits0 = log_logits1$/;"	variable	line:445
-was_alive	/home/neale/ctf_RL/run_cvdc2.py	/^        was_alive = is_alive$/;"	variable	line:446
-was_done	/home/neale/ctf_RL/run_cvdc2.py	/^        was_done = is_done$/;"	variable	line:447
-cent_s0	/home/neale/ctf_RL/run_cvdc2.py	/^        cent_s0 = cent_s1$/;"	variable	line:448
-is_alive	/home/neale/ctf_RL/run_cvdc2.py	/^        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]$/;"	variable	line:452
-s1	/home/neale/ctf_RL/run_cvdc2.py	/^        s1 = s1.astype(np.float32)  # Decentralize observation$/;"	variable	line:453
-cent_s1	/home/neale/ctf_RL/run_cvdc2.py	/^        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized$/;"	variable	line:454
-idx	/home/neale/ctf_RL/run_cvdc2.py	/^                idx = env_idx * num_agent + agent_id$/;"	variable	line:465
-etime_roll	/home/neale/ctf_RL/run_cvdc2.py	/^    etime_roll = time.time()$/;"	variable	line:507
-stime_train	/home/neale/ctf_RL/run_cvdc2.py	/^        stime_train = time.time()$/;"	variable	line:512
-log	/home/neale/ctf_RL/run_cvdc2.py	/^        log = interval_flag(global_episodes, save_image_frequency, "im_log")$/;"	variable	line:513
-log_image	/home/neale/ctf_RL/run_cvdc2.py	/^        log_image = interval_flag(global_episodes, 1024, "ima_log")$/;"	variable	line:514
-epoch	/home/neale/ctf_RL/run_cvdc2.py	/^            epoch=epoch,$/;"	variable	line:517
-batch_size	/home/neale/ctf_RL/run_cvdc2.py	/^            batch_size=minibatch_size,$/;"	variable	line:518
-writer	/home/neale/ctf_RL/run_cvdc2.py	/^            writer=writer,$/;"	variable	line:519
-log	/home/neale/ctf_RL/run_cvdc2.py	/^            log=log,$/;"	variable	line:520
-step	/home/neale/ctf_RL/run_cvdc2.py	/^            step=global_episodes,$/;"	variable	line:521
-log_image	/home/neale/ctf_RL/run_cvdc2.py	/^            log_image=log_image,$/;"	variable	line:522
-etime_train	/home/neale/ctf_RL/run_cvdc2.py	/^        etime_train = time.time()$/;"	variable	line:524
-dec_batch	/home/neale/ctf_RL/run_cvdc2.py	/^        dec_batch = []$/;"	variable	line:525
-log_tc_on	/home/neale/ctf_RL/run_cvdc2.py	/^        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')$/;"	variable	line:530
-batch	/home/neale/ctf_RL/run_cvdc2.py	/^        batch = []$/;"	variable	line:532
-log_on	/home/neale/ctf_RL/run_cvdc2.py	/^    log_on = interval_flag(global_episodes, save_stat_frequency, "log")$/;"	variable	line:543
-tag	/home/neale/ctf_RL/run_cvdc2.py	/^            tag = "baseline_training\/"$/;"	variable	line:546
-step	/home/neale/ctf_RL/run_cvdc2.py	/^                step=global_episodes,$/;"	variable	line:561
-save_on	/home/neale/ctf_RL/run_cvdc2.py	/^    save_on = interval_flag(global_episodes, save_network_frequency, "save")$/;"	variable	line:565
-fig	/home/neale/ctf_RL/run_cvdc2.py	/^        fig = plt.figure(figsize=(8, 9))$/;"	variable	line:571
-widths	/home/neale/ctf_RL/run_cvdc2.py	/^        widths = [1.2, 0.5, 1.5, 1.5]$/;"	variable	line:572
-heights	/home/neale/ctf_RL/run_cvdc2.py	/^        heights = [2, 2, 4, 4, 4]$/;"	variable	line:573
-gs	/home/neale/ctf_RL/run_cvdc2.py	/^        gs = fig.add_gridspec($/;"	variable	line:574
-ax_env	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_env = fig.add_subplot(gs[:2, :2])$/;"	variable	line:577
-ax_value	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_value = fig.add_subplot(gs[:2, 2:])$/;"	variable	line:581
-ax_agent1	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent1 = fig.add_subplot(gs[2, 0])$/;"	variable	line:584
-ax_agent2	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent2 = fig.add_subplot(gs[3, 0])$/;"	variable	line:588
-ax_agent3	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent3 = fig.add_subplot(gs[4, 0])$/;"	variable	line:592
-ax_reward3	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward3 = fig.add_subplot(gs[4, 1:])$/;"	variable	line:596
-ax_reward2	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward2 = fig.add_subplot(gs[3, 1:], sharex=ax_reward3)$/;"	variable	line:598
-ax_reward1	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward1 = fig.add_subplot(gs[2, 1:], sharex=ax_reward3)$/;"	variable	line:601
-env_image	/home/neale/ctf_RL/run_cvdc2.py	/^        env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)$/;"	variable	line:605
-agent_obs1	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs1 = ax_agent1.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:606
-agent_obs2	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs2 = ax_agent2.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:607
-agent_obs3	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs3 = ax_agent3.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:608
-animate	/home/neale/ctf_RL/run_cvdc2.py	/^        def animate(i, info, critic, env_idx):$/;"	function	line:618
-_states	/home/neale/ctf_RL/run_cvdc2.py	/^        _states = None$/;"	variable	line:669
-_agent1_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent1_r = None$/;"	variable	line:670
-_agent2_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent2_r = None$/;"	variable	line:671
-_agent3_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent3_r = None$/;"	variable	line:672
-_agent1_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent1_o = None$/;"	variable	line:673
-_agent2_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent2_o = None$/;"	variable	line:674
-_agent3_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent3_o = None$/;"	variable	line:675
-anim	/home/neale/ctf_RL/run_cvdc2.py	/^        anim = None$/;"	variable	line:676
 device_t	/home/neale/ctf_RL/archive_code/ppo_subpolicy_fix.py	/^device_t = sys.argv[2]$/;"	variable	line:46
 N_ATT	/home/neale/ctf_RL/archive_code/ppo_subpolicy_fix.py	/^N_ATT = int(sys.argv[3])$/;"	variable	line:47
 N_SCT	/home/neale/ctf_RL/archive_code/ppo_subpolicy_fix.py	/^N_SCT = int(sys.argv[4])$/;"	variable	line:48
@@ -3961,3 +3652,737 @@ b	/home/neale/ctf_RL/utility/buffer.py	/^    b = np.random.randint(5, size=10)$/
 tr	/home/neale/ctf_RL/utility/buffer.py	/^    tr = Trajectory(depth=2)$/;"	variable	line:318	class:Replay_buffer
 tr_buf	/home/neale/ctf_RL/utility/buffer.py	/^    tr_buf = Trajectory_buffer(depth=2)$/;"	variable	line:325	class:Replay_buffer
 tf_clipped_log	/home/neale/ctf_RL/utility/tf_utils.py	/^def tf_clipped_log(val, vmin=1e-10, vmax=10.0):$/;"	function	line:5
+physical_devices	/home/neale/ctf_RL/run_cvdc2.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:18
+parser	/home/neale/ctf_RL/run_cvdc2.py	/^parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")$/;"	variable	line:48
+args	/home/neale/ctf_RL/run_cvdc2.py	/^args = parser.parse_args()$/;"	variable	line:59
+PROGBAR	/home/neale/ctf_RL/run_cvdc2.py	/^PROGBAR = args.silence$/;"	variable	line:61
+TRAIN_NAME	/home/neale/ctf_RL/run_cvdc2.py	/^TRAIN_NAME = "CVDC_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format($/;"	variable	line:64
+TRAIN_TAG	/home/neale/ctf_RL/run_cvdc2.py	/^TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME$/;"	variable	line:73
+LOG_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^LOG_PATH = ".\/logs\/" + TRAIN_NAME$/;"	variable	line:74
+MODEL_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^MODEL_PATH = ".\/model\/" + TRAIN_NAME$/;"	variable	line:75
+SAVE_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^SAVE_PATH = ".\/save\/" + TRAIN_NAME$/;"	variable	line:76
+MAP_PATH	/home/neale/ctf_RL/run_cvdc2.py	/^MAP_PATH = ".\/fair_3g_20"$/;"	variable	line:77
+GPU_CAPACITY	/home/neale/ctf_RL/run_cvdc2.py	/^GPU_CAPACITY = 0.95$/;"	variable	line:78
+NENV	/home/neale/ctf_RL/run_cvdc2.py	/^NENV = multiprocessing.cpu_count() \/\/ 4$/;"	variable	line:82
+env_setting_path	/home/neale/ctf_RL/run_cvdc2.py	/^env_setting_path = "env_setting_convoy.ini"$/;"	variable	line:85
+game_config	/home/neale/ctf_RL/run_cvdc2.py	/^game_config = configparser.ConfigParser()$/;"	variable	line:86
+config_path	/home/neale/ctf_RL/run_cvdc2.py	/^config_path = "config.ini"$/;"	variable	line:99
+config	/home/neale/ctf_RL/run_cvdc2.py	/^config = configparser.ConfigParser()$/;"	variable	line:100
+total_episodes	/home/neale/ctf_RL/run_cvdc2.py	/^total_episodes = 100000$/;"	variable	line:104
+max_ep	/home/neale/ctf_RL/run_cvdc2.py	/^max_ep = 200$/;"	variable	line:105
+gamma	/home/neale/ctf_RL/run_cvdc2.py	/^gamma = 0.98  # GAE - discount$/;"	variable	line:106
+lambd	/home/neale/ctf_RL/run_cvdc2.py	/^lambd = 0.98  # GAE - lambda$/;"	variable	line:107
+save_network_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_network_frequency = 1024$/;"	variable	line:109
+save_stat_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_stat_frequency = 128$/;"	variable	line:110
+save_image_frequency	/home/neale/ctf_RL/run_cvdc2.py	/^save_image_frequency = 128$/;"	variable	line:111
+moving_average_step	/home/neale/ctf_RL/run_cvdc2.py	/^moving_average_step = 256  # MA for recording episode statistics$/;"	variable	line:112
+action_space	/home/neale/ctf_RL/run_cvdc2.py	/^action_space = 5$/;"	variable	line:114
+keep_frame	/home/neale/ctf_RL/run_cvdc2.py	/^keep_frame = 1$/;"	variable	line:115
+map_size	/home/neale/ctf_RL/run_cvdc2.py	/^map_size = args.map_size$/;"	variable	line:116
+vision_range	/home/neale/ctf_RL/run_cvdc2.py	/^vision_range = map_size - 1$/;"	variable	line:117
+nchannel	/home/neale/ctf_RL/run_cvdc2.py	/^nchannel = 6 * keep_frame$/;"	variable	line:119
+input_size	/home/neale/ctf_RL/run_cvdc2.py	/^input_size = [None, vision_dx, vision_dy, nchannel]$/;"	variable	line:120
+cent_input_size	/home/neale/ctf_RL/run_cvdc2.py	/^cent_input_size = [None, map_size, map_size, nchannel]$/;"	variable	line:121
+minibatch_size	/home/neale/ctf_RL/run_cvdc2.py	/^minibatch_size = 128$/;"	variable	line:123
+epoch	/home/neale/ctf_RL/run_cvdc2.py	/^epoch = 1$/;"	variable	line:124
+minimum_batch_size	/home/neale/ctf_RL/run_cvdc2.py	/^minimum_batch_size = 1024 * 4$/;"	variable	line:125
+log_episodic_reward	/home/neale/ctf_RL/run_cvdc2.py	/^log_episodic_reward = MovingAverage(moving_average_step)$/;"	variable	line:128
+log_winrate	/home/neale/ctf_RL/run_cvdc2.py	/^log_winrate = MovingAverage(moving_average_step)$/;"	variable	line:129
+log_redwinrate	/home/neale/ctf_RL/run_cvdc2.py	/^log_redwinrate = MovingAverage(moving_average_step)$/;"	variable	line:130
+log_looptime	/home/neale/ctf_RL/run_cvdc2.py	/^log_looptime = MovingAverage(moving_average_step)$/;"	variable	line:131
+log_traintime	/home/neale/ctf_RL/run_cvdc2.py	/^log_traintime = MovingAverage(moving_average_step)$/;"	variable	line:132
+_qenv	/home/neale/ctf_RL/run_cvdc2.py	/^_qenv = gym.make("cap-v0", map_size=map_size, config_path=game_config)$/;"	variable	line:136
+make_env	/home/neale/ctf_RL/run_cvdc2.py	/^def make_env(map_size):$/;"	function	line:137
+envs	/home/neale/ctf_RL/run_cvdc2.py	/^envs = [make_env(map_size) for i in range(NENV)]$/;"	variable	line:141
+envs	/home/neale/ctf_RL/run_cvdc2.py	/^envs = SubprocVecEnv(envs, keep_frame=keep_frame, size=vision_dx)$/;"	variable	line:142
+num_blue	/home/neale/ctf_RL/run_cvdc2.py	/^num_blue = len(envs.get_team_blue()[0])$/;"	variable	line:143
+num_red	/home/neale/ctf_RL/run_cvdc2.py	/^num_red = len(envs.get_team_red()[0])$/;"	variable	line:144
+num_agent	/home/neale/ctf_RL/run_cvdc2.py	/^num_agent = num_blue  # +num_red$/;"	variable	line:145
+agent_type	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type = []$/;"	variable	line:151
+num_type	/home/neale/ctf_RL/run_cvdc2.py	/^num_type = len(agent_type)$/;"	variable	line:156
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_masking = np.zeros([num_type, num_blue], dtype=bool)$/;"	variable	line:157
+agent_type_index	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_index = np.zeros([num_blue], dtype=int)$/;"	variable	line:158
+prev_i	/home/neale/ctf_RL/run_cvdc2.py	/^prev_i = 0$/;"	variable	line:159
+prev_i	/home/neale/ctf_RL/run_cvdc2.py	/^    prev_i = i$/;"	variable	line:163
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2.py	/^agent_type_masking = np.tile(agent_type_masking, NENV)$/;"	variable	line:164
+atoms	/home/neale/ctf_RL/run_cvdc2.py	/^atoms = 256$/;"	variable	line:167
+network	/home/neale/ctf_RL/run_cvdc2.py	/^network = Network($/;"	variable	line:168
+central_obs_shape	/home/neale/ctf_RL/run_cvdc2.py	/^    central_obs_shape=cent_input_size,$/;"	variable	line:169
+decentral_obs_shape	/home/neale/ctf_RL/run_cvdc2.py	/^    decentral_obs_shape=input_size,$/;"	variable	line:170
+action_size	/home/neale/ctf_RL/run_cvdc2.py	/^    action_size=action_space,$/;"	variable	line:171
+agent_type	/home/neale/ctf_RL/run_cvdc2.py	/^    agent_type=agent_type,$/;"	variable	line:172
+atoms	/home/neale/ctf_RL/run_cvdc2.py	/^    atoms=atoms,$/;"	variable	line:173
+save_path	/home/neale/ctf_RL/run_cvdc2.py	/^    save_path=MODEL_PATH,$/;"	variable	line:174
+global_episodes	/home/neale/ctf_RL/run_cvdc2.py	/^global_episodes = network.initiate()$/;"	variable	line:178
+writer	/home/neale/ctf_RL/run_cvdc2.py	/^writer = tf.summary.create_file_writer(LOG_PATH)$/;"	variable	line:182
+train_central	/home/neale/ctf_RL/run_cvdc2.py	/^def train_central($/;"	function	line:185
+traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^    traj_buffer = defaultdict(list)$/;"	variable	line:195
+states	/home/neale/ctf_RL/run_cvdc2.py	/^        states = np.array(traj[0])$/;"	variable	line:198
+last_state	/home/neale/ctf_RL/run_cvdc2.py	/^        last_state = np.array(traj[3])[-1:, :, :, :]$/;"	variable	line:199
+reward	/home/neale/ctf_RL/run_cvdc2.py	/^        reward = traj[2]$/;"	variable	line:200
+critic	/home/neale/ctf_RL/run_cvdc2.py	/^        critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:204
+_critic	/home/neale/ctf_RL/run_cvdc2.py	/^        _critic = _env_critic["critic"].numpy()[0, 0]$/;"	variable	line:205
+train_dataset	/home/neale/ctf_RL/run_cvdc2.py	/^    train_dataset = ($/;"	variable	line:213
+train_decentral	/home/neale/ctf_RL/run_cvdc2.py	/^def train_decentral($/;"	function	line:230
+train_datasets	/home/neale/ctf_RL/run_cvdc2.py	/^    train_datasets = []$/;"	variable	line:239
+traj_buffer_list	/home/neale/ctf_RL/run_cvdc2.py	/^    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]$/;"	variable	line:242
+advantage_lists	/home/neale/ctf_RL/run_cvdc2.py	/^    advantage_lists = [[] for _ in range(num_type)]$/;"	variable	line:243
+f1_list	/home/neale/ctf_RL/run_cvdc2.py	/^    f1_list = []$/;"	variable	line:244
+f2_list	/home/neale/ctf_RL/run_cvdc2.py	/^    f2_list = []$/;"	variable	line:245
+fc_list	/home/neale/ctf_RL/run_cvdc2.py	/^    fc_list = []$/;"	variable	line:246
+atype	/home/neale/ctf_RL/run_cvdc2.py	/^            atype = agent_type_index[idx]$/;"	variable	line:249
+reward	/home/neale/ctf_RL/run_cvdc2.py	/^            reward = traj[2]$/;"	variable	line:251
+mask	/home/neale/ctf_RL/run_cvdc2.py	/^            mask = traj[3]$/;"	variable	line:252
+critic	/home/neale/ctf_RL/run_cvdc2.py	/^            critic = traj[5]$/;"	variable	line:253
+phi	/home/neale/ctf_RL/run_cvdc2.py	/^            phi = np.array(traj[7]).tolist()$/;"	variable	line:254
+psi	/home/neale/ctf_RL/run_cvdc2.py	/^            psi = np.array(traj[8]).tolist()$/;"	variable	line:255
+_critic	/home/neale/ctf_RL/run_cvdc2.py	/^            _critic = traj[9][-1]$/;"	variable	line:256
+_psi	/home/neale/ctf_RL/run_cvdc2.py	/^            _psi = np.array(traj[10][-1])$/;"	variable	line:257
+cent_state	/home/neale/ctf_RL/run_cvdc2.py	/^            cent_state = np.array(traj[14])$/;"	variable	line:259
+env_critic	/home/neale/ctf_RL/run_cvdc2.py	/^            env_critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:261
+icritic	/home/neale/ctf_RL/run_cvdc2.py	/^            icritic = traj[12]$/;"	variable	line:266
+dc	/home/neale/ctf_RL/run_cvdc2.py	/^            dc = np.array(critic[1:])-np.array(critic[:-1])$/;"	variable	line:268
+dc1	/home/neale/ctf_RL/run_cvdc2.py	/^            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])$/;"	variable	line:269
+dc2	/home/neale/ctf_RL/run_cvdc2.py	/^            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])$/;"	variable	line:270
+normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False$/;"	variable	line:279
+normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False,$/;"	variable	line:288
+discount_adv	/home/neale/ctf_RL/run_cvdc2.py	/^                discount_adv=False,$/;"	variable	line:307
+normalize	/home/neale/ctf_RL/run_cvdc2.py	/^                normalize=False,$/;"	variable	line:308
+beta	/home/neale/ctf_RL/run_cvdc2.py	/^            beta = max(min((-0.9\/30000)*step + 1, 1.0),0.1)$/;"	variable	line:310
+traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^            traj_buffer = traj_buffer_list[atype]$/;"	variable	line:312
+traj_buffer	/home/neale/ctf_RL/run_cvdc2.py	/^        traj_buffer = traj_buffer_list[atype]$/;"	variable	line:323
+train_dataset	/home/neale/ctf_RL/run_cvdc2.py	/^        train_dataset = ($/;"	variable	line:324
+tag	/home/neale/ctf_RL/run_cvdc2.py	/^            tag = "advantages\/"$/;"	variable	line:349
+run_network	/home/neale/ctf_RL/run_cvdc2.py	/^def run_network(states):$/;"	function	line:361
+batch	/home/neale/ctf_RL/run_cvdc2.py	/^batch = []$/;"	variable	line:400
+dec_batch	/home/neale/ctf_RL/run_cvdc2.py	/^dec_batch = []$/;"	variable	line:401
+log_save_analysis	/home/neale/ctf_RL/run_cvdc2.py	/^    log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")$/;"	variable	line:405
+episode_rew	/home/neale/ctf_RL/run_cvdc2.py	/^    episode_rew = np.zeros(NENV)$/;"	variable	line:408
+is_alive	/home/neale/ctf_RL/run_cvdc2.py	/^    is_alive = [True for agent in envs.get_team_blue().flat]$/;"	variable	line:409
+is_done	/home/neale/ctf_RL/run_cvdc2.py	/^    is_done = [False for env in range(NENV * num_agent)]$/;"	variable	line:410
+trajs	/home/neale/ctf_RL/run_cvdc2.py	/^    trajs = [[Trajectory(depth=16) for _ in range(num_agent)] for _ in range(NENV)]$/;"	variable	line:412
+cent_trajs	/home/neale/ctf_RL/run_cvdc2.py	/^    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]$/;"	variable	line:413
+s1	/home/neale/ctf_RL/run_cvdc2.py	/^    s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)$/;"	variable	line:420
+s1	/home/neale/ctf_RL/run_cvdc2.py	/^    s1 = s1.astype(np.float32)$/;"	variable	line:421
+cent_s1	/home/neale/ctf_RL/run_cvdc2.py	/^    cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized$/;"	variable	line:422
+reward_pred_list	/home/neale/ctf_RL/run_cvdc2.py	/^    reward_pred_list = []$/;"	variable	line:426
+stime_roll	/home/neale/ctf_RL/run_cvdc2.py	/^    stime_roll = time.time()$/;"	variable	line:429
+_states	/home/neale/ctf_RL/run_cvdc2.py	/^    _states = [[] for _ in range(NENV)]$/;"	variable	line:430
+_agent1_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent1_r = [[] for _ in range(NENV)]$/;"	variable	line:431
+_agent2_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent2_r = [[] for _ in range(NENV)]$/;"	variable	line:432
+_agent3_r	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent3_r = [[] for _ in range(NENV)]$/;"	variable	line:433
+_agent1_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent1_o = [[] for _ in range(NENV)]$/;"	variable	line:434
+_agent2_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent2_o = [[] for _ in range(NENV)]$/;"	variable	line:435
+_agent3_o	/home/neale/ctf_RL/run_cvdc2.py	/^    _agent3_o = [[] for _ in range(NENV)]$/;"	variable	line:436
+s0	/home/neale/ctf_RL/run_cvdc2.py	/^        s0 = s1$/;"	variable	line:439
+a0	/home/neale/ctf_RL/run_cvdc2.py	/^        a0 = a1$/;"	variable	line:440
+vg0	/home/neale/ctf_RL/run_cvdc2.py	/^        vg0 = vg1$/;"	variable	line:441
+vc0	/home/neale/ctf_RL/run_cvdc2.py	/^        vc0 = vc1$/;"	variable	line:442
+psi0	/home/neale/ctf_RL/run_cvdc2.py	/^        psi0 = psi1$/;"	variable	line:443
+phi0	/home/neale/ctf_RL/run_cvdc2.py	/^        phi0 = phi1$/;"	variable	line:444
+log_logits0	/home/neale/ctf_RL/run_cvdc2.py	/^        log_logits0 = log_logits1$/;"	variable	line:445
+was_alive	/home/neale/ctf_RL/run_cvdc2.py	/^        was_alive = is_alive$/;"	variable	line:446
+was_done	/home/neale/ctf_RL/run_cvdc2.py	/^        was_done = is_done$/;"	variable	line:447
+cent_s0	/home/neale/ctf_RL/run_cvdc2.py	/^        cent_s0 = cent_s1$/;"	variable	line:448
+is_alive	/home/neale/ctf_RL/run_cvdc2.py	/^        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]$/;"	variable	line:452
+s1	/home/neale/ctf_RL/run_cvdc2.py	/^        s1 = s1.astype(np.float32)  # Decentralize observation$/;"	variable	line:453
+cent_s1	/home/neale/ctf_RL/run_cvdc2.py	/^        cent_s1 = envs.get_obs_blue().astype(np.float32)  # Centralized$/;"	variable	line:454
+idx	/home/neale/ctf_RL/run_cvdc2.py	/^                idx = env_idx * num_agent + agent_id$/;"	variable	line:465
+etime_roll	/home/neale/ctf_RL/run_cvdc2.py	/^    etime_roll = time.time()$/;"	variable	line:507
+stime_train	/home/neale/ctf_RL/run_cvdc2.py	/^        stime_train = time.time()$/;"	variable	line:512
+log	/home/neale/ctf_RL/run_cvdc2.py	/^        log = interval_flag(global_episodes, save_image_frequency, "im_log")$/;"	variable	line:513
+log_image	/home/neale/ctf_RL/run_cvdc2.py	/^        log_image = interval_flag(global_episodes, 1024, "ima_log")$/;"	variable	line:514
+epoch	/home/neale/ctf_RL/run_cvdc2.py	/^            epoch=epoch,$/;"	variable	line:517
+batch_size	/home/neale/ctf_RL/run_cvdc2.py	/^            batch_size=minibatch_size,$/;"	variable	line:518
+writer	/home/neale/ctf_RL/run_cvdc2.py	/^            writer=writer,$/;"	variable	line:519
+log	/home/neale/ctf_RL/run_cvdc2.py	/^            log=log,$/;"	variable	line:520
+step	/home/neale/ctf_RL/run_cvdc2.py	/^            step=global_episodes,$/;"	variable	line:521
+log_image	/home/neale/ctf_RL/run_cvdc2.py	/^            log_image=log_image,$/;"	variable	line:522
+etime_train	/home/neale/ctf_RL/run_cvdc2.py	/^        etime_train = time.time()$/;"	variable	line:524
+dec_batch	/home/neale/ctf_RL/run_cvdc2.py	/^        dec_batch = []$/;"	variable	line:525
+log_tc_on	/home/neale/ctf_RL/run_cvdc2.py	/^        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')$/;"	variable	line:530
+batch	/home/neale/ctf_RL/run_cvdc2.py	/^        batch = []$/;"	variable	line:532
+log_on	/home/neale/ctf_RL/run_cvdc2.py	/^    log_on = interval_flag(global_episodes, save_stat_frequency, "log")$/;"	variable	line:543
+tag	/home/neale/ctf_RL/run_cvdc2.py	/^            tag = "baseline_training\/"$/;"	variable	line:546
+step	/home/neale/ctf_RL/run_cvdc2.py	/^                step=global_episodes,$/;"	variable	line:561
+save_on	/home/neale/ctf_RL/run_cvdc2.py	/^    save_on = interval_flag(global_episodes, save_network_frequency, "save")$/;"	variable	line:565
+fig	/home/neale/ctf_RL/run_cvdc2.py	/^        fig = plt.figure(figsize=(8, 9))$/;"	variable	line:571
+widths	/home/neale/ctf_RL/run_cvdc2.py	/^        widths = [1.2, 0.5, 1.5, 1.5]$/;"	variable	line:572
+heights	/home/neale/ctf_RL/run_cvdc2.py	/^        heights = [2, 2, 4, 4, 4]$/;"	variable	line:573
+gs	/home/neale/ctf_RL/run_cvdc2.py	/^        gs = fig.add_gridspec($/;"	variable	line:574
+ax_env	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_env = fig.add_subplot(gs[:2, :2])$/;"	variable	line:577
+ax_value	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_value = fig.add_subplot(gs[:2, 2:])$/;"	variable	line:581
+ax_agent1	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent1 = fig.add_subplot(gs[2, 0])$/;"	variable	line:584
+ax_agent2	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent2 = fig.add_subplot(gs[3, 0])$/;"	variable	line:588
+ax_agent3	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_agent3 = fig.add_subplot(gs[4, 0])$/;"	variable	line:592
+ax_reward3	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward3 = fig.add_subplot(gs[4, 1:])$/;"	variable	line:596
+ax_reward2	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward2 = fig.add_subplot(gs[3, 1:], sharex=ax_reward3)$/;"	variable	line:598
+ax_reward1	/home/neale/ctf_RL/run_cvdc2.py	/^        ax_reward1 = fig.add_subplot(gs[2, 1:], sharex=ax_reward3)$/;"	variable	line:601
+env_image	/home/neale/ctf_RL/run_cvdc2.py	/^        env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)$/;"	variable	line:605
+agent_obs1	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs1 = ax_agent1.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:606
+agent_obs2	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs2 = ax_agent2.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:607
+agent_obs3	/home/neale/ctf_RL/run_cvdc2.py	/^        agent_obs3 = ax_agent3.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:608
+animate	/home/neale/ctf_RL/run_cvdc2.py	/^        def animate(i, info, critic, env_idx):$/;"	function	line:618
+_states	/home/neale/ctf_RL/run_cvdc2.py	/^        _states = None$/;"	variable	line:669
+_agent1_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent1_r = None$/;"	variable	line:670
+_agent2_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent2_r = None$/;"	variable	line:671
+_agent3_r	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent3_r = None$/;"	variable	line:672
+_agent1_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent1_o = None$/;"	variable	line:673
+_agent2_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent2_o = None$/;"	variable	line:674
+_agent3_o	/home/neale/ctf_RL/run_cvdc2.py	/^        _agent3_o = None$/;"	variable	line:675
+anim	/home/neale/ctf_RL/run_cvdc2.py	/^        anim = None$/;"	variable	line:676
+LSTM_Flatten	/home/neale/ctf_RL/network/lstm_utils.py	/^class LSTM_Flatten(Layer):$/;"	class	line:5
+__init__	/home/neale/ctf_RL/network/lstm_utils.py	/^    def __init__(self,name='lstmreshape',**kwargs):$/;"	member	line:7	class:LSTM_Flatten
+build	/home/neale/ctf_RL/network/lstm_utils.py	/^    def build(self,input_shape):$/;"	member	line:10	class:LSTM_Flatten
+call	/home/neale/ctf_RL/network/lstm_utils.py	/^    def call(self, inputs):$/;"	member	line:13	class:LSTM_Flatten
+compute_output_shape	/home/neale/ctf_RL/network/lstm_utils.py	/^    def compute_output_shape(self, input_shape):$/;"	member	line:17	class:LSTM_Flatten
+get_config	/home/neale/ctf_RL/network/lstm_utils.py	/^    def get_config(self):$/;"	member	line:20	class:LSTM_Flatten
+V4	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4(tf.keras.Model):$/;"	class	line:19
+STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:20	class:V4
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:21	class:V4
+LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:22	class:V4
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:25	class:V4
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:52	class:V4
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:56	class:V4
+V4_lstm	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4_lstm(tf.keras.Model):$/;"	class	line:68
+STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:69	class:V4_lstm
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:70	class:V4_lstm
+LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:71	class:V4_lstm
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:74	class:V4_lstm
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:107	class:V4_lstm
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:111	class:V4_lstm
+V4INV	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4INV(tf.keras.Model):$/;"	class	line:123
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, trainable=True, name='FeatureNN_Inverse'):$/;"	member	line:125	class:V4INV
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:147	class:V4INV
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:151	class:V4INV
+V4Decentral	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4Decentral(tf.keras.Model):$/;"	class	line:162
+STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:163	class:V4Decentral
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:164	class:V4Decentral
+LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:165	class:V4Decentral
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:168	class:V4Decentral
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:193	class:V4Decentral
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:197	class:V4Decentral
+V4Decentral_lstm	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4Decentral_lstm(tf.keras.Model):$/;"	class	line:210
+STATIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:211	class:V4Decentral_lstm
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/model_V4_30.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:212	class:V4Decentral_lstm
+LATENT_DIM	/home/neale/ctf_RL/network/model_V4_30.py	/^    LATENT_DIM = 128$/;"	variable	line:213	class:V4Decentral_lstm
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:216	class:V4Decentral_lstm
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:244	class:V4Decentral_lstm
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:248	class:V4Decentral_lstm
+V4INVDecentral	/home/neale/ctf_RL/network/model_V4_30.py	/^class V4INVDecentral(tf.keras.Model):$/;"	class	line:260
+__init__	/home/neale/ctf_RL/network/model_V4_30.py	/^    def __init__(self, trainable=True, name='FeatureNN_Inverse', **kwargs):$/;"	member	line:262	class:V4INVDecentral
+print_summary	/home/neale/ctf_RL/network/model_V4_30.py	/^    def print_summary(self):$/;"	member	line:284	class:V4INVDecentral
+call	/home/neale/ctf_RL/network/model_V4_30.py	/^    def call(self, inputs):$/;"	member	line:288	class:V4INVDecentral
+physical_devices	/home/neale/ctf_RL/network/model_V4_30.py	/^    physical_devices = tf.config.experimental.list_physical_devices('GPU')$/;"	variable	line:300	class:V4INVDecentral
+config	/home/neale/ctf_RL/network/model_V4_30.py	/^    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)$/;"	variable	line:302	class:V4INVDecentral
+sample_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_size = 32$/;"	variable	line:305	class:V4INVDecentral
+map_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    map_size = 30$/;"	variable	line:306	class:V4INVDecentral
+map_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    map_size = map_size*2-1$/;"	variable	line:307	class:V4INVDecentral
+image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [map_size,map_size,6]$/;"	variable	line:308	class:V4INVDecentral
+sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:309	class:V4INVDecentral
+latent_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_size = 128$/;"	variable	line:310	class:V4INVDecentral
+latent_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_shape = [sample_size]+[latent_size]$/;"	variable	line:311	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4(image_shape, 5)$/;"	variable	line:314	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:317	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:318	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4INV()$/;"	variable	line:323	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(latent_shape).astype(np.float32)$/;"	variable	line:326	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:327	class:V4INVDecentral
+image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [3,map_size,map_size,6]$/;"	variable	line:332	class:V4INVDecentral
+sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:333	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4_lstm(image_shape, 5)$/;"	variable	line:335	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:338	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:339	class:V4INVDecentral
+sample_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_size = 32$/;"	variable	line:345	class:V4INVDecentral
+image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [map_size,map_size,6]$/;"	variable	line:347	class:V4INVDecentral
+sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:348	class:V4INVDecentral
+latent_size	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_size = 128$/;"	variable	line:349	class:V4INVDecentral
+latent_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    latent_shape = [sample_size]+[latent_size]$/;"	variable	line:350	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4Decentral(image_shape, 5)$/;"	variable	line:353	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:356	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:357	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4INVDecentral()$/;"	variable	line:362	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(latent_shape).astype(np.float32)$/;"	variable	line:365	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:366	class:V4INVDecentral
+image_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    image_shape = [3,map_size,map_size,6]$/;"	variable	line:371	class:V4INVDecentral
+sample_shape	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample_shape = [sample_size]+image_shape$/;"	variable	line:372	class:V4INVDecentral
+model	/home/neale/ctf_RL/network/model_V4_30.py	/^    model = V4Decentral_lstm(image_shape)$/;"	variable	line:373	class:V4INVDecentral
+sample	/home/neale/ctf_RL/network/model_V4_30.py	/^    sample = np.random.random(sample_shape).astype(np.float32)$/;"	variable	line:376	class:V4INVDecentral
+output	/home/neale/ctf_RL/network/model_V4_30.py	/^    output = model(sample)$/;"	variable	line:377	class:V4INVDecentral
+SF_CVDC	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC:$/;"	class	line:16
+__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:20	class:SF_CVDC
+log	/home/neale/ctf_RL/method/CVDC2.py	/^    def log(self, step, log_weights=True, logs=None):$/;"	member	line:85	class:SF_CVDC
+run_network_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_central(self, states):$/;"	member	line:113	class:SF_CVDC
+run_network_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_decentral(self, states_list):$/;"	member	line:119	class:SF_CVDC
+update_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):$/;"	member	line:133	class:SF_CVDC
+update_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):$/;"	member	line:155	class:SF_CVDC
+initiate	/home/neale/ctf_RL/method/CVDC2.py	/^    def initiate(self, verbose=1):$/;"	member	line:220	class:SF_CVDC
+restore	/home/neale/ctf_RL/method/CVDC2.py	/^    def restore(self):$/;"	member	line:235	class:SF_CVDC
+save	/home/neale/ctf_RL/method/CVDC2.py	/^    def save(self, checkpoint_number):$/;"	member	line:242	class:SF_CVDC
+SF_CVDC_lstm	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC_lstm(SF_CVDC):$/;"	class	line:252
+__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:256	class:SF_CVDC_lstm
+update_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):$/;"	member	line:320	class:SF_CVDC_lstm
+SF_CVDC_SC2	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC_SC2:$/;"	class	line:391
+__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:395	class:SF_CVDC_SC2
+log	/home/neale/ctf_RL/method/CVDC2.py	/^    def log(self, step, log_weights=True, logs=None):$/;"	member	line:461	class:SF_CVDC_SC2
+run_network_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_central(self, states):$/;"	member	line:489	class:SF_CVDC_SC2
+run_network_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def run_network_decentral(self, states_list,validActions_list):$/;"	member	line:495	class:SF_CVDC_SC2
+update_central	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):$/;"	member	line:514	class:SF_CVDC_SC2
+update_decentral	/home/neale/ctf_RL/method/CVDC2.py	/^    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):$/;"	member	line:536	class:SF_CVDC_SC2
+initiate	/home/neale/ctf_RL/method/CVDC2.py	/^    def initiate(self, verbose=1):$/;"	member	line:602	class:SF_CVDC_SC2
+restore	/home/neale/ctf_RL/method/CVDC2.py	/^    def restore(self):$/;"	member	line:617	class:SF_CVDC_SC2
+save	/home/neale/ctf_RL/method/CVDC2.py	/^    def save(self, checkpoint_number):$/;"	member	line:624	class:SF_CVDC_SC2
+SF_CVDC_SC2_lstm	/home/neale/ctf_RL/method/CVDC2.py	/^class SF_CVDC_SC2_lstm(SF_CVDC_SC2):$/;"	class	line:633
+__init__	/home/neale/ctf_RL/method/CVDC2.py	/^    def __init__($/;"	member	line:635	class:SF_CVDC_SC2_lstm
+sc2	/home/neale/ctf_RL/Makefile	/^define sc2$/;"	macro	line:2
+Decentral	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Decentral(tf.keras.Model):$/;"	class	line:22
+__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:24	class:Decentral
+print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:91	class:Decentral
+action_call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:95	class:Decentral
+call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:138	class:Decentral
+Central	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Central(tf.keras.Model):$/;"	class	line:213
+__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:215	class:Central
+print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:231	class:Central
+call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs):$/;"	member	line:234	class:Central
+loss_central	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_central(model, state, td_target_c):$/;"	function	line:251
+loss_decentral_critic_only	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):$/;"	function	line:264
+loss_ppo	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,$/;"	function	line:276
+get_gradient	/home/neale/ctf_RL/network/CVDC_model2.py	/^def get_gradient(model, loss, inputs, hyperparameters={}):$/;"	function	line:364
+train	/home/neale/ctf_RL/network/CVDC_model2.py	/^def train(model, loss, optimizer, inputs, hyperparameters={}):$/;"	function	line:371
+Decentral_lstm	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Decentral_lstm(tf.keras.Model):$/;"	class	line:382
+__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:384	class:Decentral_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:451	class:Decentral_lstm
+action_call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:455	class:Decentral_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:498	class:Decentral_lstm
+Central_lstm	/home/neale/ctf_RL/network/CVDC_model2.py	/^class Central_lstm(tf.keras.Model):$/;"	class	line:573
+__init__	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:575	class:Central_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def print_summary(self):$/;"	member	line:591	class:Central_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2.py	/^    def call(self, inputs):$/;"	member	line:594	class:Central_lstm
+loss_ppo_lstm	/home/neale/ctf_RL/network/CVDC_model2.py	/^def loss_ppo_lstm(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,$/;"	function	line:612
+FrameStacking	/home/neale/ctf_RL/CTFWrappers.py	/^class FrameStacking(gym.core.Wrapper):$/;"	class	line:4
+__init__	/home/neale/ctf_RL/CTFWrappers.py	/^    def __init__(self,env,numFrames=3,lstm=True,**kwargs):$/;"	member	line:6	class:FrameStacking
+reset	/home/neale/ctf_RL/CTFWrappers.py	/^    def reset(self,*args,**kwargs):$/;"	member	line:18	class:FrameStacking
+step	/home/neale/ctf_RL/CTFWrappers.py	/^    def step(self,action,*args,**kwargs):$/;"	member	line:24	class:FrameStacking
+GetCentralState	/home/neale/ctf_RL/CTFWrappers.py	/^    def GetCentralState(self):$/;"	member	line:29	class:FrameStacking
+Stacked_state	/home/neale/ctf_RL/CTFWrappers.py	/^class Stacked_state:$/;"	class	line:33
+__init__	/home/neale/ctf_RL/CTFWrappers.py	/^    def __init__(self, keep_frame, axis,lstm=True):$/;"	member	line:34	class:Stacked_state
+initiate	/home/neale/ctf_RL/CTFWrappers.py	/^    def initiate(self, obj):$/;"	member	line:40	class:Stacked_state
+__call__	/home/neale/ctf_RL/CTFWrappers.py	/^    def __call__(self, obj=None):$/;"	member	line:43	class:Stacked_state	file:
+convert_observation_to_space	/home/neale/ctf_RL/CTFWrappers.py	/^def convert_observation_to_space(observation):$/;"	function	line:58
+physical_devices	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:18
+parser	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")$/;"	variable	line:49
+args	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^args = parser.parse_args()$/;"	variable	line:60
+PROGBAR	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^PROGBAR = args.silence$/;"	variable	line:62
+TRAIN_NAME	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^TRAIN_NAME = "CVDC_{}_{:02d}_convoy_{}g{}a_{}g{}a_m{}".format($/;"	variable	line:65
+TRAIN_TAG	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME$/;"	variable	line:74
+LOG_PATH	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^LOG_PATH = ".\/logs\/" + TRAIN_NAME$/;"	variable	line:75
+MODEL_PATH	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^MODEL_PATH = ".\/model\/" + TRAIN_NAME$/;"	variable	line:76
+SAVE_PATH	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^SAVE_PATH = ".\/save\/" + TRAIN_NAME$/;"	variable	line:77
+MAP_PATH	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^MAP_PATH = ".\/fair_3g_20"$/;"	variable	line:78
+GPU_CAPACITY	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^GPU_CAPACITY = 0.95$/;"	variable	line:79
+NENV	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^NENV = multiprocessing.cpu_count() \/\/ 4$/;"	variable	line:83
+env_setting_path	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^env_setting_path = "env_setting_convoy.ini"$/;"	variable	line:86
+game_config	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^game_config = configparser.ConfigParser()$/;"	variable	line:87
+config_path	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^config_path = "config.ini"$/;"	variable	line:100
+config	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^config = configparser.ConfigParser()$/;"	variable	line:101
+total_episodes	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^total_episodes = 100000$/;"	variable	line:105
+max_ep	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^max_ep = 200$/;"	variable	line:106
+gamma	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^gamma = 0.98  # GAE - discount$/;"	variable	line:107
+lambd	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^lambd = 0.98  # GAE - lambda$/;"	variable	line:108
+save_network_frequency	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^save_network_frequency = 1024$/;"	variable	line:110
+save_stat_frequency	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^save_stat_frequency = 128$/;"	variable	line:111
+save_image_frequency	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^save_image_frequency = 128$/;"	variable	line:112
+moving_average_step	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^moving_average_step = 256  # MA for recording episode statistics$/;"	variable	line:113
+action_space	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^action_space = 5$/;"	variable	line:115
+keep_frame	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^keep_frame = 3$/;"	variable	line:116
+map_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^map_size = args.map_size$/;"	variable	line:117
+vision_range	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^vision_range = map_size - 1$/;"	variable	line:118
+nchannel	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^nchannel = 6$/;"	variable	line:120
+input_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^input_size = [None, keep_frame,vision_dx, vision_dy, nchannel]$/;"	variable	line:121
+cent_input_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^cent_input_size = [None, keep_frame,map_size, map_size, nchannel]$/;"	variable	line:122
+minibatch_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^minibatch_size = 128$/;"	variable	line:124
+epoch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^epoch = 1$/;"	variable	line:125
+minimum_batch_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^minimum_batch_size = 1024 * 4$/;"	variable	line:126
+log_episodic_reward	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^log_episodic_reward = MovingAverage(moving_average_step)$/;"	variable	line:129
+log_winrate	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^log_winrate = MovingAverage(moving_average_step)$/;"	variable	line:130
+log_redwinrate	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^log_redwinrate = MovingAverage(moving_average_step)$/;"	variable	line:131
+log_looptime	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^log_looptime = MovingAverage(moving_average_step)$/;"	variable	line:132
+log_traintime	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^log_traintime = MovingAverage(moving_average_step)$/;"	variable	line:133
+_qenv	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^_qenv = gym.make("cap-v0", map_size=map_size, config_path=game_config)$/;"	variable	line:137
+make_env	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^def make_env(map_size):$/;"	function	line:138
+envs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^envs = [make_env(map_size) for i in range(NENV)]$/;"	variable	line:142
+envs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^envs = SubprocVecEnv(envs, keep_frame=1, size=vision_dx)$/;"	variable	line:143
+envs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^envs = FrameStacking(envs,keep_frame)$/;"	variable	line:144
+t	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^t= envs.reset(config_path=game_config, policy_red=policy.Roomba,)$/;"	variable	line:145
+num_blue	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^num_blue = len(envs.get_team_blue()[0])$/;"	variable	line:146
+num_red	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^num_red = len(envs.get_team_red()[0])$/;"	variable	line:147
+num_agent	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^num_agent = num_blue  # +num_red$/;"	variable	line:148
+agent_type	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^agent_type = []$/;"	variable	line:155
+num_type	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^num_type = len(agent_type)$/;"	variable	line:160
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^agent_type_masking = np.zeros([num_type, num_blue], dtype=bool)$/;"	variable	line:161
+agent_type_index	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^agent_type_index = np.zeros([num_blue], dtype=int)$/;"	variable	line:162
+prev_i	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^prev_i = 0$/;"	variable	line:163
+prev_i	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    prev_i = i$/;"	variable	line:167
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^agent_type_masking = np.tile(agent_type_masking, NENV)$/;"	variable	line:168
+atoms	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^atoms = 256$/;"	variable	line:171
+network	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^network = Network($/;"	variable	line:172
+central_obs_shape	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    central_obs_shape=cent_input_size,$/;"	variable	line:173
+decentral_obs_shape	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    decentral_obs_shape=input_size,$/;"	variable	line:174
+action_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    action_size=action_space,$/;"	variable	line:175
+agent_type	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    agent_type=agent_type,$/;"	variable	line:176
+atoms	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    atoms=atoms,$/;"	variable	line:177
+save_path	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    save_path=MODEL_PATH,$/;"	variable	line:178
+global_episodes	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^global_episodes = network.initiate()$/;"	variable	line:182
+writer	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^writer = tf.summary.create_file_writer(LOG_PATH)$/;"	variable	line:186
+train_central	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^def train_central($/;"	function	line:189
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    traj_buffer = defaultdict(list)$/;"	variable	line:199
+states	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        states = np.array(traj[0])$/;"	variable	line:202
+last_state	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        last_state = np.array(traj[3])[-1:, :, :, :]$/;"	variable	line:203
+reward	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        reward = traj[2]$/;"	variable	line:204
+critic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:208
+_critic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _critic = _env_critic["critic"].numpy()[0, 0]$/;"	variable	line:209
+train_dataset	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    train_dataset = ($/;"	variable	line:217
+train_decentral	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^def train_decentral($/;"	function	line:234
+train_datasets	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    train_datasets = []$/;"	variable	line:243
+traj_buffer_list	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]$/;"	variable	line:246
+advantage_lists	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    advantage_lists = [[] for _ in range(num_type)]$/;"	variable	line:247
+f1_list	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    f1_list = []$/;"	variable	line:248
+f2_list	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    f2_list = []$/;"	variable	line:249
+fc_list	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    fc_list = []$/;"	variable	line:250
+atype	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            atype = agent_type_index[idx]$/;"	variable	line:253
+reward	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            reward = traj[2]$/;"	variable	line:255
+mask	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            mask = traj[3]$/;"	variable	line:256
+critic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            critic = traj[5]$/;"	variable	line:257
+phi	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            phi = np.array(traj[7]).tolist()$/;"	variable	line:258
+psi	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            psi = np.array(traj[8]).tolist()$/;"	variable	line:259
+_critic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            _critic = traj[9][-1]$/;"	variable	line:260
+_psi	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            _psi = np.array(traj[10][-1])$/;"	variable	line:261
+cent_state	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            cent_state = np.array(traj[14])$/;"	variable	line:263
+env_critic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            env_critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:265
+icritic	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            icritic = traj[12]$/;"	variable	line:270
+dc	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            dc = np.array(critic[1:])-np.array(critic[:-1])$/;"	variable	line:272
+dc1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])$/;"	variable	line:273
+dc2	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])$/;"	variable	line:274
+normalize	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                normalize=False$/;"	variable	line:283
+normalize	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                normalize=False,$/;"	variable	line:292
+discount_adv	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                discount_adv=False,$/;"	variable	line:311
+normalize	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                normalize=False,$/;"	variable	line:312
+beta	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            beta = max(min((-0.9\/30000)*step + 1, 1.0),0.1)$/;"	variable	line:314
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            traj_buffer = traj_buffer_list[atype]$/;"	variable	line:316
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        traj_buffer = traj_buffer_list[atype]$/;"	variable	line:327
+train_dataset	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        train_dataset = ($/;"	variable	line:328
+tag	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            tag = "advantages\/"$/;"	variable	line:353
+run_network	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^def run_network(states):$/;"	function	line:365
+batch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^batch = []$/;"	variable	line:404
+dec_batch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^dec_batch = []$/;"	variable	line:405
+log_save_analysis	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")$/;"	variable	line:409
+episode_rew	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    episode_rew = np.zeros(NENV)$/;"	variable	line:412
+is_alive	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    is_alive = [True for agent in envs.get_team_blue().flat]$/;"	variable	line:413
+is_done	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    is_done = [False for env in range(NENV * num_agent)]$/;"	variable	line:414
+trajs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    trajs = [[Trajectory(depth=16) for _ in range(num_agent)] for _ in range(NENV)]$/;"	variable	line:416
+cent_trajs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]$/;"	variable	line:417
+s1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    s1 = envs.reset(config_path=game_config, policy_red=policy.Roomba,)$/;"	variable	line:424
+s1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    s1 = s1.astype(np.float32)$/;"	variable	line:425
+cent_s1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    cent_s1 = envs.GetCentralState()  # Centralized$/;"	variable	line:426
+reward_pred_list	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    reward_pred_list = []$/;"	variable	line:430
+stime_roll	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    stime_roll = time.time()$/;"	variable	line:433
+_states	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _states = [[] for _ in range(NENV)]$/;"	variable	line:434
+_agent1_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent1_r = [[] for _ in range(NENV)]$/;"	variable	line:435
+_agent2_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent2_r = [[] for _ in range(NENV)]$/;"	variable	line:436
+_agent3_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent3_r = [[] for _ in range(NENV)]$/;"	variable	line:437
+_agent1_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent1_o = [[] for _ in range(NENV)]$/;"	variable	line:438
+_agent2_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent2_o = [[] for _ in range(NENV)]$/;"	variable	line:439
+_agent3_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    _agent3_o = [[] for _ in range(NENV)]$/;"	variable	line:440
+s0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        s0 = s1$/;"	variable	line:443
+a0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        a0 = a1$/;"	variable	line:444
+vg0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        vg0 = vg1$/;"	variable	line:445
+vc0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        vc0 = vc1$/;"	variable	line:446
+psi0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        psi0 = psi1$/;"	variable	line:447
+phi0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        phi0 = phi1$/;"	variable	line:448
+log_logits0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        log_logits0 = log_logits1$/;"	variable	line:449
+was_alive	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        was_alive = is_alive$/;"	variable	line:450
+was_done	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        was_done = is_done$/;"	variable	line:451
+cent_s0	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        cent_s0 = cent_s1$/;"	variable	line:452
+is_alive	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        is_alive = [agent.isAlive for agent in envs.get_team_blue().flat]$/;"	variable	line:456
+s1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        s1 = s1.astype(np.float32)  # Decentralize observation$/;"	variable	line:457
+cent_s1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        cent_s1 = envs.GetCentralState() # Centralized$/;"	variable	line:458
+idx	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                idx = env_idx * num_agent + agent_id$/;"	variable	line:469
+etime_roll	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    etime_roll = time.time()$/;"	variable	line:511
+stime_train	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        stime_train = time.time()$/;"	variable	line:516
+log	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        log = interval_flag(global_episodes, save_image_frequency, "im_log")$/;"	variable	line:517
+log_image	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        log_image = interval_flag(global_episodes, 1024, "ima_log")$/;"	variable	line:518
+epoch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            epoch=epoch,$/;"	variable	line:521
+batch_size	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            batch_size=minibatch_size,$/;"	variable	line:522
+writer	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            writer=writer,$/;"	variable	line:523
+log	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            log=log,$/;"	variable	line:524
+step	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            step=global_episodes,$/;"	variable	line:525
+log_image	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            log_image=log_image,$/;"	variable	line:526
+etime_train	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        etime_train = time.time()$/;"	variable	line:528
+dec_batch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        dec_batch = []$/;"	variable	line:529
+log_tc_on	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')$/;"	variable	line:534
+batch	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        batch = []$/;"	variable	line:536
+log_on	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    log_on = interval_flag(global_episodes, save_stat_frequency, "log")$/;"	variable	line:547
+tag	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^            tag = "baseline_training\/"$/;"	variable	line:550
+step	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^                step=global_episodes,$/;"	variable	line:565
+save_on	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^    save_on = interval_flag(global_episodes, save_network_frequency, "save")$/;"	variable	line:569
+fig	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        fig = plt.figure(figsize=(8, 9))$/;"	variable	line:575
+widths	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        widths = [1.2, 0.5, 1.5, 1.5]$/;"	variable	line:576
+heights	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        heights = [2, 2, 4, 4, 4]$/;"	variable	line:577
+gs	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        gs = fig.add_gridspec($/;"	variable	line:578
+ax_env	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_env = fig.add_subplot(gs[:2, :2])$/;"	variable	line:581
+ax_value	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_value = fig.add_subplot(gs[:2, 2:])$/;"	variable	line:585
+ax_agent1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_agent1 = fig.add_subplot(gs[2, 0])$/;"	variable	line:588
+ax_agent2	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_agent2 = fig.add_subplot(gs[3, 0])$/;"	variable	line:592
+ax_agent3	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_agent3 = fig.add_subplot(gs[4, 0])$/;"	variable	line:596
+ax_reward3	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_reward3 = fig.add_subplot(gs[4, 1:])$/;"	variable	line:600
+ax_reward2	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_reward2 = fig.add_subplot(gs[3, 1:], sharex=ax_reward3)$/;"	variable	line:602
+ax_reward1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        ax_reward1 = fig.add_subplot(gs[2, 1:], sharex=ax_reward3)$/;"	variable	line:605
+env_image	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)$/;"	variable	line:609
+agent_obs1	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        agent_obs1 = ax_agent1.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:610
+agent_obs2	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        agent_obs2 = ax_agent2.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:611
+agent_obs3	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        agent_obs3 = ax_agent3.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:612
+animate	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        def animate(i, info, critic, env_idx):$/;"	function	line:622
+_states	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _states = None$/;"	variable	line:673
+_agent1_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent1_r = None$/;"	variable	line:674
+_agent2_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent2_r = None$/;"	variable	line:675
+_agent3_r	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent3_r = None$/;"	variable	line:676
+_agent1_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent1_o = None$/;"	variable	line:677
+_agent2_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent2_o = None$/;"	variable	line:678
+_agent3_o	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        _agent3_o = None$/;"	variable	line:679
+anim	/home/neale/ctf_RL/run_cvdc2_lstm.py	/^        anim = None$/;"	variable	line:680
+SMACWrapper	/home/neale/ctf_RL/SC2Wrappers.py	/^class SMACWrapper(gym.core.Wrapper):$/;"	class	line:4
+__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env,**kwargs):$/;"	member	line:9	class:SMACWrapper
+reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self,*args,**kwargs):$/;"	member	line:17	class:SMACWrapper
+step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self,action,*args,**kwargs):$/;"	member	line:20	class:SMACWrapper
+get_avail_actions	/home/neale/ctf_RL/SC2Wrappers.py	/^    def get_avail_actions(self):$/;"	member	line:41	class:SMACWrapper
+convert_observation_to_space	/home/neale/ctf_RL/SC2Wrappers.py	/^def convert_observation_to_space(observation):$/;"	function	line:54
+ActionFiltering	/home/neale/ctf_RL/SC2Wrappers.py	/^class ActionFiltering(gym.core.Wrapper):$/;"	class	line:70
+__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env, **kwargs):$/;"	member	line:71	class:ActionFiltering
+reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self, **kwargs):$/;"	member	line:74	class:ActionFiltering
+step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self, action):$/;"	member	line:78	class:ActionFiltering
+ActionFiltering	/home/neale/ctf_RL/SC2Wrappers.py	/^class ActionFiltering(gym.core.Wrapper):$/;"	class	line:83
+__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env, **kwargs):$/;"	member	line:84	class:ActionFiltering
+reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self, **kwargs):$/;"	member	line:87	class:ActionFiltering
+step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self, action):$/;"	member	line:91	class:ActionFiltering
+FrameStacking	/home/neale/ctf_RL/SC2Wrappers.py	/^class FrameStacking(gym.core.Wrapper):$/;"	class	line:96
+__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self,env,numFrames=3,lstm=False,**kwargs):$/;"	member	line:98	class:FrameStacking
+reset	/home/neale/ctf_RL/SC2Wrappers.py	/^    def reset(self,*args,**kwargs):$/;"	member	line:114	class:FrameStacking
+step	/home/neale/ctf_RL/SC2Wrappers.py	/^    def step(self,action,*args,**kwargs):$/;"	member	line:122	class:FrameStacking
+Stacked_state	/home/neale/ctf_RL/SC2Wrappers.py	/^class Stacked_state:$/;"	class	line:128
+__init__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __init__(self, keep_frame, axis,lstm=False):$/;"	member	line:129	class:Stacked_state
+initiate	/home/neale/ctf_RL/SC2Wrappers.py	/^    def initiate(self, obj):$/;"	member	line:135	class:Stacked_state
+__call__	/home/neale/ctf_RL/SC2Wrappers.py	/^    def __call__(self, obj=None):$/;"	member	line:138	class:Stacked_state	file:
+physical_devices	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^physical_devices = tf.config.experimental.list_physical_devices("GPU")$/;"	variable	line:18
+parser	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^parser = argparse.ArgumentParser(description="PPO trainer for convoy")$/;"	variable	line:50
+args	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^args = parser.parse_args()$/;"	variable	line:58
+PROGBAR	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^PROGBAR = args.silence$/;"	variable	line:60
+TRAIN_NAME	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^TRAIN_NAME = "CVDC_{}_{:02d}_map_{}".format($/;"	variable	line:63
+TRAIN_TAG	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^TRAIN_TAG = "PPO e2e model w Stacked Frames: " + TRAIN_NAME$/;"	variable	line:68
+LOG_PATH	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^LOG_PATH = ".\/logs\/" + TRAIN_NAME$/;"	variable	line:69
+MODEL_PATH	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^MODEL_PATH = ".\/model\/" + TRAIN_NAME$/;"	variable	line:70
+GPU_CAPACITY	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^GPU_CAPACITY = 0.95$/;"	variable	line:71
+NENV	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^NENV = 1$/;"	variable	line:73
+total_episodes	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^total_episodes = 50000$/;"	variable	line:82
+max_ep	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^max_ep = 200$/;"	variable	line:83
+gamma	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^gamma = 0.98  # GAE - discount$/;"	variable	line:84
+lambd	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^lambd = 0.98  # GAE - lambda$/;"	variable	line:85
+save_network_frequency	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^save_network_frequency = 1024$/;"	variable	line:87
+save_stat_frequency	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^save_stat_frequency = 128$/;"	variable	line:88
+save_image_frequency	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^save_image_frequency = 128$/;"	variable	line:89
+moving_average_step	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^moving_average_step = 256  # MA for recording episode statistics$/;"	variable	line:90
+keep_frame	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^keep_frame = 3$/;"	variable	line:92
+minibatch_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^minibatch_size = 128$/;"	variable	line:94
+epoch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^epoch = 2$/;"	variable	line:95
+minimum_batch_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^minimum_batch_size = 1024$/;"	variable	line:96
+log_episodic_reward	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^log_episodic_reward = MovingAverage(moving_average_step)$/;"	variable	line:99
+log_winrate	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^log_winrate = MovingAverage(moving_average_step)$/;"	variable	line:100
+log_looptime	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^log_looptime = MovingAverage(moving_average_step)$/;"	variable	line:101
+log_traintime	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^log_traintime = MovingAverage(moving_average_step)$/;"	variable	line:102
+make_env	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^def make_env():$/;"	function	line:106
+envs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^envs = StarCraft2Env(args.map)$/;"	variable	line:109
+envs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^envs = SMACWrapper(envs)$/;"	variable	line:111
+envs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^envs = FrameStacking(envs,numFrames=keep_frame,lstm=True)$/;"	variable	line:112
+action_space	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^action_space = len(envs.env.get_avail_agent_actions(0))$/;"	variable	line:115
+input_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^input_size = [None,keep_frame,envs.observation_space.shape[0]]$/;"	variable	line:116
+cent_input_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^cent_input_size = [None,keep_frame,envs.state_shape.shape[0]]$/;"	variable	line:117
+agent_type	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^agent_type = []$/;"	variable	line:126
+num_agent	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^num_agent = sum(agent_type)$/;"	variable	line:131
+num_type	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^num_type = len(agent_type)$/;"	variable	line:134
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^agent_type_masking = np.zeros([num_type, num_agent], dtype=bool)$/;"	variable	line:135
+agent_type_index	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^agent_type_index = np.zeros([num_agent], dtype=int)$/;"	variable	line:136
+prev_i	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^prev_i = 0$/;"	variable	line:137
+prev_i	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    prev_i = i$/;"	variable	line:141
+agent_type_masking	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^agent_type_masking = np.tile(agent_type_masking, NENV)$/;"	variable	line:142
+atoms	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^atoms = 256$/;"	variable	line:145
+network	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^network = Network($/;"	variable	line:146
+central_obs_shape	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    central_obs_shape=cent_input_size,$/;"	variable	line:147
+decentral_obs_shape	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    decentral_obs_shape=input_size,$/;"	variable	line:148
+action_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    action_size=action_space,$/;"	variable	line:149
+agent_type	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    agent_type=agent_type,$/;"	variable	line:150
+atoms	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    atoms=atoms,$/;"	variable	line:151
+save_path	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    save_path=MODEL_PATH,$/;"	variable	line:152
+entropy	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    entropy=args.entropy,$/;"	variable	line:153
+global_episodes	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^global_episodes = network.initiate()$/;"	variable	line:157
+writer	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^writer = tf.summary.create_file_writer(LOG_PATH)$/;"	variable	line:161
+train_central	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^def train_central($/;"	function	line:164
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    traj_buffer = defaultdict(list)$/;"	variable	line:174
+states	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        states = np.array(traj[0])$/;"	variable	line:177
+last_state	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        last_state = np.array(traj[3])[-1:, :]$/;"	variable	line:178
+reward	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        reward = traj[2]$/;"	variable	line:179
+critic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:183
+_critic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _critic = _env_critic["critic"].numpy()[0, 0]$/;"	variable	line:184
+train_dataset	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    train_dataset = ($/;"	variable	line:192
+train_decentral	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^def train_decentral($/;"	function	line:209
+train_datasets	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    train_datasets = []$/;"	variable	line:218
+traj_buffer_list	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    traj_buffer_list = [defaultdict(list) for _ in range(num_type)]$/;"	variable	line:221
+advantage_lists	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    advantage_lists = [[] for _ in range(num_type)]$/;"	variable	line:222
+f1_list	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    f1_list = []$/;"	variable	line:223
+f2_list	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    f2_list = []$/;"	variable	line:224
+fc_list	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    fc_list = []$/;"	variable	line:225
+atype	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            atype = agent_type_index[idx]$/;"	variable	line:228
+reward	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            reward = traj[2]$/;"	variable	line:230
+mask	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            mask = traj[3]$/;"	variable	line:231
+critic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            critic = traj[5]$/;"	variable	line:232
+phi	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            phi = np.array(traj[7]).tolist()$/;"	variable	line:233
+psi	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            psi = np.array(traj[8]).tolist()$/;"	variable	line:234
+_critic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            _critic = traj[9][-1]$/;"	variable	line:235
+_psi	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            _psi = np.array(traj[10][-1])$/;"	variable	line:236
+cent_state	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            cent_state = np.array(traj[14])$/;"	variable	line:238
+env_critic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            env_critic = env_critic["critic"].numpy()[:, 0].tolist()$/;"	variable	line:240
+icritic	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            icritic = traj[12]$/;"	variable	line:245
+dc	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            dc = np.array(critic[1:])-np.array(critic[:-1])$/;"	variable	line:247
+dc1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])$/;"	variable	line:248
+dc2	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            dc2 = np.array(icritic[1:])-np.array(icritic[:-1])$/;"	variable	line:249
+normalize	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                normalize=False$/;"	variable	line:258
+normalize	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                normalize=False,$/;"	variable	line:267
+discount_adv	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                discount_adv=False,$/;"	variable	line:286
+normalize	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                normalize=False,$/;"	variable	line:287
+beta	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            beta = max(min((-0.9\/30000)*step + 1, 1.0),0.1)$/;"	variable	line:289
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            traj_buffer = traj_buffer_list[atype]$/;"	variable	line:291
+traj_buffer	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        traj_buffer = traj_buffer_list[atype]$/;"	variable	line:302
+train_dataset	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        train_dataset = ($/;"	variable	line:303
+tag	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            tag = "advantages\/"$/;"	variable	line:328
+run_network	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^def run_network(states,validActions):$/;"	function	line:340
+batch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^batch = []$/;"	variable	line:384
+dec_batch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^dec_batch = []$/;"	variable	line:385
+log_save_analysis	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    log_save_analysis = False  #interval_flag(global_episodes, 1024 * 4, "save_log")$/;"	variable	line:389
+episode_rew	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    episode_rew = np.zeros(NENV)$/;"	variable	line:392
+is_alive	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    is_alive = [not va[0] for va in envs.get_avail_actions()]$/;"	variable	line:393
+is_done	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    is_done = [False for env in range(NENV * num_agent)]$/;"	variable	line:394
+trajs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    trajs = [[Trajectory(depth=16) for _ in range(num_agent)] for _ in range(NENV)]$/;"	variable	line:396
+cent_trajs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    cent_trajs = [Trajectory(depth=4) for _ in range(NENV)]$/;"	variable	line:397
+s1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    s1 = np.stack(s1).astype(np.float32)$/;"	variable	line:403
+validActions	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    validActions = envs.get_avail_actions()$/;"	variable	line:404
+validActions	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    validActions = envs.get_avail_actions()$/;"	variable	line:405
+reward_pred_list	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    reward_pred_list = []$/;"	variable	line:414
+stime_roll	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    stime_roll = time.time()$/;"	variable	line:417
+_states	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _states = [[] for _ in range(NENV)]$/;"	variable	line:418
+_agent1_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent1_r = [[] for _ in range(NENV)]$/;"	variable	line:419
+_agent2_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent2_r = [[] for _ in range(NENV)]$/;"	variable	line:420
+_agent3_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent3_r = [[] for _ in range(NENV)]$/;"	variable	line:421
+_agent1_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent1_o = [[] for _ in range(NENV)]$/;"	variable	line:422
+_agent2_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent2_o = [[] for _ in range(NENV)]$/;"	variable	line:423
+_agent3_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    _agent3_o = [[] for _ in range(NENV)]$/;"	variable	line:424
+s0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        s0 = s1$/;"	variable	line:427
+a0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        a0 = a1$/;"	variable	line:428
+vg0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        vg0 = vg1$/;"	variable	line:429
+vc0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        vc0 = vc1$/;"	variable	line:430
+psi0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        psi0 = psi1$/;"	variable	line:431
+phi0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        phi0 = phi1$/;"	variable	line:432
+log_logits0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        log_logits0 = log_logits1$/;"	variable	line:433
+was_alive	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        was_alive = is_alive$/;"	variable	line:434
+was_done	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        was_done = is_done$/;"	variable	line:435
+cent_s0	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        cent_s0 = cent_s1$/;"	variable	line:436
+is_alive	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        is_alive = [not va[0] for va in envs.get_avail_actions()]$/;"	variable	line:441
+s1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        s1 = s1.astype(np.float32)  # Decentralize observation$/;"	variable	line:442
+validActions	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        validActions = envs.get_avail_actions()$/;"	variable	line:447
+validActions	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        validActions = envs.get_avail_actions()$/;"	variable	line:448
+idx	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                idx = env_idx * num_agent + agent_id$/;"	variable	line:456
+etime_roll	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    etime_roll = time.time()$/;"	variable	line:501
+stime_train	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        stime_train = time.time()$/;"	variable	line:506
+log	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        log = interval_flag(global_episodes, save_image_frequency, "im_log")$/;"	variable	line:507
+log_image	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        log_image = interval_flag(global_episodes, 1024, "ima_log")$/;"	variable	line:508
+epoch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            epoch=epoch,$/;"	variable	line:511
+batch_size	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            batch_size=minibatch_size,$/;"	variable	line:512
+writer	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            writer=writer,$/;"	variable	line:513
+log	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            log=log,$/;"	variable	line:514
+step	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            step=global_episodes,$/;"	variable	line:515
+log_image	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            log_image=log_image,$/;"	variable	line:516
+etime_train	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        etime_train = time.time()$/;"	variable	line:518
+dec_batch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        dec_batch = []$/;"	variable	line:519
+log_tc_on	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')$/;"	variable	line:524
+batch	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        batch = []$/;"	variable	line:526
+log_on	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    log_on = interval_flag(global_episodes, save_stat_frequency, "log")$/;"	variable	line:537
+tag	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^            tag = "baseline_training\/"$/;"	variable	line:540
+step	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^                step=global_episodes,$/;"	variable	line:555
+save_on	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^    save_on = interval_flag(global_episodes, save_network_frequency, "save")$/;"	variable	line:559
+fig	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        fig = plt.figure(figsize=(8, 9))$/;"	variable	line:565
+widths	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        widths = [1.2, 0.5, 1.5, 1.5]$/;"	variable	line:566
+heights	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        heights = [2, 2, 4, 4, 4]$/;"	variable	line:567
+gs	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        gs = fig.add_gridspec($/;"	variable	line:568
+ax_env	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_env = fig.add_subplot(gs[:2, :2])$/;"	variable	line:571
+ax_value	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_value = fig.add_subplot(gs[:2, 2:])$/;"	variable	line:575
+ax_agent1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_agent1 = fig.add_subplot(gs[2, 0])$/;"	variable	line:578
+ax_agent2	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_agent2 = fig.add_subplot(gs[3, 0])$/;"	variable	line:582
+ax_agent3	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_agent3 = fig.add_subplot(gs[4, 0])$/;"	variable	line:586
+ax_reward3	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_reward3 = fig.add_subplot(gs[4, 1:])$/;"	variable	line:590
+ax_reward2	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_reward2 = fig.add_subplot(gs[3, 1:], sharex=ax_reward3)$/;"	variable	line:592
+ax_reward1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        ax_reward1 = fig.add_subplot(gs[2, 1:], sharex=ax_reward3)$/;"	variable	line:595
+env_image	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        env_image = ax_env.imshow(np.ones((map_size, map_size, 3)), vmin=0, vmax=1)$/;"	variable	line:599
+agent_obs1	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        agent_obs1 = ax_agent1.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:600
+agent_obs2	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        agent_obs2 = ax_agent2.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:601
+agent_obs3	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        agent_obs3 = ax_agent3.imshow(np.ones((59, 59, 3)), vmin=0, vmax=1)$/;"	variable	line:602
+animate	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        def animate(i, info, critic, env_idx):$/;"	function	line:612
+_states	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _states = None$/;"	variable	line:663
+_agent1_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent1_r = None$/;"	variable	line:664
+_agent2_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent2_r = None$/;"	variable	line:665
+_agent3_r	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent3_r = None$/;"	variable	line:666
+_agent1_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent1_o = None$/;"	variable	line:667
+_agent2_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent2_o = None$/;"	variable	line:668
+_agent3_o	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        _agent3_o = None$/;"	variable	line:669
+anim	/home/neale/ctf_RL/run_cvdc2_sc2_lstm.py	/^        anim = None$/;"	variable	line:670
+V4	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4(tf.keras.Model):$/;"	class	line:18
+STATIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:19	class:V4
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:20	class:V4
+LATENT_DIM	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    LATENT_DIM = 256$/;"	variable	line:21	class:V4
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:24	class:V4
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:36	class:V4
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:39	class:V4
+V4INV	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4INV(tf.keras.Model):$/;"	class	line:46
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, trainable=True, name='FeatureNN_Inverse'):$/;"	member	line:48	class:V4INV
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:62	class:V4INV
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:65	class:V4INV
+V4INV_lstm	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4INV_lstm(tf.keras.Model):$/;"	class	line:68
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, trainable=True, name='FeatureNN_Inverse'):$/;"	member	line:70	class:V4INV_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:84	class:V4INV_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:87	class:V4INV_lstm
+Decentral	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Decentral(tf.keras.Model):$/;"	class	line:91
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:93	class:Decentral
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:161	class:Decentral
+action_call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:165	class:Decentral
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:209	class:Decentral
+Central	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Central(tf.keras.Model):$/;"	class	line:285
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:287	class:Central
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:303	class:Central
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:306	class:Central
+loss_central	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_central(model, state, td_target_c):$/;"	function	line:323
+loss_decentral_critic_only	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):$/;"	function	line:336
+loss_ppo	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,$/;"	function	line:348
+get_gradient	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def get_gradient(model, loss, inputs, hyperparameters={}):$/;"	function	line:440
+train	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^def train(model, loss, optimizer, inputs, hyperparameters={}):$/;"	function	line:447
+V4_lstm	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class V4_lstm(tf.keras.Model):$/;"	class	line:457
+STATIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    STATIC_CHANNEL = [0,1,3]$/;"	variable	line:458	class:V4_lstm
+DYNAMIC_CHANNEL	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    DYNAMIC_CHANNEL = [2,4,5]$/;"	variable	line:459	class:V4_lstm
+LATENT_DIM	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    LATENT_DIM = 256$/;"	variable	line:460	class:V4_lstm
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5,$/;"	member	line:463	class:V4_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:476	class:V4_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:479	class:V4_lstm
+Decentral_lstm	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Decentral_lstm(tf.keras.Model):$/;"	class	line:486
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, action_size=5, atoms=512,$/;"	member	line:488	class:Decentral_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:556	class:Decentral_lstm
+action_call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def action_call(self, obs):  # Short operation for forward pass$/;"	member	line:560	class:Decentral_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs): # Full Operation of the method$/;"	member	line:604	class:Decentral_lstm
+Central_lstm	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^class Central_lstm(tf.keras.Model):$/;"	class	line:680
+__init__	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def __init__(self, input_shape, atoms,$/;"	member	line:682	class:Central_lstm
+print_summary	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def print_summary(self):$/;"	member	line:698	class:Central_lstm
+call	/home/neale/ctf_RL/network/CVDC_model2_sc2.py	/^    def call(self, inputs):$/;"	member	line:701	class:Central_lstm

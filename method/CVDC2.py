@@ -245,6 +245,143 @@ class SF_CVDC:
             manager = self.dec_managers[i]
             manager.save(checkpoint_number)
 
+from network.CVDC_model2 import Central_lstm
+from network.CVDC_model2 import Decentral_lstm
+from network.CVDC_model2 import loss_ppo_lstm
+
+class SF_CVDC_lstm(SF_CVDC):
+    # Full architecture for centralized value training and
+    # decentralized control.
+    @store_args
+    def __init__(
+        self,
+        central_obs_shape,
+        decentral_obs_shape,
+        action_size,
+        agent_type,
+        save_path,
+        atoms=256,
+        lr=2e-4,
+        **kwargs
+    ):
+        assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
+        self.num_agent_type = len(agent_type)
+
+        # Set Model
+        self.dec_models = []
+        self.dec_optimizers = []
+        self.dec_checkpoints = []
+        self.dec_managers = []
+
+
+        # Build Network (Central)
+        self.model_central = Central_lstm(central_obs_shape[1:], atoms=atoms)
+        self.save_directory_central = os.path.join(save_path, 'central')
+        self.optimizer_central = tf.keras.optimizers.Adam(5e-4)
+        self.checkpoint_central = tf.train.Checkpoint(
+                optimizer=self.optimizer_central, model=self.model_central)
+        self.manager_central = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_central,
+                directory=self.save_directory_central,
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+
+        # Build Network (Decentral)
+        for i in range(self.num_agent_type):
+            model = Decentral_lstm(
+                    decentral_obs_shape[1:],
+                    action_size=5,
+                    atoms=atoms,
+                    prebuilt_layers=None)
+            save_directory = os.path.join(save_path, 'decentral{}'.format(i))
+            optimizer = tf.keras.optimizers.Adam(lr)
+            checkpoint = tf.train.Checkpoint(
+                   optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(
+                    checkpoint=checkpoint,
+                    directory=save_directory,
+                    max_to_keep=3,
+                    keep_checkpoint_every_n_hours=1)
+            self.dec_models.append(model)
+            self.dec_optimizers.append(optimizer)
+            self.dec_checkpoints.append(checkpoint)
+            self.dec_managers.append(manager)
+
+        # PPO Configuration
+        self.ppo_config = {
+                'eps': tf.constant(0.20, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.05, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-3, dtype=tf.float32),
+                'critic_beta': tf.constant(0.5, dtype=tf.float32),
+                'q_beta': tf.constant(0.5, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.01, dtype=tf.float32),
+                }
+    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, log_image=False):
+        if log:
+            assert writer is not None
+            assert step is not None
+            assert tag is not None
+        actor_losses = []
+        dec_psi_losses = []
+        entropy = []
+        decoder_losses = []
+        critic_mse = []
+        q_losses = []
+        reward_mse = []
+        multiagent_value_loss = []
+        multiagent_reward_loss = []
+
+        learnability_loss = []
+
+        # Get gradients
+        for i in range(self.num_agent_type):
+            dataset = datasets[i]
+            model = self.dec_models[i]
+            optimizer = self.dec_optimizers[i]
+            for inputs in dataset:
+                _, info = train(model, loss_ppo_lstm, optimizer, inputs, self.ppo_config)
+                if log:
+                    actor_losses.append(info['actor_loss'])
+                    dec_psi_losses.append(info['psi_loss'])
+                    entropy.append(info['entropy'])
+                    decoder_losses.append(info['generator_loss'])
+                    critic_mse.append(info['critic_mse'])
+                    q_losses.append(info['q_loss'])
+                    reward_mse.append(info['reward_loss'])
+                    learnability_loss.append(info['learnability_loss'])
+        if log:
+            logs = {tag+'dec_actor_loss': np.mean(actor_losses),
+                    tag+'dec_psi_loss': np.mean(dec_psi_losses),
+                    tag+'dec_entropy': np.mean(entropy),
+                    tag+'dec_generator_loss': np.mean(decoder_losses),
+                    tag+'dec_critic_loss': np.mean(critic_mse),
+                    tag+'dec_q_loss': np.mean(q_losses),
+                    tag+'dec_reward_loss': np.mean(reward_mse),
+                    tag+'dec_learnability_loss': np.mean(learnability_loss),
+                    }
+            with writer.as_default():
+                self.log(step, logs=logs)
+                writer.flush()
+
+        #if log_image:
+        if False:
+            with writer.as_default():
+                for i in range(self.num_agent_type):
+                    test_dataset = datasets[i]
+                    for inputs in dataset:
+                        test_states = inputs['state']
+                        break
+                    n_state = test_states.shape[0]
+                    idx = np.random.randint(low=0, high=n_state, size=8)
+                    test_states = tf.gather(test_states, indices=idx, axis=0)
+                    _, SF = self.dec_models[i]([test_states, np.zeros(8, dtype=int)])
+                    tb_log_ctf_frame(np.stack(test_states, axis=0), tag=f'given states agent{i}', step=step)
+                    tb_log_ctf_frame(np.stack(SF['decoded_state'], axis=0), tag=f'decoded states agent{i}', step=step)
+                    tb_log_ctf_frame(np.stack(SF['filtered_decoded_state'], axis=0), tag=f'filtered states agent{i}', step=step)
+                writer.flush()
+
+
 from network.CVDC_model2_sc2 import Central as Central_sc2
 from network.CVDC_model2_sc2 import Decentral as Decentral_sc2
 from network.CVDC_model2_sc2 import loss_ppo as loss_ppo_sc2
@@ -489,3 +626,74 @@ class SF_CVDC_SC2:
         for i in range(self.num_agent_type):
             manager = self.dec_managers[i]
             manager.save(checkpoint_number)
+
+from network.CVDC_model2_sc2 import Central_lstm as Central_sc2_lstm
+from network.CVDC_model2_sc2 import Decentral_lstm as Decentral_sc2_ltsm
+
+class SF_CVDC_SC2_lstm(SF_CVDC_SC2):
+    @store_args
+    def __init__(
+        self,
+        central_obs_shape,
+        decentral_obs_shape,
+        action_size,
+        agent_type,
+        save_path,
+        atoms=256,
+        lr=2e-4,
+        entropy=0.02,
+        **kwargs
+    ):
+        assert type(agent_type) is list, "Wrong agent type. (e.g. 2 ground 1 air : [2,1])"
+        self.num_agent_type = len(agent_type)
+
+        # Set Model
+        self.dec_models = []
+        self.dec_optimizers = []
+        self.dec_checkpoints = []
+        self.dec_managers = []
+
+
+        # Build Network (Central)
+        self.model_central = Central_sc2_lstm(central_obs_shape[1:], atoms=atoms)
+        self.save_directory_central = os.path.join(save_path, 'central')
+        self.optimizer_central = tf.keras.optimizers.Adam(5e-4)
+        self.checkpoint_central = tf.train.Checkpoint(
+                optimizer=self.optimizer_central, model=self.model_central)
+        self.manager_central = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_central,
+                directory=self.save_directory_central,
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+
+        # Build Network (Decentral)
+        for i in range(self.num_agent_type):
+            model = Decentral_sc2_ltsm(
+                    decentral_obs_shape[1:],
+                    action_size=action_size,
+                    atoms=atoms,
+                    prebuilt_layers=None)
+            save_directory = os.path.join(save_path, 'decentral{}'.format(i))
+            optimizer = tf.keras.optimizers.Adam(lr)
+            checkpoint = tf.train.Checkpoint(
+                   optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(
+                    checkpoint=checkpoint,
+                    directory=save_directory,
+                    max_to_keep=3,
+                    keep_checkpoint_every_n_hours=1)
+            self.dec_models.append(model)
+            self.dec_optimizers.append(optimizer)
+            self.dec_checkpoints.append(checkpoint)
+            self.dec_managers.append(manager)
+
+        # PPO Configuration
+        self.ppo_config = {
+                'eps': tf.constant(0.20, dtype=tf.float32),
+                'entropy_beta': tf.constant(entropy, dtype=tf.float32),
+                'psi_beta': tf.constant(0.0001, dtype=tf.float32),
+                'decoder_beta': tf.constant(1e-2, dtype=tf.float32),
+                'critic_beta': tf.constant(0.5, dtype=tf.float32),
+                'q_beta': tf.constant(0.5, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.01, dtype=tf.float32),
+                }
