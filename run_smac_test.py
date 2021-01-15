@@ -10,14 +10,19 @@ def main():
 
     n_episodes = 1000
 
+
     for e in range(n_episodes):
         env.reset()
         terminated = False
         episode_reward = 0
 
+        mean_obs = []
+        mean_state = []
         while not terminated:
-            obs = env.get_obs()
-            state = env.get_state()
+            obs = np.array(env.get_obs())
+            state = np.array(env.get_state())
+            mean_obs.append(obs.mean())
+            mean_state.append(state.mean())
 
             actions = []
             for agent_id in range(n_agents):
@@ -29,7 +34,9 @@ def main():
             reward, terminated, _ = env.step(actions)
             episode_reward += reward
 
-        print("Total reward in episode {} = {}".format(e, episode_reward))
+        #print("Total reward in episode {} = {}".format(e, episode_reward))
+        #print("Battle won {}".format(env.battles_won))
+        print("Observation mean : {}, state mean : {}".format(np.mean(mean_obs), np.mean(mean_state)))
 
     env.close()
 

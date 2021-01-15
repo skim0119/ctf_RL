@@ -28,6 +28,7 @@ from collections import defaultdict
 from functools import partial
 
 from smac.env import StarCraft2Env
+from SC2Wrappers import SMACWrapper, FrameStacking
 
 from utility.utils import MovingAverage
 from utility.utils import interval_flag, path_create
@@ -49,7 +50,7 @@ parser.add_argument("--print", action="store_true", help="print out the progress
 parser.add_argument("--difficulty", type=str, default='7', help='the difficulty of the game')
 parser.add_argument("--seed", type=int, default=100, help='random seed')
 parser.add_argument("--step_mul", type=int, default=8, help='how many steps to make an action')
-parser.add_argument("--training_episodes", type=int, default=1000000, help='number of training episodes')
+parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
 args = parser.parse_args()
 
 PROGBAR = args.silence
@@ -75,16 +76,17 @@ path_create(SAVE_PATH)
 
 # Training
 total_episodes = args.training_episodes
-gamma = 0.98  # GAE - discount
-lambd = 0.98  # GAE - lambda
+gamma = 0.99  # GAE - discount
+lambd = 0.95  # GAE - lambda
 
 # Log
-save_network_frequency = 1024
-save_stat_frequency = 128
-save_image_frequency = 128
-moving_average_step = 256  # MA for recording episode statistics
+save_network_frequency = 4096
+save_stat_frequency = 2000
+save_image_frequency = 2000
+moving_average_step = 2000 # MA for recording episode statistics
 
 ## Environment
+frame_stack = 4
 env = StarCraft2Env(
     map_name=args.map,
     step_mul=args.step_mul,
@@ -92,22 +94,26 @@ env = StarCraft2Env(
     replay_dir=SAVE_PATH
 )
 env_info = env.get_env_info()
+env = SMACWrapper(env)
+env = FrameStacking(env, numFrames=frame_stack, lstm=True)
 print(env_info)
-
+        
 # Environment/Policy Settings
 action_space = env_info["n_actions"]
 num_agent = env_info["n_agents"]
-state_shape = env_info["state_shape"]
-obs_shape = env_info["obs_shape"]
+state_shape = [frame_stack, env.state_shape.shape[0]]#env_info["state_shape"] * frame_stack
+obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] * frame_stack
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 256
-epoch = 1
-minimum_batch_size = 4096
+minibatch_size = 128
+epoch = 4
+buffer_size = 2048
+drop_remainder = True
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
+log_winrate = MovingAverage(moving_average_step)
 log_looptime = MovingAverage(moving_average_step)
 log_traintime = MovingAverage(moving_average_step)
 
@@ -116,7 +122,7 @@ if PROGBAR:
     progbar = tf.keras.utils.Progbar(None, unit_name=TRAIN_TAG)
 
 # Network Setup
-atoms = 256
+atoms = 128
 network = Network(
     state_shape=state_shape,
     obs_shape=obs_shape,
@@ -124,11 +130,8 @@ network = Network(
     atoms=atoms,
     save_path=MODEL_PATH,
 )
-
-# Resotre / Initialize
 global_episodes = network.initiate()
 print(global_episodes)
-
 writer = tf.summary.create_file_writer(LOG_PATH)
 
 # TRAINING 
@@ -147,29 +150,34 @@ def train_central(
         # Forward
         states = np.array(traj[0])
         last_state = np.array(traj[3])[-1:, ...]
-        reward = traj[2]
+        reward = traj[1]
 
         env_critic, _ = network.run_network_central(states)
         _env_critic, _ = network.run_network_central(last_state)
-        critic = env_critic["critic"].numpy()[:, 0].tolist()
-        _critic = _env_critic["critic"].numpy()[0, 0]
+        critic = env_critic["critic"].numpy().tolist()
+        _critic = _env_critic["critic"].numpy()
 
         # TD-target
-        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd, discount_adv=False)
+        td_target_c, _ = gae(reward, critic, _critic, gamma, lambd,
+            normalize=False,
+            td_lambda=True
+        )
 
         traj_buffer["state"].extend(traj[0])
         traj_buffer["td_target_c"].extend(td_target_c)
+        traj_buffer["old_value"].extend(critic)
 
     train_dataset = (
         tf.data.Dataset.from_tensor_slices(
             {
                 "state": np.stack(traj_buffer["state"]).astype(np.float32),
                 "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
+                "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
             }
         )
         .shuffle(64)
         .repeat(epoch)
-        .batch(batch_size)
+        .batch(batch_size, drop_remainder=True)
     )
 
     network.update_central(
@@ -201,25 +209,39 @@ def train_decentral(
 
         cent_state = np.array(traj[14])
         env_critic, _ = network.run_network_central(cent_state)
-        env_critic = env_critic["critic"].numpy()[:, 0]
-        #cent_last_state = np.array(traj[15])[-1:, ...]
-        #_env_critic, _ = network.run_network_central(cent_last_state)
-        #_env_critic = _env_critic["critic"].numpy()[0, 0]
+        env_critic = env_critic["critic"].numpy().tolist()
+        cent_last_state = np.array(traj[15])[-1:, ...]
+        _env_critic, _ = network.run_network_central(cent_last_state)
+        _env_critic = _env_critic["critic"].numpy()
 
         icritic = traj[12]
+        mask = traj[3]
 
+        '''
         dc = np.array(critic[1:])-np.array(critic[:-1])
         dc1 = np.array(env_critic[1:])-np.array(env_critic[:-1])
         dc2 = np.array(icritic[1:])-np.array(icritic[:-1])
         f1_list.append(np.mean((dc * dc1)>0))
         f2_list.append(np.mean((dc * dc2)>0))
         fc_list.append(np.mean((dc * dc)>0))
+        '''
 
         # Zero bootstrap because all trajectory terminates
         td_target_c, advantages_global = gae(
             reward, critic, _critic,
-            gamma, lambd, # mask=mask,
-            normalize=False
+            gamma, lambd, normalize=False,
+            td_lambda=True, # mask=mask,
+            standardize_td=True,
+        )
+        _, advantages_global = gae(
+            reward,
+            env_critic,
+            _env_critic,
+            gamma,
+            lambd,
+            normalize=False,
+            td_lambda=True,
+            #mask=mask,
         )
         _, advantages = gae(
             traj[11],
@@ -230,16 +252,6 @@ def train_decentral(
            # mask=mask,
             normalize=False,
         )
-        '''
-        _, advantages = gae(
-            reward,
-            env_critic,
-            _env_critic,
-            gamma,
-            lambd,
-            normalize=False,
-        )
-        '''
         td_target_psi, _ = gae(
             phi,
             psi,
@@ -249,21 +261,42 @@ def train_decentral(
            # mask=np.array(mask)[:, None],
             discount_adv=False,
             normalize=False,
+            td_lambda=False,
         )
+
+        '''
+        traj_length = np.where(mask)[0]
+        if len(traj_length) == 0:
+            traj_length = len(traj[0])
+        else:
+            traj_length = traj_length[0]
+        '''
         traj_buffer["state"].extend(traj[0])
         traj_buffer["next_state"].extend(traj[4])
         traj_buffer["log_logit"].extend(traj[6])
         traj_buffer["action"].extend(traj[1])
         traj_buffer["old_value"].extend(critic)
         traj_buffer["td_target_psi"].extend(td_target_psi)
-        traj_buffer["advantage"].extend(advantages)
+        traj_buffer["advantage"].extend(advantages_global)
         traj_buffer["td_target_c"].extend(td_target_c)
         traj_buffer["rewards"].extend(reward)
+        traj_buffer["avail_actions"].extend(traj[16])
 
-    train_datasets = []
+    train_datasets = []  # Each for type of agents
     num_type = 1
     for atype in range(num_type):
         #traj_buffer = traj_buffer_list[atype]
+
+        # Normalize Advantage (global)
+        _adv = np.array(traj_buffer["advantage"]).astype(np.float32)
+        _adv = (_adv - _adv.mean()) / (_adv.std()+1e-9)
+
+        try:
+            _avail = np.stack(traj_buffer["avail_actions"])
+        except:
+            print(traj_buffer["avail_actions"])
+            raise
+
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
@@ -272,15 +305,16 @@ def train_decentral(
                     "action": np.stack(traj_buffer["action"]),
                     "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
                     "td_target": np.stack(traj_buffer["td_target_psi"]).astype(np.float32),
-                    "advantage": np.stack(traj_buffer["advantage"]).astype(np.float32),
+                    "advantage": _adv,
                     "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
                     "rewards": np.stack(traj_buffer["rewards"]).astype(np.float32),
                     "next_state": np.stack(traj_buffer["next_state"]).astype(np.float32),
+                    "avail_actions": np.stack(traj_buffer["avail_actions"]).astype(np.bool)
                 }
             )
             .shuffle(64)
             .repeat(epoch)
-            .batch(batch_size)
+            .batch(batch_size, drop_remainder=drop_remainder)
         )
         train_datasets.append(train_dataset)
         
@@ -294,9 +328,9 @@ def train_decentral(
                 tb_log_histogram(
                     np.array(adv_list), tag + "dec_advantages_{}".format(idx), step=step
                 )
-            tf.summary.scalar('factoredness/f1', np.mean(f1_list), step=step)
-            tf.summary.scalar('factoredness/f2', np.mean(f2_list), step=step)
-            tf.summary.scalar('factoredness/fc', np.mean(fc_list), step=step)
+            #tf.summary.scalar('factoredness/f1', np.mean(f1_list), step=step)
+            #tf.summary.scalar('factoredness/f2', np.mean(f2_list), step=step)
+            #tf.summary.scalar('factoredness/fc', np.mean(fc_list), step=step)
             writer.flush()
 
 
@@ -310,7 +344,7 @@ def run_network(observations, env):
 
     # Run decentral network
     observations = np.asarray(observations)
-    actor, critic = network.run_network_decentral(observations)
+    actor, critic = network.run_network_decentral(observations, avail_actions)
     # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
 
     # Get action
@@ -371,129 +405,137 @@ def run_network(observations, env):
     log_logits1 = actor["log_softmax"]
     reward_pred1 = critic["reward_predict"]
 
-    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1
+    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions
 
 
-batch = []
-batch_size = 0
-dec_batch = []
-dec_batch_size = 0
 while global_episodes < total_episodes:
 #while True:
-    # initialize parameters
-    dec_trajs = [Trajectory(depth=16) for _ in range(num_agent)]
-    cent_trajs = Trajectory(depth=4)
+    batch = []
+    batch_size = 0
+    dec_batch = []
+    dec_batch_size = 0
+    while dec_batch_size < buffer_size:
+        # initialize parameters
+        dec_trajs = [Trajectory(depth=17) for _ in range(num_agent)]
+        cent_trajs = Trajectory(depth=4)
 
-    # Reset Game
-    env.reset()
-    done = False
-    episode_reward = 0
+        # Reset Game
+        env.reset()
+        done = np.array([False]*num_agent)
+        episode_reward = 0
 
-    # Bootstrap
-    s1 = env.get_state()
-    o1 = env.get_obs()
-    a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
-
-    # Rollout
-    stime_roll = time.time()
-    step = 0
-    while not done:
-        s0 = s1
-        o0 = o1
-        a0 = a1
-        vg0 = vg1
-        vc0 = vc1
-        psi0 = psi1
-        phi0 = phi1
-        log_logits0 = log_logits1
-        was_done = done
-
-        # Run environment
-        reward, done, _ = env.step(a0)
-        step += 1
-        episode_reward += reward
-
-        # Run network
+        # Bootstrap
         s1 = env.get_state()
         o1 = env.get_obs()
-        a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1 = run_network(o1, env)
+        a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
 
-        # Experience recording
-        for idx in range(num_agent):
-            dec_trajs[idx].append(
-                [
-                    o0[idx],
-                    a0[idx],
-                    reward,  # + reward_pred1[idx], # Advantage
-                    done,  # masking
-                    o1[idx],
-                    vg0[idx],  # Advantage
-                    log_logits0[idx],  # PPO
-                    phi0[idx],  # phi: one-step ahead
-                    psi0[idx],
-                    vg1[idx],
-                    psi1[idx],
-                    reward,
-                    #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
-                    #reward[env_idx]-reward_pred1[idx],
-                    vc0[idx],
-                    vc1[idx],
-                    s0,
-                    s1,
-                ]
-            )
-        cent_trajs.append([
-            s0,
-            reward,
-            done,
-            s1,
-        ])
-    etime_roll = time.time()
+        # Rollout
+        stime_roll = time.time()
+        step = 0
+        while not done.all():
+            s0 = s1
+            o0 = o1
+            a0 = a1
+            vg0 = vg1
+            vc0 = vc1
+            psi0 = psi1
+            phi0 = phi1
+            log_logits0 = log_logits1
+            was_done = done
+            avail_actions = _avail_actions
 
-    if PRINT:
-        print("Reward in episode {} = {}".format(global_episodes, episode_reward))
+            # Run environment
+            #reward, done, _ = env.step(a0)
+            o1, reward, done, info, s1 = env.step(a0)
+            step += 1
+            episode_reward += reward
+
+            # Run network
+            a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
+
+            # Experience recording
+            for idx in range(num_agent):
+                if np.all(o0[idx]==0):
+                    continue
+                dec_trajs[idx].append(
+                    [
+                        o0[idx],
+                        a0[idx],
+                        reward,  # + reward_pred1[idx], # Advantage
+                        was_done[idx],  # masking
+                        o1[idx],
+                        vg0[idx],  # Advantage
+                        log_logits0[idx],  # PPO
+                        phi0[idx],  # phi: one-step ahead
+                        psi0[idx],
+                        vg1[idx],
+                        psi1[idx],
+                        reward,
+                        #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
+                        #reward[env_idx]-reward_pred1[idx],
+                        vc0[idx],
+                        vc1[idx],
+                        s0[0],
+                        s1[0],
+                        avail_actions[idx]
+                    ]
+                )
+            cent_trajs.append([
+                s0[0],
+                reward,
+                was_done.all(),
+                s1[0],
+            ])
+        etime_roll = time.time()
+        
+        log_episodic_reward.append(episode_reward)
+        log_looptime.append(etime_roll - stime_roll)
+        log_winrate.append(info["battle_won"])
+
+        # Buffer
+        dec_batch.extend(dec_trajs)
+        dec_batch_size += sum([len(traj) for traj in dec_trajs])
+        batch.append(cent_trajs)
+        batch_size += step
+
+        if PRINT:
+            print("Reward in episode {} = {} {}".format(global_episodes, episode_reward, TRAIN_NAME))
+
+        # Stepper
+        global_episodes += step
+        if PROGBAR:
+            progbar.update(global_episodes)
 
     # decentralize training
-    dec_batch.extend(dec_trajs)
-    dec_batch_size += len(dec_trajs) * step
-    if dec_batch_size > minimum_batch_size:
-        if PRINT:
-            print('training: {}'.format(dec_batch_size))
-        stime_train = time.time()
-        log = interval_flag(global_episodes, save_image_frequency, "im_log")
-        train_decentral(
-            dec_batch,
-            epoch=epoch,
-            batch_size=minibatch_size,
-            writer=writer,
-            log=log,
-            step=global_episodes,
-        )
-        dec_batch = []
-        dec_batch_size = 0
-        etime_train = time.time()
-        log_traintime.append(etime_train - stime_train)
+    if PRINT:
+        print('training: {}'.format(dec_batch_size))
+    stime_train = time.time()
+    log = interval_flag(global_episodes, save_image_frequency, "im_log")
+    train_decentral(
+        dec_batch,
+        epoch=epoch,
+        batch_size=minibatch_size,
+        writer=writer,
+        log=log,
+        step=global_episodes,
+    )
+    etime_train = time.time()
+    log_traintime.append(etime_train - stime_train)
 
-    '''
     # centralize training
-    batch.extend(cent_trajs)
-    batch_size += step
-    if batch_size >= minimum_batch_size // 2:
-        if PRINT:
-            print('training(central): {}'.format(batch_size))
-        log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
-        train_central(network, batch, 0, epoch, minibatch_size, writer, log_tc_on, global_episodes)
-        batch = []
-        batch_size = 0
-    '''
-
-    log_episodic_reward.append(episode_reward)
-    log_looptime.append(etime_roll - stime_roll)
-
-    # Stepper
-    global_episodes += 1
-    if PROGBAR:
-        progbar.update(global_episodes)
+    if PRINT:
+        print('training(central): {}'.format(batch_size))
+    log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
+    train_central(
+        network, 
+        batch, 
+        0, 
+        epoch, 
+        minibatch_size, 
+        writer, 
+        log_tc_on,
+        global_episodes
+    )
 
     # Log
     log_on = interval_flag(global_episodes, save_stat_frequency, "log")
@@ -501,10 +543,12 @@ while global_episodes < total_episodes:
         with writer.as_default():
             tag = "baseline_training/"
             tf.summary.scalar(tag + "env_reward", log_episodic_reward(), step=global_episodes)
+            tf.summary.scalar(tag + "winrate", log_winrate(), step=global_episodes)
             tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
             writer.flush()
 
+    # Network Save
     save_on = interval_flag(global_episodes, save_network_frequency, "save")
     if save_on:
         network.save(global_episodes)

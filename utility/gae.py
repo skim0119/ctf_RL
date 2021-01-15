@@ -16,8 +16,9 @@ def gae(
     terminal=False,
     mask=None,
     discount_adv=True,
-    normalize=True,
+    normalize=False,
     td_lambda=False,
+    standardize_td=False,
 ):
     """ gae
 
@@ -51,6 +52,7 @@ def gae(
         td_target = reward_np + gamma * value_ext[1:]
     else:
         td_target = reward_np + gamma * value_ext[1:] * (1 - np.array(mask))
+    
     advantages = td_target - value_ext[:-1]
 
     # Discount Advantage (default: True)
@@ -59,9 +61,11 @@ def gae(
 
     if td_lambda:
         td_target = advantages + value_ext[:-1]
+    if standardize_td:
+        td_target = (td_target - td_target.mean()) / (td_target.std() + 1e-9)
 
     # Normalize Advantage to be Normal
     if normalize:
-        advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-6)
+        advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-9)
 
     return td_target.tolist(), advantages.tolist()

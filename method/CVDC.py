@@ -8,7 +8,7 @@ from utility.utils import store_args
 from utility.logger import *
 
 from network.CVDC_model import Central, Decentral
-from network.CVDC_model import get_gradient, train
+from network.CVDC_model import train
 from network.CVDC_model import loss_central
 from network.CVDC_model import loss_ppo
 
@@ -23,9 +23,9 @@ class SF_CVDC:
         obs_shape,
         action_space,
         save_path,
-        atoms=128,
+        atoms=256,
         lr=1e-4,
-        clr=1e-3,
+        clr=1e-4,
         **kwargs
     ):
         # Set Model
@@ -38,7 +38,7 @@ class SF_CVDC:
         # Build Network (Central)
         self.model_central = Central(state_shape, atoms=atoms)
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.Adam(clr)
+        self.optimizer_central = tf.keras.optimizers.RMSprop(clr, rho=0.99, epsilon=1e-5)#Adam(clr)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -55,7 +55,7 @@ class SF_CVDC:
                     atoms=atoms,
                     prebuilt_layers=None)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
-            optimizer = tf.keras.optimizers.Adam(lr)
+            optimizer = tf.keras.optimizers.RMSprop(lr, rho=0.99, epsilon=1e-5)#Adam(lr)
             checkpoint = tf.train.Checkpoint(
                    optimizer=optimizer, model=model)
             manager = tf.train.CheckpointManager(
@@ -69,14 +69,16 @@ class SF_CVDC:
             self.dec_managers.append(manager)
 
         # PPO Configuration
+        self.target_kl = 0.015
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.20, dtype=tf.float32),
-                'psi_beta': tf.constant(0.0020, dtype=tf.float32),
-                'decoder_beta': tf.constant(0.5, dtype=tf.float32),
+                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
+                'psi_beta': tf.constant(0.50, dtype=tf.float32),
+                'reward_beta': tf.constant(.05, dtype=tf.float32),
+                'decoder_beta': tf.constant(0.0001, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
-                'q_beta': tf.constant(0.5, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.000, dtype=tf.float32),
+                'q_beta': tf.constant(0.05, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.001, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -113,15 +115,12 @@ class SF_CVDC:
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature 
 
-    def run_network_decentral(self, observations):
+    def run_network_decentral(self, observations, avail_actions):
         #(TODO) heterogeneous agent
         model = self.dec_models[0]
-        if model._built:
-            actor, SF = model.action_call(observations)
-        else:
-            num_sample = observations.shape[0]
-            temp_action = np.ones([num_sample], dtype=int)
-            actor, SF = model([observations, temp_action])
+        num_sample = observations.shape[0]
+        temp_action = np.ones([num_sample], dtype=int)
+        actor, SF = model([observations, temp_action, avail_actions])
         return actor, SF
         '''
         results = []
@@ -139,10 +138,6 @@ class SF_CVDC:
 
     # Centralize updater
     def update_central(self, datasets, writer=None, log=False, step=None, tag=None):
-        if log:
-            assert writer is not None
-            assert step is not None
-            assert tag is not None
         critic_losses = []
         
         # Get gradients
@@ -150,9 +145,12 @@ class SF_CVDC:
         optimizer = self.optimizer_central
         for inputs in datasets:
             _, info = train(model, loss_central, optimizer, inputs)
-            if log:
-                critic_losses.append(info["critic_mse"])
+            critic_losses.append(info["critic_mse"])
+        print(np.mean(critic_losses))
         if log:
+            assert writer is not None
+            assert step is not None
+            assert tag is not None
             logs = {tag+'central_critic_loss': np.mean(critic_losses)}
             with writer.as_default():
                 for name, val in logs.items():
@@ -172,10 +170,12 @@ class SF_CVDC:
         critic_mse = []
         q_losses = []
         reward_mse = []
-        multiagent_value_loss = []
-        multiagent_reward_loss = []
 
         learnability_loss = []
+
+        grad_norms = []
+        approx_kls = []
+        approx_ents = []
 
         # Get gradients
         for i in range(self.num_agent_type):
@@ -184,6 +184,8 @@ class SF_CVDC:
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
                 _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
+                approx_kls.append(info['approx_kl'])
+                approx_ents.append(info['approx_ent'])
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])
@@ -193,6 +195,9 @@ class SF_CVDC:
                     q_losses.append(info['q_loss'])
                     reward_mse.append(info['reward_loss'])
                     learnability_loss.append(info['learnability_loss'])
+                    grad_norms.append(info["grad_norm"])
+                if info['approx_kl'] > 1.5 * self.target_kl:
+                    break
         if log:
             logs = {tag+'dec_actor_loss': np.mean(actor_losses),
                     tag+'dec_psi_loss': np.mean(dec_psi_losses),
@@ -202,6 +207,9 @@ class SF_CVDC:
                     tag+'dec_q_loss': np.mean(q_losses),
                     tag+'dec_reward_loss': np.mean(reward_mse),
                     tag+'dec_learnability_loss': np.mean(learnability_loss),
+                    'grad_norm': np.mean(grad_norms),
+                    'approx_kl': np.mean(approx_kls),
+                    'approx_ent': np.mean(approx_ents),
                     }
             with writer.as_default():
                 self.log(step, logs=logs)

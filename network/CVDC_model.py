@@ -10,8 +10,6 @@ import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 
 from network.attention import Non_local_nn
-from network.model_SC2SMAC import CentralEnc
-from network.model_SC2SMAC import DecentralEnc, DecentralDec
 
 from utility.utils import store_args
 from utility.tf_utils import tf_clipped_log as tf_log
@@ -27,21 +25,76 @@ class Decentral(tf.keras.Model):
 
         if prebuilt_layers is None:
             # Feature Encoding
-            self.feature_layer = DecentralEnc(input_shape, action_space)
-            self.pi_layer = DecentralEnc(input_shape, action_space)
+            self.feature_layer = keras.Sequential([
+                layers.Input(shape=input_shape),
+                layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                #layers.GRU(64),
+                layers.Dense(units=128, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Flatten(),
+                #layers.Dense(units=256, activation='elu'),
+                #layers.Dense(units=256, activation='elu'),
+            ])
+            self.pi_layer = keras.Sequential([
+                layers.Input(shape=input_shape),
+                layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                #layers.GRU(64),
+                layers.Dense(units=128, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Flatten(),
+                #layers.Dense(units=256, activation='elu'),
+                #layers.Dense(units=256, activation='elu'),
+            ])
+            '''
+            self.feature_layer2= keras.Sequential([
+                layers.Input(shape=input_shape),
+                layers.Conv1D(filters=64, kernel_size=3, strides=2, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Conv1D(filters=128, kernel_size=3, strides=1, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Conv1D(filters=256, kernel_size=3, strides=1, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Flatten(),
+                layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Dense(units=atoms, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+            ])
+            self.pi_layer2 = keras.Sequential([
+                layers.Input(shape=input_shape),
+                layers.Conv1D(filters=64, kernel_size=3, strides=2, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Conv1D(filters=128, kernel_size=3, strides=1, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Conv1D(filters=256, kernel_size=3, strides=1, padding='same',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Flatten(),
+                layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+                layers.Dense(units=atoms, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+            ])
+            '''
 
             # Decoder
-            self.action_dense1 = layers.Dense(units=128, activation='elu')
-            self.decoder_pre_dense1 = layers.Dense(units=128, activation='elu')
-            self.decoder_dense1 = layers.Dense(units=128, activation='elu')
-            self.decoder = DecentralDec(input_shape)
+            self.action_dense1 = layers.Dense(units=256, activation='elu')
+            self.decoder_pre_dense1 = layers.Dense(units=256, activation='elu')
+            self.decoder_dense1 = layers.Dense(units=256, activation='elu')
+            self.decoder = keras.Sequential([
+                layers.Dense(units=256, activation='elu'),
+                layers.Dense(units=256, activation='elu'),
+                layers.Dense(units=np.prod(input_shape), activation='linear'),
+                layers.Reshape(input_shape)
+            ])
 
             # Phi
-            self.phi_dense1 = layers.Dense(units=atoms, activation='relu')
+            self.phi_dense1 = layers.Dense(units=atoms, activation='elu')
 
             # Psi
-            self.psi_dense1 = layers.Dense(units=atoms, activation='relu')
-            self.psi_dense2 = layers.Dense(units=atoms, activation='relu')
+            self.psi_dense1 = layers.Dense(units=atoms, activation='elu')
+            self.psi_dense2 = layers.Dense(units=atoms, activation='elu')
         else:
             # Feature Encoding
             self.feature_layer = prebuilt_layers.feature_layer
@@ -61,12 +114,11 @@ class Decentral(tf.keras.Model):
             self.psi_dense2 = prebuilt_layers.psi_dense2
 
         # Critic weights
-        self.sf_v_weight = layers.Dense(units=1, activation='linear') #, use_bias=False,)
-        self.sf_q_weight = layers.Dense(units=action_space, activation='linear') #, use_bias=False,)
+        self.sf_v_weight = layers.Dense(units=1, activation='linear', use_bias=False,)
+        self.sf_q_weight = layers.Dense(units=action_space, activation='linear', use_bias=False,)
 
         # Actor
-        self.actor_dense1 = layers.Dense(128, activation='relu')
-        self.actor_dense2 = layers.Dense(action_space)
+        self.actor_dense1 = layers.Dense(action_space)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -91,68 +143,26 @@ class Decentral(tf.keras.Model):
     def print_summary(self):
         self.feature_layer.summary()
 
-    @tf.function
-    def action_call(self, obs):  # Short operation for forward pass
-        # Feature Encoding SF-phi
-        net = self.feature_layer(obs)
-        phi = self.phi_dense1(net)
-        phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
-        phi = tf.math.divide_no_nan(phi, phi_norm)
-
-        # Actor
-        net = self.pi_layer(obs)
-        #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
-        net = self.actor_dense1(net)
-        net = self.actor_dense2(net)
-        softmax_logits = self.softmax(net)
-        log_logits = self.log_softmax(net)
-
-        # Non-grad psi
-        psi = self.psi_dense1(tf.stop_gradient(phi))
-        psi = self.psi_dense2(psi)
-
-        # Psi
-        net = self.psi_dense1(phi)
-        net = self.psi_dense2(net)
-        critic = self.sf_v_weight(net, training=True)
-        critic = tf.reshape(critic, [-1])
-        q = self.sf_q_weight(net, training=True)
-
-        beta = tf.math.abs(self.beta)
-        #wv = self.sf_v_weight.weights[0]
-        wv_neg = self.sf_v_weight.weights[0] * (1.0-beta)
-        reward_predict = tf.linalg.matmul(phi, wv_neg)
-        reward_predict = tf.reshape(reward_predict, [-1])
-        inv_critic = tf.linalg.matmul(psi, wv_neg)
-        inv_critic = tf.reshape(inv_critic, [-1])
-
-        actor = {'softmax': softmax_logits,
-                 'log_softmax': log_logits}
-        SF = {'reward_predict': reward_predict,
-              'phi': phi,
-              'psi': psi,
-              'critic': critic,
-              'icritic': critic - 0.1*inv_critic, # Corrected critic
-              }
-        return actor, SF
-
     def call(self, inputs): # Full Operation of the method
         # Run full network
         obs = inputs[0]
         action = inputs[1] # Action is included for decoder
+        avail_actions = tf.cast(inputs[2], tf.float32)
+        num_sample = obs.shape[0]
         action_one_hot = tf.one_hot(action, self.action_space, dtype=tf.float32)
 
         # Feature Encoding SF-phi
-        net = self.feature_layer(obs)
-        phi = self.phi_dense1(net)
-        phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
-        phi = tf.math.divide_no_nan(phi, phi_norm)
+        phi = self.feature_layer(obs)
+        phi = self.phi_dense1(phi)
+        #phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
+        #phi = tf.math.divide_no_nan(phi, phi_norm)
 
         # Actor
         net = self.pi_layer(obs)
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(net)
-        net = self.actor_dense2(net)
+        inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
+        net = inf_mask + net
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 
@@ -166,8 +176,9 @@ class Decentral(tf.keras.Model):
         psi = self.psi_dense1(tf.stop_gradient(phi))
         psi = self.psi_dense2(psi)
 
-        net = self.psi_dense1(phi)
-        net = self.psi_dense2(net)
+        #net = self.psi_dense1(phi)
+        #net = self.psi_dense2(net)
+        net = phi
         critic = self.sf_v_weight(net, training=True)
         critic = tf.reshape(critic, [-1])
         q = self.sf_q_weight(net, training=True)
@@ -176,7 +187,7 @@ class Decentral(tf.keras.Model):
         wv = self.sf_v_weight.weights[0]
         wq = self.sf_q_weight.weights[0]
         wv_neg = wv * (1.0-beta)
-        reward_predict = tf.linalg.matmul(phi, wv_neg)
+        reward_predict = tf.linalg.matmul(tf.stop_gradient(phi), wv_neg) # inverse approx
         reward_predict = tf.reshape(reward_predict, [-1])
         inv_critic = tf.linalg.matmul(psi, wv_neg)
         inv_critic = tf.reshape(inv_critic, [-1])
@@ -205,7 +216,7 @@ class Decentral(tf.keras.Model):
               'icritic': critic - 0.1*inv_critic, # Corrected critic
               'psi_q_pos': psi_q_pos,
               'psi_v_neg': psi_v_neg,
-              'filtered_decoded_state': _decoded_state
+              'filtered_decoded_state': _decoded_state,
               }
 
         self._built = True
@@ -219,69 +230,62 @@ class Central(tf.keras.Model):
         super(Central, self).__init__()
 
         # Feature Encoding
-        self.feature_layer = CentralEnc(input_shape)
+        self.feature_layer = keras.Sequential([
+            layers.Input(shape=input_shape),
+            layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+            layers.Dense(units=256, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+            #layers.GRU(64),
+            layers.Flatten(),
+            layers.Dense(units=atoms, activation='elu',
+                    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)),
+        ])
 
         # Critic
-        self.critic_dense1 = layers.Dense(units=atoms, activation='elu')
-        self.successor_weight = layers.Dense(units=1, activation='linear')
+        self.critic_dense1 = layers.Dense(units=1, activation='linear', use_bias=False,
+            kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))
 
-        # Loss Operations
-        self.mse_loss_mean = tf.keras.losses.MeanSquaredError()
-        self.mse_loss_sum = tf.keras.losses.MeanSquaredError(
-                reduction=tf.keras.losses.Reduction.SUM)
-
-    def print_summary(self):
-        self.feature_layer.print_summary()
+        #self.huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
 
     def call(self, inputs):
-        state = inputs
-
         # Encoder
-        n_sample = state.shape[0]
-        net = self.feature_layer(state)
-
-        # Critic  
+        net = self.feature_layer(inputs)
         net = self.critic_dense1(net)
-        critic = self.successor_weight(net)
+        critic = tf.squeeze(net)
 
         feature = {'latent': net}
         SF = {'critic': critic}
 
         return SF, feature 
 
-@tf.function
-def loss_central(model, state, td_target_c):
+#@tf.function
+def loss_central(model, state, td_target_c, old_value):
+    eps = 0.2
     inputs = state
     SF, feature = model(inputs)
 
     # Critic - TD Difference
-    critic_mse = model.mse_loss_mean(td_target_c, SF['critic'])
+    v_pred = SF['critic']
+    v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
+    critic_mse = tf.minimum(
+        tf.square(v_pred - td_target_c),
+        tf.square(v_pred_clipped - td_target_c))
+    critic_mse = tf.reduce_mean(critic_mse)
 
     total_loss = critic_mse
     info = {'critic_mse': critic_mse}
 
     return total_loss, info
 
-@tf.function
-def loss_decentral_critic_only(model, state, action, td_target_psi, td_target_c):
-    # Critic Loss
-    _, v = model([state, action])
-    critic_mse = model.mse_loss_mean(td_target_c, v['critic'])
-    psi_mse = model.mse_loss_mean(td_target_psi, v['psi'])
-    
-    total_loss = critic_mse + psi_mse * 0.01
-    info = {'critic_mse': critic_mse}
-
-    return total_loss, info
-
-@tf.function
-def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state,
-        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta,):
+#@tf.function
+def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state, avail_actions,
+        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta, reward_beta):
     num_sample = state.shape[0]
 
     # Run Model
-    pi, v = model([state, action])
-    pi_next, v_next = model([next_state, action])
+    pi, v = model([state, action, avail_actions])
+    pi_next, v_next = model([next_state, action, avail_actions]) # dummy action
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
@@ -296,19 +300,23 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     # Entropy
     H = -tf.reduce_mean(actor * tf_log(actor), axis=-1) # Entropy H of each sample
-    mean_entropy = tf.reduce_mean(H)
+    mean_entropy = tf.reduce_sum(H)
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
     smoothed_pseudo_H = model.smoothed_pseudo_H
 
+    # KL Divergence
+    
     # Critic Loss
     v_pred = v['critic']
     v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
-    critic_mse = tf.maximum(
+    critic_mse = tf.minimum(
         tf.square(v_pred - td_target_c),
         tf.square(v_pred_clipped - td_target_c))
-    critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
+    critic_mse = tf.reduce_sum(critic_mse)
+    #critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
+    #critic_mse = tf.reduce_mean(tf.square(v_pred-td_target_c))
     
     # Psi Loss
     psi_mse = model.mse_loss_mean(td_target, psi)
@@ -319,10 +327,15 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     log_prob = tf.reduce_sum(log_logits * action_one_hot, 1)
     old_log_prob = tf.reduce_sum(old_log_logit * action_one_hot, 1)
     ratio = tf.exp(log_prob - old_log_prob) # precision: log_prob / old_log_prob
+    #ratio = tf.clip_by_value(ratio, -1e8, 1e8)
     surrogate = ratio * advantage # Clipped surrogate function
     clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
-    surrogate_loss = tf.minimum(surrogate, clipped_surrogate, name='surrogate_loss')
-    actor_loss = -tf.reduce_mean(surrogate_loss, name='actor_loss')
+    surrogate_loss = tf.minimum(surrogate, clipped_surrogate)
+    actor_loss = -tf.reduce_sum(surrogate_loss)
+
+    # KL
+    approx_kl = tf.reduce_mean(old_log_prob - log_prob)
+    approx_ent = tf.reduce_mean(-log_prob)
 
     # Q - Loss
     q = v['Q']
@@ -343,8 +356,9 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     total_loss = actor_loss
     total_loss += psi_beta*psi_mse
-    total_loss -= entropy_beta*mean_entropy
+    total_loss += entropy_beta*(-mean_entropy)
     total_loss += decoder_beta*generator_loss
+    total_loss += reward_beta*reward_loss
     total_loss += critic_beta*critic_mse
     total_loss += q_beta*q_loss
     total_loss += learnability_beta*learnability_loss
@@ -359,23 +373,34 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
             'q_loss': q_loss,
             'reward_loss': reward_loss,
             'learnability_loss': learnability_loss,
+            'approx_kl': approx_kl,
+            'approx_ent': approx_ent,
             }
 
     return total_loss, info
 
+'''
 def get_gradient(model, loss, inputs, hyperparameters={}):
     with tf.GradientTape() as tape:
         loss_val, info = loss(model, **inputs, **hyperparameters)
     grads = tape.gradient(loss_val, model.trainable_variables,
             unconnected_gradients=tf.UnconnectedGradients.ZERO)
     return grads, info
+'''
 
 def train(model, loss, optimizer, inputs, hyperparameters={}):
     with tf.GradientTape() as tape:
         total_loss, info = loss(model, **inputs, **hyperparameters)
     grads = tape.gradient(total_loss, model.trainable_variables)
+    grads, grad_norm = tf.clip_by_global_norm(grads, 10)
+    info["grad_norm"] = grad_norm
     optimizer.apply_gradients([
-        (grad, var)
+        (
+            #tf.clip_by_norm(grad, 0.5),
+            #tf.clip_by_value(grad, -5.0, 5.0),
+            grad,
+            var
+        )
         for (grad,var) in zip(grads, model.trainable_variables)
         if grad is not None])
     return total_loss, info
