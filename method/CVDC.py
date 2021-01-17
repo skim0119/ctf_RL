@@ -77,8 +77,8 @@ class SF_CVDC:
                 'reward_beta': tf.constant(.05, dtype=tf.float32),
                 'decoder_beta': tf.constant(0.0001, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
-                'q_beta': tf.constant(0.05, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.001, dtype=tf.float32),
+                'q_beta': tf.constant(0.00, dtype=tf.float32),
+                'learnability_beta': tf.constant(0.000, dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -137,15 +137,16 @@ class SF_CVDC:
         '''
 
     # Centralize updater
-    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         critic_losses = []
         
         # Get gradients
         model = self.model_central
         optimizer = self.optimizer_central
-        for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs)
-            critic_losses.append(info["critic_mse"])
+        for _ in range(epoch):
+            for inputs in datasets:
+                _, info = train(model, loss_central, optimizer, inputs)
+                critic_losses.append(info["critic_mse"])
         print(np.mean(critic_losses))
         if log:
             assert writer is not None
@@ -158,7 +159,7 @@ class SF_CVDC:
                 writer.flush()
     
     # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update_decentral(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         if log:
             assert writer is not None
             assert step is not None
@@ -182,21 +183,25 @@ class SF_CVDC:
             dataset = datasets[i]
             model = self.dec_models[i]
             optimizer = self.dec_optimizers[i]
-            for inputs in dataset:
-                _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
-                approx_kls.append(info['approx_kl'])
-                approx_ents.append(info['approx_ent'])
-                if log:
-                    actor_losses.append(info['actor_loss'])
-                    dec_psi_losses.append(info['psi_loss'])
-                    entropy.append(info['entropy'])
-                    decoder_losses.append(info['generator_loss'])
-                    critic_mse.append(info['critic_mse'])
-                    q_losses.append(info['q_loss'])
-                    reward_mse.append(info['reward_loss'])
-                    learnability_loss.append(info['learnability_loss'])
-                    grad_norms.append(info["grad_norm"])
-                if info['approx_kl'] > 1.5 * self.target_kl:
+            for _ in range(epoch):
+                kls = []
+                for inputs in dataset:
+                    _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
+                    kls.append(info['approx_kl'])
+                    if log:
+                        actor_losses.append(info['actor_loss'])
+                        dec_psi_losses.append(info['psi_loss'])
+                        entropy.append(info['entropy'])
+                        decoder_losses.append(info['generator_loss'])
+                        critic_mse.append(info['critic_mse'])
+                        q_losses.append(info['q_loss'])
+                        reward_mse.append(info['reward_loss'])
+                        learnability_loss.append(info['learnability_loss'])
+                        grad_norms.append(info["grad_norm"])
+                        approx_kls.append(info['approx_kl'])
+                        approx_ents.append(info['approx_ent'])
+                #if info['approx_kl'] > 1.5 * self.target_kl:
+                if np.mean(kls) > 1.5 * self.target_kl:
                     break
         if log:
             logs = {tag+'dec_actor_loss': np.mean(actor_losses),

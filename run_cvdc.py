@@ -106,7 +106,7 @@ obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] 
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 128
+minibatch_size = 256
 epoch = 4
 buffer_size = 2048
 drop_remainder = True
@@ -176,12 +176,11 @@ def train_central(
             }
         )
         .shuffle(64)
-        .repeat(epoch)
         .batch(batch_size, drop_remainder=True)
     )
 
     network.update_central(
-        train_dataset, writer=writer, log=log, step=step, tag="losses/"
+        train_dataset, epoch, writer=writer, log=log, step=step, tag="losses/"
     )
 
 def train_decentral(
@@ -291,12 +290,6 @@ def train_decentral(
         _adv = np.array(traj_buffer["advantage"]).astype(np.float32)
         _adv = (_adv - _adv.mean()) / (_adv.std()+1e-9)
 
-        try:
-            _avail = np.stack(traj_buffer["avail_actions"])
-        except:
-            print(traj_buffer["avail_actions"])
-            raise
-
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
@@ -313,13 +306,12 @@ def train_decentral(
                 }
             )
             .shuffle(64)
-            .repeat(epoch)
             .batch(batch_size, drop_remainder=drop_remainder)
         )
         train_datasets.append(train_dataset)
         
     network.update_decentral(
-        train_datasets, writer=writer, log=log, step=step, tag="losses/", 
+        train_datasets, epoch, writer=writer, log=log, step=step, tag="losses/", 
     )
     if log:
         with writer.as_default():
