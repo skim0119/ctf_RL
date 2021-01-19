@@ -383,6 +383,7 @@ def run_network(states,validActions):
 
 batch = []
 dec_batch = []
+frames=0
 while global_episodes < total_episodes:
 #while True:
     # Flags
@@ -451,7 +452,9 @@ while global_episodes < total_episodes:
         reward_pred_list.append(reward_pred1.reshape(-1))
 
         # Buffer
+        frames+=1
         for env_idx in range(NENV):
+
             for agent_id in range(num_agent):
                 idx = env_idx * num_agent + agent_id
                 # if not was_done[env_idx] and was_alive[idx]: # fixed length
@@ -538,12 +541,12 @@ while global_episodes < total_episodes:
     if log_on:
         with writer.as_default():
             tag = "baseline_training/"
-            tf.summary.scalar(tag + "win-rate", log_winrate(), step=global_episodes)
+            tf.summary.scalar(tag + "win-rate", log_winrate(), step=frames)
             # tf.summary.scalar(
             #     tag + "redwin-rate", log_redwinrate(), step=global_episodes
             # )
             tf.summary.scalar(
-                tag + "env_reward", log_episodic_reward(), step=global_episodes
+                tag + "env_reward", log_episodic_reward(), step=frames
             )
             tf.summary.scalar(
                 tag + "rollout_time", log_looptime(), step=global_episodes
