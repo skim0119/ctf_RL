@@ -11,6 +11,7 @@ reference/
 clips/
 test_
 eval*
+.tags*
 
 *.swp
 .*.swp
