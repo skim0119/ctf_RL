@@ -26,6 +26,7 @@ class SF_CVDC:
         atoms=256,
         lr=1e-4,
         clr=1e-4,
+        entropy=0.001,
         **kwargs
     ):
         # Set Model
@@ -48,7 +49,7 @@ class SF_CVDC:
                 keep_checkpoint_every_n_hours=1)
 
         # Build Network (Decentral)
-        for i in range(self.num_agent_type): 
+        for i in range(self.num_agent_type):
             model = Decentral(
                     obs_shape,
                     action_space=action_space,
@@ -72,7 +73,7 @@ class SF_CVDC:
         self.target_kl = 0.015
         self.ppo_config = {
                 'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
+                'entropy_beta': tf.constant(entropy, dtype=tf.float32),
                 'psi_beta': tf.constant(0.50, dtype=tf.float32),
                 'reward_beta': tf.constant(.05, dtype=tf.float32),
                 'decoder_beta': tf.constant(0.0001, dtype=tf.float32),
@@ -113,7 +114,7 @@ class SF_CVDC:
         # states: environment state
         # observations: individual (centered) observation
         env_critic, env_feature = self.model_central(states)
-        return env_critic, env_feature 
+        return env_critic, env_feature
 
     def run_network_decentral(self, observations, avail_actions):
         #(TODO) heterogeneous agent
@@ -139,7 +140,7 @@ class SF_CVDC:
     # Centralize updater
     def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         critic_losses = []
-        
+
         # Get gradients
         model = self.model_central
         optimizer = self.optimizer_central
@@ -147,7 +148,7 @@ class SF_CVDC:
             for inputs in datasets:
                 _, info = train(model, loss_central, optimizer, inputs)
                 critic_losses.append(info["critic_mse"])
-        print(np.mean(critic_losses))
+        # print(np.mean(critic_losses))
         if log:
             assert writer is not None
             assert step is not None
@@ -157,7 +158,7 @@ class SF_CVDC:
                 for name, val in logs.items():
                     tf.summary.scalar(name, val, step=step)
                 writer.flush()
-    
+
     # Decentralize updater
     def update_decentral(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         if log:
@@ -167,6 +168,7 @@ class SF_CVDC:
         actor_losses = []
         dec_psi_losses = []
         entropy = []
+        adaptive_entropy = []
         decoder_losses = []
         critic_mse = []
         q_losses = []
@@ -189,6 +191,7 @@ class SF_CVDC:
                     _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
                     kls.append(info['approx_kl'])
                     if log:
+                        adaptive_entropy.append(info['adaptive_entropy'])
                         actor_losses.append(info['actor_loss'])
                         dec_psi_losses.append(info['psi_loss'])
                         entropy.append(info['entropy'])
@@ -207,6 +210,7 @@ class SF_CVDC:
             logs = {tag+'dec_actor_loss': np.mean(actor_losses),
                     tag+'dec_psi_loss': np.mean(dec_psi_losses),
                     tag+'dec_entropy': np.mean(entropy),
+                    tag+'adaptive_entropy': np.mean(adaptive_entropy),
                     tag+'dec_generator_loss': np.mean(decoder_losses),
                     tag+'dec_critic_loss': np.mean(critic_mse),
                     tag+'dec_q_loss': np.mean(q_losses),
@@ -248,4 +252,3 @@ class SF_CVDC:
         for i in range(self.num_agent_type):
             manager = self.dec_managers[i]
             manager.save(checkpoint_number)
-

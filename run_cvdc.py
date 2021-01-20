@@ -14,10 +14,6 @@ import threading
 import multiprocessing
 
 import tensorflow as tf
-#tf.config.experimental_run_functions_eagerly(True)
-physical_devices = tf.config.experimental.list_physical_devices("GPU")
-for device in physical_devices:
-    tf.config.experimental.set_memory_growth(device, True)
 
 import time
 import gym
@@ -41,29 +37,33 @@ from utility.gae import gae
 
 from method.CVDC import SF_CVDC as Network
 
-parser = argparse.ArgumentParser(description="CVDC(learnability) trainer for convoy")
+parser = argparse.ArgumentParser(description="CVDC(learnability) PredPrey")
 parser.add_argument("--train_number", type=int, help="training train_number")
 parser.add_argument("--machine", type=str, help="training machine")
-parser.add_argument("--map", type=str, default='8m', help='the map of the game')
 parser.add_argument("--silence", action="store_false", help="call to disable the progress bar")
 parser.add_argument("--print", action="store_true", help="print out the progress in detail")
-parser.add_argument("--difficulty", type=str, default='7', help='the difficulty of the game')
 parser.add_argument("--seed", type=int, default=100, help='random seed')
-parser.add_argument("--step_mul", type=int, default=8, help='how many steps to make an action')
 parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
+parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
 args = parser.parse_args()
+
+if args.gpu:
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+else:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 PROGBAR = args.silence
 PRINT = args.print
 
 ## Training Directory Reset
-TRAIN_NAME = "CVDC_{}_{}_{:02d}".format(
+TRAIN_NAME = "CVDC_PredPrey_{}_{:02d}".format(
     args.machine,
-    args.map,
     args.train_number,
 )
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
-TRAIN_TAG = "Central value decentralized control(learnability), " + TRAIN_NAME
+TRAIN_TAG = "CVDC(learnability), " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME
@@ -87,17 +87,16 @@ moving_average_step = 2000 # MA for recording episode statistics
 
 ## Environment
 frame_stack = 4
-env = StarCraft2Env(
-    map_name=args.map,
-    step_mul=args.step_mul,
-    difficulty=args.difficulty,
-    replay_dir=SAVE_PATH
+from PredatorPreyEnv import StagHunt
+env = StagHunt(
 )
+
 env_info = env.get_env_info()
-env = SMACWrapper(env)
+# env = SMACWrapper(env)
 env = FrameStacking(env, numFrames=frame_stack, lstm=True)
 print(env_info)
-        
+exit()
+
 # Environment/Policy Settings
 action_space = env_info["n_actions"]
 num_agent = env_info["n_agents"]
@@ -129,12 +128,13 @@ network = Network(
     action_space=action_space,
     atoms=atoms,
     save_path=MODEL_PATH,
+    entropy=0.001,
 )
 global_episodes = network.initiate()
 print(global_episodes)
 writer = tf.summary.create_file_writer(LOG_PATH)
 
-# TRAINING 
+# TRAINING
 def train_central(
     network,
     trajs,
@@ -309,9 +309,9 @@ def train_decentral(
             .batch(batch_size, drop_remainder=drop_remainder)
         )
         train_datasets.append(train_dataset)
-        
+
     network.update_decentral(
-        train_datasets, epoch, writer=writer, log=log, step=step, tag="losses/", 
+        train_datasets, epoch, writer=writer, log=log, step=step, tag="losses/",
     )
     if log:
         with writer.as_default():
@@ -479,10 +479,10 @@ while global_episodes < total_episodes:
                 s1[0],
             ])
         etime_roll = time.time()
-        
+
         log_episodic_reward.append(episode_reward)
         log_looptime.append(etime_roll - stime_roll)
-        log_winrate.append(info["battle_won"])
+        # log_winrate.append(info["battle_won"])
 
         # Buffer
         dec_batch.extend(dec_trajs)
@@ -519,12 +519,12 @@ while global_episodes < total_episodes:
         print('training(central): {}'.format(batch_size))
     log_tc_on = interval_flag(global_episodes, save_image_frequency, 'tc_log')
     train_central(
-        network, 
-        batch, 
-        0, 
-        epoch, 
-        minibatch_size, 
-        writer, 
+        network,
+        batch,
+        0,
+        epoch,
+        minibatch_size,
+        writer,
         log_tc_on,
         global_episodes
     )
@@ -535,7 +535,7 @@ while global_episodes < total_episodes:
         with writer.as_default():
             tag = "baseline_training/"
             tf.summary.scalar(tag + "env_reward", log_episodic_reward(), step=global_episodes)
-            tf.summary.scalar(tag + "winrate", log_winrate(), step=global_episodes)
+            # tf.summary.scalar(tag + "winrate", log_winrate(), step=global_episodes)
             tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
             writer.flush()

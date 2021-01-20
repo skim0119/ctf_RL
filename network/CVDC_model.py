@@ -257,7 +257,7 @@ class Central(tf.keras.Model):
         feature = {'latent': net}
         SF = {'critic': critic}
 
-        return SF, feature 
+        return SF, feature
 
 #@tf.function
 def loss_central(model, state, td_target_c, old_value):
@@ -306,8 +306,16 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
     smoothed_pseudo_H = model.smoothed_pseudo_H
 
+    #Adaptive_Entropy from LICA
+    num_actions = actor.shape[1]
+    a_acts = tf.cast(avail_actions, tf.float32)
+
+    adaptive_entropy = (tf_log(actor)+1.0)/tf.clip_by_value(tf.tile(tf.stop_gradient(tf.expand_dims(H,axis=-1)),tf.constant([1,num_actions], tf.int32)),0.00001,1)*a_acts
+    # exit()
+    adaptive_entropy = tf.reduce_sum(adaptive_entropy)
+
     # KL Divergence
-    
+
     # Critic Loss
     v_pred = v['critic']
     v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
@@ -317,7 +325,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     critic_mse = tf.reduce_sum(critic_mse)
     #critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
     #critic_mse = tf.reduce_mean(tf.square(v_pred-td_target_c))
-    
+
     # Psi Loss
     psi_mse = model.mse_loss_mean(td_target, psi)
     #psi_mse = 0.0
@@ -356,7 +364,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     total_loss = actor_loss
     total_loss += psi_beta*psi_mse
-    total_loss += entropy_beta*(-mean_entropy)
+    total_loss += entropy_beta*(-adaptive_entropy)
     total_loss += decoder_beta*generator_loss
     total_loss += reward_beta*reward_loss
     total_loss += critic_beta*critic_mse
@@ -369,6 +377,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
             'psi_loss': psi_mse,
             'critic_mse': critic_mse,
             'entropy': mean_entropy,
+            'adaptive_entropy': adaptive_entropy,
             'generator_loss': generator_loss,
             'q_loss': q_loss,
             'reward_loss': reward_loss,
@@ -404,4 +413,3 @@ def train(model, loss, optimizer, inputs, hyperparameters={}):
         for (grad,var) in zip(grads, model.trainable_variables)
         if grad is not None])
     return total_loss, info
-
