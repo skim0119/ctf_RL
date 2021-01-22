@@ -42,3 +42,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
+    for i in range(len(env.agents)):
+        agent = env.agents[i]
+        agent.unit_type

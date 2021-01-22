@@ -306,8 +306,6 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
     smoothed_pseudo_H = model.smoothed_pseudo_H
 
-    # KL Divergence
-    
     # Critic Loss
     v_pred = v['critic']
     v_pred_clipped = old_value + tf.clip_by_value(v_pred-old_value, -eps, eps)
@@ -355,13 +353,13 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     learnability_loss = tf.reduce_mean(-var_action+0.5*var_environment)
 
     total_loss = actor_loss
-    total_loss += psi_beta*psi_mse
+    #total_loss += psi_beta*psi_mse
     total_loss += entropy_beta*(-mean_entropy)
     total_loss += decoder_beta*generator_loss
-    total_loss += reward_beta*reward_loss
+    #total_loss += reward_beta*reward_loss
     total_loss += critic_beta*critic_mse
-    total_loss += q_beta*q_loss
-    total_loss += learnability_beta*learnability_loss
+    #total_loss += q_beta*q_loss
+    #total_loss += learnability_beta*learnability_loss
     #total_loss += 0.001*l2_loss
 
     # Log

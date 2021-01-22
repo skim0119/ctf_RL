@@ -48,16 +48,24 @@ parser.add_argument("--map", type=str, default='8m', help='the map of the game')
 parser.add_argument("--silence", action="store_false", help="call to disable the progress bar")
 parser.add_argument("--print", action="store_true", help="print out the progress in detail")
 parser.add_argument("--difficulty", type=str, default='7', help='the difficulty of the game')
-parser.add_argument("--seed", type=int, default=100, help='random seed')
+parser.add_argument("--seed", type=int, default=-1, help='random seed (-1 for no seed)')
 parser.add_argument("--step_mul", type=int, default=8, help='how many steps to make an action')
 parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
 args = parser.parse_args()
+
+# Random Seeding
+seed = args.seed
+if seed != -1:
+    tf.random.set_seed(seed)
+    np.random.seed(seed)
 
 PROGBAR = args.silence
 PRINT = args.print
 
 ## Training Directory Reset
-TRAIN_NAME = "CVDC_{}_{}_{:02d}".format(
+ALG_NAME = "CVDC"
+TRAIN_NAME = "{}_{}_{}_{:02d}".format(
+    ALG_NAME,
     args.machine,
     args.map,
     args.train_number,
@@ -106,7 +114,7 @@ obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] 
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 256
+minibatch_size = 128
 epoch = 4
 buffer_size = 2048
 drop_remainder = True
@@ -160,7 +168,8 @@ def train_central(
         # TD-target
         td_target_c, _ = gae(reward, critic, _critic, gamma, lambd,
             normalize=False,
-            td_lambda=True
+            td_lambda=True,
+            standardize_td=False,
         )
 
         traj_buffer["state"].extend(traj[0])
@@ -176,11 +185,12 @@ def train_central(
             }
         )
         .shuffle(64)
+        .repeat(epoch)
         .batch(batch_size, drop_remainder=True)
     )
 
     network.update_central(
-        train_dataset, epoch, writer=writer, log=log, step=step, tag="losses/"
+        train_dataset, writer=writer, log=log, step=step, tag="losses/"
     )
 
 def train_decentral(
@@ -229,8 +239,9 @@ def train_decentral(
         td_target_c, advantages_global = gae(
             reward, critic, _critic,
             gamma, lambd, normalize=False,
-            td_lambda=True, # mask=mask,
+            td_lambda=True, 
             standardize_td=True,
+            #mask=mask,
         )
         _, advantages_global = gae(
             reward,
@@ -239,7 +250,6 @@ def train_decentral(
             gamma,
             lambd,
             normalize=False,
-            td_lambda=True,
             #mask=mask,
         )
         _, advantages = gae(
@@ -248,8 +258,8 @@ def train_decentral(
             traj[13][-1],
             gamma,
             lambd,
-           # mask=mask,
             normalize=False,
+            #mask=mask,
         )
         td_target_psi, _ = gae(
             phi,
@@ -257,10 +267,10 @@ def train_decentral(
             _psi,  # np.zeros_like(phi[0]),
             gamma,
             lambd,
-           # mask=np.array(mask)[:, None],
             discount_adv=False,
             normalize=False,
             td_lambda=False,
+            #mask=np.array(mask)[:, None],
         )
 
         '''
@@ -269,6 +279,7 @@ def train_decentral(
             traj_length = len(traj[0])
         else:
             traj_length = traj_length[0]
+        traj_length = np.where(mask)[0]
         '''
         traj_buffer["state"].extend(traj[0])
         traj_buffer["next_state"].extend(traj[4])
@@ -306,12 +317,13 @@ def train_decentral(
                 }
             )
             .shuffle(64)
+            .repeat(epoch)
             .batch(batch_size, drop_remainder=drop_remainder)
         )
         train_datasets.append(train_dataset)
         
     network.update_decentral(
-        train_datasets, epoch, writer=writer, log=log, step=step, tag="losses/", 
+        train_datasets, writer=writer, log=log, step=step, tag="losses/", 
     )
     if log:
         with writer.as_default():
