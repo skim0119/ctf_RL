@@ -7,10 +7,10 @@ import numpy as np
 from utility.utils import store_args
 from utility.logger import *
 
-from network.CVDC_model import Central, Decentral
-from network.CVDC_model import train
-from network.CVDC_model import loss_central
-from network.CVDC_model import loss_ppo
+from network.CVDC_model_v2 import Central, Decentral
+from network.CVDC_model_v2 import train
+from network.CVDC_model_v2 import loss_central
+from network.CVDC_model_v2 import loss_ppo
 
 
 class SF_CVDC:
@@ -116,12 +116,12 @@ class SF_CVDC:
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature
 
-    def run_network_decentral(self, observations, avail_actions):
+    def run_network_decentral(self, observations, avail_actions,initial_state):
         #(TODO) heterogeneous agent
         model = self.dec_models[0]
         num_sample = observations.shape[0]
         temp_action = np.ones([num_sample], dtype=int)
-        actor, SF = model([observations, temp_action, avail_actions])
+        actor, SF = model([observations, temp_action, avail_actions,initial_state])
         return actor, SF
         '''
         results = []
@@ -136,6 +136,8 @@ class SF_CVDC:
             results.append([actions, actor, SF])
         return results
         '''
+    def get_initial_state(self,batch_size):
+        return self.dec_models[0].get_initial_state(batch_size)
 
     # Centralize updater
     def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
