@@ -110,14 +110,14 @@ class SF_CVDC:
             for name, val in logs.items():
                 tf.summary.scalar(name, val, step=step)
 
-    @tf.function
+    @tf.function(experimental_relax_shapes=True)
     def run_network_central(self, states):
         # states: environment state
         # observations: individual (centered) observation
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature
 
-    @tf.function
+    @tf.function(experimental_relax_shapes=True)
     def run_network_decentral(self, observations, avail_actions,initial_state):
         #(TODO) heterogeneous agent
         model = self.dec_models[0]
