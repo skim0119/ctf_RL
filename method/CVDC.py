@@ -120,13 +120,14 @@ class SF_CVDC:
         if logs is not None:
             for name, val in logs.items():
                 tf.summary.scalar(name, val, step=step)
-
+    @tf.function()
     def run_network_central(self, states):
         # states: environment state
         # observations: individual (centered) observation
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature
 
+    @tf.function()
     def run_network_decentral(self, observations, avail_actions):
         #(TODO) heterogeneous agent
         model = self.dec_models[0]
@@ -149,6 +150,7 @@ class SF_CVDC:
         '''
 
     # Centralize updater
+    @tf.function
     def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         critic_losses = []
 

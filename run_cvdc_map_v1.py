@@ -211,11 +211,10 @@ def train_decentral(
         reward = traj[2]
         mask = traj[3]
         critic = traj[5]
-        phi = np.array(traj[7]).tolist()
-        psi = np.array(traj[8]).tolist()
+        phi = traj[7]
+        psi = traj[8]
         _critic = traj[9][-1]
-        _psi = np.array(traj[10][-1])
-
+        _psi = traj[10][-1]
         cent_state = np.array(traj[14])
         env_critic, _ = network.run_network_central(cent_state)
         env_critic = env_critic["critic"].numpy().tolist()
@@ -474,8 +473,10 @@ while global_episodes < total_episodes:
                             o1[idx],
                             vg0[idx],  # Advantage
                             log_logits0[idx],  # PPO
-                            phi0[idx],  # phi: one-step ahead
-                            psi0[idx],
+                            # phi0[idx],  # phi: one-step ahead
+                            # psi0[idx],
+                            phi0[idx].numpy(),  # phi: one-step ahead
+                            psi0[idx].numpy(),
                             vg1[idx],
                             psi1[idx],
                             reward,
