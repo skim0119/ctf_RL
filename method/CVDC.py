@@ -30,6 +30,8 @@ class SF_CVDC:
         lr=1e-4,
         clr=1e-4,
         entropy=0.001,
+        reward_beta=.05,
+        decoder_beta=0.0001,
         network_type="LSTM",
         **kwargs
     ):
@@ -86,8 +88,8 @@ class SF_CVDC:
                 'eps': tf.constant(0.20, dtype=tf.float32),
                 'entropy_beta': tf.constant(entropy, dtype=tf.float32),
                 'psi_beta': tf.constant(0.50, dtype=tf.float32),
-                'reward_beta': tf.constant(.05, dtype=tf.float32),
-                'decoder_beta': tf.constant(0.0001, dtype=tf.float32),
+                'reward_beta': tf.constant(reward_beta, dtype=tf.float32),
+                'decoder_beta': tf.constant(decoder_beta, dtype=tf.float32),
                 'critic_beta': tf.constant(0.5, dtype=tf.float32),
                 'q_beta': tf.constant(0.05, dtype=tf.float32),
                 'learnability_beta': tf.constant(0.001, dtype=tf.float32),
