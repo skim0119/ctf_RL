@@ -43,7 +43,7 @@ parser.add_argument("--machine", type=str, help="training machine")
 parser.add_argument("--silence", action="store_false", help="call to disable the progress bar")
 parser.add_argument("--print", action="store_true", help="print out the progress in detail")
 parser.add_argument("--seed", type=int, default=100, help='random seed')
-parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
+parser.add_argument("--training_episodes", type=int, default=1000000, help='number of training episodes')
 parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
 parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
 parser.add_argument("--lr", type=float, default=1E-4, help='lr')
@@ -415,7 +415,9 @@ while global_episodes < total_episodes:
     batch_size = 0
     dec_batch = []
     dec_batch_size = 0
+    episode_counter = 0
     while dec_batch_size < buffer_size:
+        episode_counter +=1
         # initialize parameters
         dec_trajs = [Trajectory(depth=17) for _ in range(num_agent)]
         cent_trajs = Trajectory(depth=4)
@@ -556,6 +558,7 @@ while global_episodes < total_episodes:
             tf.summary.scalar(tag + "episode_length", log_winrate(), step=global_episodes)
             tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
+            tf.summary.scalar(tag + "episodes", episode_counter, step=global_episodes)
             writer.flush()
 
     # Network Save

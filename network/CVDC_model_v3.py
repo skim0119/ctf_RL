@@ -29,8 +29,6 @@ class Decentral(tf.keras.Model):
             self.feature_layer = keras.Sequential([
                 layers.Input(shape=input_shape),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
             ])
             self.LSTM=layers.GRU(units=128, activation='elu')
 

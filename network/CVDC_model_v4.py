@@ -30,7 +30,6 @@ class Decentral(tf.keras.Model):
                 layers.Input(shape=input_shape),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
             ])
             self.LSTM=layers.Flatten()
 

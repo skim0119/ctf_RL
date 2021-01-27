@@ -415,7 +415,9 @@ while global_episodes < total_episodes:
     batch_size = 0
     dec_batch = []
     dec_batch_size = 0
+    episode_counter = 0
     while dec_batch_size < buffer_size:
+        episode_counter +=1
         # initialize parameters
         dec_trajs = [Trajectory(depth=17) for _ in range(num_agent)]
         cent_trajs = Trajectory(depth=4)
@@ -556,6 +558,7 @@ while global_episodes < total_episodes:
             tf.summary.scalar(tag + "episode_length", log_winrate(), step=global_episodes)
             tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
+            tf.summary.scalar(tag + "episodes", episode_counter, step=global_episodes)
             writer.flush()
 
     # Network Save
