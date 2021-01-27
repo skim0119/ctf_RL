@@ -28,9 +28,10 @@ class Decentral(tf.keras.Model):
             # Feature Encoding
             self.feature_layer = keras.Sequential([
                 layers.Input(shape=input_shape),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+                layers.TimeDistributed(layers.Dense(units=64, activation='elu')),
             ])
-            self.LSTM=layers.GRU(units=128, activation='elu')
+            self.attention=layers.Attention()
+            self.flatten=layers.Flatten()
 
             '''
             self.feature_layer2= keras.Sequential([
@@ -139,7 +140,9 @@ class Decentral(tf.keras.Model):
 
         # Feature Encoding SF-phi
         phi = self.feature_layer(obs)
-        phi = self.LSTM(phi)
+        phi = tf.transpose(phi,[0,2,1])
+        phi = self.attention([phi,phi])
+        phi = self.flatten(phi)
         phi = self.phi_dense1(phi)
         #phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
         #phi = tf.math.divide_no_nan(phi, phi_norm)

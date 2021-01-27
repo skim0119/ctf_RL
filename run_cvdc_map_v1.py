@@ -47,6 +47,7 @@ parser.add_argument("--training_episodes", type=int, default=1000000, help='numb
 parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
 parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
 parser.add_argument("--lr", type=float, default=1E-4, help='lr')
+parser.add_argument("--clr", type=float, default=1E-4, help='clr')
 parser.add_argument("--ent", type=float, default=1E-3, help='entropyBeta')
 parser.add_argument("--epoch", type=int, default=1, help='epoch')
 parser.add_argument("--bs", type=int, default=512, help='buffer_size')
@@ -70,7 +71,7 @@ TRAIN_NAME = "CVDC_PredPrey_{}_{:02d}".format(
     args.train_number,
 )
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
-TRAIN_TAG = "CVDC(learnability), " + TRAIN_NAME
+TRAIN_TAG = "CVDC, " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME
@@ -136,7 +137,7 @@ network = Network(
     atoms=atoms,
     save_path=MODEL_PATH,
     lr=args.lr,
-    clr=args.lr,
+    clr=args.clr,
     entropy=args.ent,
     network_type="LSTM"
 )

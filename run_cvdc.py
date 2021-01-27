@@ -40,11 +40,20 @@ from method.CVDC import SF_CVDC as Network
 parser = argparse.ArgumentParser(description="CVDC(learnability) PredPrey")
 parser.add_argument("--train_number", type=int, help="training train_number")
 parser.add_argument("--machine", type=str, help="training machine")
+parser.add_argument("--map", type=str, default='8m', help='the map of the game')
 parser.add_argument("--silence", action="store_false", help="call to disable the progress bar")
 parser.add_argument("--print", action="store_true", help="print out the progress in detail")
 parser.add_argument("--seed", type=int, default=100, help='random seed')
 parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
 parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
+parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
+parser.add_argument("--lr", type=float, default=1E-4, help='lr')
+parser.add_argument("--clr", type=float, default=1E-4, help='clr')
+parser.add_argument("--ent", type=float, default=0.0, help='entropyBeta')
+parser.add_argument("--epoch", type=int, default=1, help='epoch')
+parser.add_argument("--bs", type=int, default=512, help='buffer_size')
+parser.add_argument("--mbs", type=int, default=128, help='minibatch_size')
+parser.add_argument("--frames", type=int, default=4, help='frames')
 args = parser.parse_args()
 
 if args.gpu:
@@ -76,7 +85,7 @@ path_create(SAVE_PATH)
 
 # Training
 total_episodes = args.training_episodes
-gamma = 0.99  # GAE - discount
+gamma = args.gamma  # GAE - discount
 lambd = 0.95  # GAE - lambda
 
 # Log
@@ -86,15 +95,14 @@ save_image_frequency = 2000
 moving_average_step = 2000 # MA for recording episode statistics
 
 ## Environment
-frame_stack = 4
-from PredatorPreyEnv import StagHunt
-env = StagHunt(
+frame_stack = args.frames
+env = StarCraft2Env(
+    map_name=args.map,
+    replay_dir=SAVE_PATH
 )
-
 env_info = env.get_env_info()
-# env = SMACWrapper(env)
+env = SMACWrapper(env)
 env = FrameStacking(env, numFrames=frame_stack, lstm=True)
-print(env_info)
 
 # Environment/Policy Settings
 action_space = env_info["n_actions"]
@@ -104,10 +112,10 @@ obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] 
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 256
-epoch = 4
-buffer_size = 2048
-drop_remainder = True
+minibatch_size = args.mbs
+epoch = args.epoch
+buffer_size = args.bs
+drop_remainder = False
 
 ## Logger Initialization
 log_episodic_reward = MovingAverage(moving_average_step)
@@ -127,7 +135,10 @@ network = Network(
     action_space=action_space,
     atoms=atoms,
     save_path=MODEL_PATH,
-    entropy=0.01,
+    lr=args.lr,
+    clr=args.clr,
+    entropy=args.ent,
+    network_type="LSTM"
 )
 global_episodes = network.initiate()
 print(global_episodes)
@@ -200,10 +211,10 @@ def train_decentral(
         reward = traj[2]
         mask = traj[3]
         critic = traj[5]
-        phi = np.array(traj[7]).tolist()
-        psi = np.array(traj[8]).tolist()
+        phi = traj[7]
+        psi = traj[8]
         _critic = traj[9][-1]
-        _psi = np.array(traj[10][-1])
+        _psi = traj[10][-1]
 
         cent_state = np.array(traj[14])
         env_critic, _ = network.run_network_central(cent_state)
@@ -457,10 +468,10 @@ while global_episodes < total_episodes:
                         o1[idx],
                         vg0[idx],  # Advantage
                         log_logits0[idx],  # PPO
-                        phi0[idx],  # phi: one-step ahead
-                        psi0[idx],
+                        phi0[idx].numpy(),  # phi: one-step ahead
+                        psi0[idx].numpy(),
                         vg1[idx],
-                        psi1[idx],
+                        psi1[idx].numpy(),
                         reward,
                         #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
                         #reward[env_idx]-reward_pred1[idx],

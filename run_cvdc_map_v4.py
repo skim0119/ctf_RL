@@ -70,7 +70,7 @@ TRAIN_NAME = "CVDC_PredPrey_{}_{:02d}".format(
     args.train_number,
 )
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
-TRAIN_TAG = "CVDC(learnability), " + TRAIN_NAME
+TRAIN_TAG = "CVDC, " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME

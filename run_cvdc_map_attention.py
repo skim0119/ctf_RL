@@ -35,7 +35,7 @@ from utility.gae import gae
 
 # from utility.slack import SlackAssist
 
-from method.CVDC_lstm import SF_CVDC as Network
+from method.CVDC_attention import SF_CVDC as Network
 
 parser = argparse.ArgumentParser(description="CVDC(learnability) PredPrey")
 parser.add_argument("--train_number", type=int, help="training train_number")
@@ -47,10 +47,12 @@ parser.add_argument("--training_episodes", type=int, default=1000000, help='numb
 parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
 parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
 parser.add_argument("--lr", type=float, default=1E-4, help='lr')
+parser.add_argument("--clr", type=float, default=1E-4, help='clr')
 parser.add_argument("--ent", type=float, default=1E-3, help='entropyBeta')
 parser.add_argument("--epoch", type=int, default=1, help='epoch')
 parser.add_argument("--bs", type=int, default=512, help='buffer_size')
 parser.add_argument("--mbs", type=int, default=64, help='minibatch_size')
+parser.add_argument("--frames", type=int, default=4, help='frames')
 args = parser.parse_args()
 
 if args.gpu:
@@ -69,7 +71,7 @@ TRAIN_NAME = "CVDC_PredPrey_{}_{:02d}".format(
     args.train_number,
 )
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
-TRAIN_TAG = "CVDC, " + TRAIN_NAME
+TRAIN_TAG = "CVDC " + TRAIN_NAME
 LOG_PATH = "./logs/" + TRAIN_NAME
 MODEL_PATH = "./model/" + TRAIN_NAME
 SAVE_PATH = "./save/" + TRAIN_NAME
@@ -92,7 +94,7 @@ save_image_frequency = 2000
 moving_average_step = 2000 # MA for recording episode statistics
 
 ## Environment
-frame_stack = 1
+frame_stack = args.frames
 env = gym.make("PredPrey-v0")
 
 env_info = env.get_env_info()
@@ -135,7 +137,7 @@ network = Network(
     atoms=atoms,
     save_path=MODEL_PATH,
     lr=args.lr,
-    clr=args.lr,
+    clr=args.clr,
     entropy=args.ent,
 )
 global_episodes = network.initiate()
@@ -213,7 +215,6 @@ def train_decentral(
         psi = traj[8]
         _critic = traj[9][-1]
         _psi = traj[10][-1]
-
         cent_state = np.array(traj[14])
         env_critic, _ = network.run_network_central(cent_state)
         env_critic = env_critic["critic"].numpy().tolist()
@@ -288,8 +289,6 @@ def train_decentral(
         traj_buffer["td_target_c"].extend(td_target_c)
         traj_buffer["rewards"].extend(reward)
         traj_buffer["avail_actions"].extend(traj[16])
-        traj_buffer["initial_state"].extend(traj[17])
-        traj_buffer["final_state"].extend(traj[18])
 
     train_datasets = []  # Each for type of agents
     num_type = 1
@@ -312,9 +311,7 @@ def train_decentral(
                     "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
                     "rewards": np.stack(traj_buffer["rewards"]).astype(np.float32),
                     "next_state": np.stack(traj_buffer["next_state"]).astype(np.float32),
-                    "avail_actions": np.stack(traj_buffer["avail_actions"]).astype(np.bool),
-                    "initial_state": np.stack(traj_buffer["initial_state"]).astype(np.float32),
-                    "final_state": np.stack(traj_buffer["final_state"]).astype(np.float32)
+                    "avail_actions": np.stack(traj_buffer["avail_actions"]).astype(np.bool)
                 }
             )
             .shuffle(64)
@@ -337,7 +334,7 @@ def train_decentral(
             writer.flush()
 
 
-def run_network(observations, env,initial_state):
+def run_network(observations, env):
     # Get available actions
     avail_actions = []
     for i in range(num_agent):
@@ -347,7 +344,7 @@ def run_network(observations, env,initial_state):
 
     # Run decentral network
     observations = np.asarray(observations)
-    actor, critic = network.run_network_decentral(observations, avail_actions,initial_state)
+    actor, critic = network.run_network_decentral(observations, avail_actions)
     # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
 
     # Get action
@@ -406,10 +403,9 @@ def run_network(observations, env,initial_state):
     phi1 = critic["phi"]
     psi1 = critic["psi"]
     log_logits1 = actor["log_softmax"]
-    final_state = actor["final_state"]
     reward_pred1 = critic["reward_predict"]
 
-    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions, final_state
+    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions
 
 
 while global_episodes < total_episodes:
@@ -422,7 +418,7 @@ while global_episodes < total_episodes:
     while dec_batch_size < buffer_size:
         episode_counter +=1
         # initialize parameters
-        dec_trajs = [Trajectory(depth=19) for _ in range(num_agent)]
+        dec_trajs = [Trajectory(depth=17) for _ in range(num_agent)]
         cent_trajs = Trajectory(depth=4)
 
         # Reset Game
@@ -430,12 +426,10 @@ while global_episodes < total_episodes:
         done = np.array([False]*num_agent)
         episode_reward = 0
 
-        initial_state = network.get_initial_state(num_agent)
-
         # Bootstrap
         s1 = env.get_state()
         o1 = env.get_obs()
-        a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions,final_state = run_network(o1, env,initial_state)
+        a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
 
         # Rollout
         stime_roll = time.time()
@@ -452,7 +446,6 @@ while global_episodes < total_episodes:
             log_logits0 = log_logits1
             was_done = done
             avail_actions = _avail_actions
-            initial_state = final_state
 
             # Run environment
             #reward, done, _ = env.step(a0)
@@ -461,7 +454,7 @@ while global_episodes < total_episodes:
             episode_reward += reward
 
             # Run network
-            a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions,final_state = run_network(o1, env,initial_state)
+            a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
             if done.all()and count==0:
                 continue
             else:
@@ -491,9 +484,7 @@ while global_episodes < total_episodes:
                             vc1[idx],
                             s0[0],
                             s1[0],
-                            avail_actions[idx],
-                            initial_state[idx],
-                            final_state[idx],
+                            avail_actions[idx]
                         ]
                     )
                 cent_trajs.append([
