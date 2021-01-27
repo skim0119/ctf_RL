@@ -150,7 +150,7 @@ class SF_CVDC:
         '''
 
     # Centralize updater
-    @tf.function
+    # @tf.function
     def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         critic_losses = []
 

@@ -142,7 +142,7 @@ class SF_CVDC:
         return self.dec_models[0].get_initial_state(batch_size)
 
     # Centralize updater
-    @tf.function
+    # @tf.function
     def update_central(self, datasets, epoch=1, writer=None, log=False, step=None, tag=None):
         critic_losses = []
 
