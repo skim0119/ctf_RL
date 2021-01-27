@@ -22,6 +22,7 @@ class Decentral(tf.keras.Model):
     def __init__(self, input_shape, action_space, atoms=128,
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
+        print("----v1------")
 
         if prebuilt_layers is None:
             # Feature Encoding
@@ -30,17 +31,9 @@ class Decentral(tf.keras.Model):
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.LSTM(units=128, activation='elu'),
-                layers.Flatten(),
             ])
-            self.pi_layer = keras.Sequential([
-                layers.Input(shape=input_shape),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-                layers.LSTM(units=128, activation='elu'),
-                layers.Flatten(),
-            ])
+            self.LSTM=layers.GRU(units=128, activation='elu')
+
             '''
             self.feature_layer2= keras.Sequential([
                 layers.Input(shape=input_shape),
@@ -112,7 +105,8 @@ class Decentral(tf.keras.Model):
         self.sf_q_weight = layers.Dense(units=action_space, activation='linear', use_bias=False,)
 
         # Actor
-        self.actor_dense1 = layers.Dense(action_space)
+        self.actor_dense1 = layers.Dense(128)
+        self.actor_dense2 = layers.Dense(action_space)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -147,14 +141,15 @@ class Decentral(tf.keras.Model):
 
         # Feature Encoding SF-phi
         phi = self.feature_layer(obs)
+        phi = self.LSTM(phi)
         phi = self.phi_dense1(phi)
         #phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
         #phi = tf.math.divide_no_nan(phi, phi_norm)
 
         # Actor
-        net = self.pi_layer(obs)
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
-        net = self.actor_dense1(net)
+        net = self.actor_dense1(phi)
+        net = self.actor_dense2(net)
         inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
         net = inf_mask + net
         softmax_logits = self.softmax(net)

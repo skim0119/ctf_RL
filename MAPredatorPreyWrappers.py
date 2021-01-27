@@ -17,7 +17,6 @@ class RandomPreyActions(gym.core.Wrapper):
         self.action_space = self.action_space[0]
         self.n_agents=self.env.n-1
 
-
     def reset(self, **kwargs):
         observation = self.env.reset(**kwargs)
         observation.pop(-1)
@@ -60,6 +59,7 @@ class MAPFrameStacking(gym.core.Wrapper):
 
     def get_obs(self):
         return [self.stackedStates[i]() for i in range(self.n_agents)]
+
     def get_avail_agent_actions(self,agent_i):
         return np.ones(self.action_space.n)
 
@@ -102,7 +102,6 @@ class Stacked_state:
             self.stack.append(obj)
             self.stack.pop(0)
         if self.lstm:
-            # print(np.stack(self.stack, axis=self.axis).shape)
             return np.stack(self.stack, axis=self.axis)
         else:
             return np.concatenate(self.stack, axis=self.axis)

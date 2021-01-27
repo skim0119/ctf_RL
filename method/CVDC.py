@@ -7,7 +7,10 @@ import numpy as np
 from utility.utils import store_args
 from utility.logger import *
 
-from network.CVDC_model import Central, Decentral
+from network.CVDC_model import Central
+from network.CVDC_model import Decentral as Decentral1
+from network.CVDC_model_v3 import Decentral as Decentral3
+from network.CVDC_model_v4 import Decentral as  Decentral4
 from network.CVDC_model import train
 from network.CVDC_model import loss_central
 from network.CVDC_model import loss_ppo
@@ -27,6 +30,7 @@ class SF_CVDC:
         lr=1e-4,
         clr=1e-4,
         entropy=0.001,
+        network_type="LSTM",
         **kwargs
     ):
         # Set Model
@@ -35,6 +39,13 @@ class SF_CVDC:
         self.dec_optimizers = []
         self.dec_checkpoints = []
         self.dec_managers = []
+
+        if network_type == "LSTM":
+            Decentral= Decentral1
+        elif network_type == "LSTM_Init":
+            Decentral= Decentral3
+        elif network_type == "No LSTM":
+            Decentral= Decentral4
 
         # Build Network (Central)
         self.model_central = Central(state_shape, atoms=atoms)

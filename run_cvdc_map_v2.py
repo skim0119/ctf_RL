@@ -45,6 +45,12 @@ parser.add_argument("--print", action="store_true", help="print out the progress
 parser.add_argument("--seed", type=int, default=100, help='random seed')
 parser.add_argument("--training_episodes", type=int, default=10000000, help='number of training episodes')
 parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
+parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
+parser.add_argument("--lr", type=float, default=1E-4, help='lr')
+parser.add_argument("--ent", type=float, default=1E-3, help='entropyBeta')
+parser.add_argument("--epoch", type=int, default=1, help='epoch')
+parser.add_argument("--bs", type=int, default=512, help='buffer_size')
+parser.add_argument("--mbs", type=int, default=64, help='minibatch_size')
 args = parser.parse_args()
 
 if args.gpu:
@@ -76,7 +82,7 @@ path_create(SAVE_PATH)
 
 # Training
 total_episodes = args.training_episodes
-gamma = 0.99  # GAE - discount
+gamma = args.gamma  # GAE - discount
 lambd = 0.95  # GAE - lambda
 
 # Log
@@ -95,6 +101,7 @@ env = RandomPreyActions(env)
 env = MAPFrameStacking(env, numFrames=frame_stack)
 env = PredatorPreyTerminator(env)
 print(env_info)
+# exit()
 
 # Environment/Policy Settings
 action_space = env_info["n_actions"].n
@@ -104,9 +111,9 @@ obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] 
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
-minibatch_size = 256
-epoch = 4
-buffer_size = 2048
+minibatch_size = args.mbs
+epoch = args.epoch
+buffer_size = args.bs
 drop_remainder = False
 
 ## Logger Initialization
@@ -127,9 +134,9 @@ network = Network(
     action_space=action_space,
     atoms=atoms,
     save_path=MODEL_PATH,
-    lr=1E-4,
-    clr=1E-4,
-    entropy=0.001,
+    lr=args.lr,
+    clr=args.lr,
+    entropy=args.ent,
 )
 global_episodes = network.initiate()
 print(global_episodes)

@@ -1,0 +1,38 @@
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_lr5e4 --lr 0.0005 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_lr5e4 --lr 0.0005 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_lr5e4 --lr 0.0005 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_lr5e4 --lr 0.0005 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_mb128 --mbs 128 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_mb128 --mbs 128 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_mb128 --mbs 128 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_mb128 --mbs 128 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_bs1024 --bs 1024 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_bs1024 --bs 1024 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_bs1024 --bs 1024 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_bs1024 --bs 1024 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_e4 --epoch 4 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_e4 --epoch 4 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_e4 --epoch 4 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_e4 --epoch 4 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_ent0 --ent 0.0 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_ent0 --ent 0.0 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_ent0 --ent 0.0 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_ent0 --ent 0.0 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_gamma95 --gamma 0.99 &
+python run_cvdc_map_v2.py --train_number 2 --machine lstm_v2_gamma95 --gamma 0.99 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_gamma95 --gamma 0.99 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_gamma95 --gamma 0.99 &
+
+python run_cvdc_map_v1.py --train_number 2 --machine lstm_v1_f6 --frames 6 &
+python run_cvdc_map_v3.py --train_number 2 --machine lstm_v3_f6 --frames 6 &
+python run_cvdc_map_v4.py --train_number 2 --machine lstm_v4_f6 --frames 6 &

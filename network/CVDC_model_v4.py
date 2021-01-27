@@ -20,10 +20,9 @@ import numpy as np
 class Decentral(tf.keras.Model):
     @store_args
     def __init__(self, input_shape, action_space, atoms=128,
-            prebuilt_layers=None, trainable=True,gru_units=128):
+            prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
-        self.gru_units=gru_units
-        print("----v2------")
+        print("----v4------")
 
         if prebuilt_layers is None:
             # Feature Encoding
@@ -31,9 +30,10 @@ class Decentral(tf.keras.Model):
                 layers.Input(shape=input_shape),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
             ])
+            self.LSTM=layers.Flatten()
 
-            self.gru = layers.GRU(units=gru_units, activation='elu',return_state=True)
             '''
             self.feature_layer2= keras.Sequential([
                 layers.Input(shape=input_shape),
@@ -85,7 +85,7 @@ class Decentral(tf.keras.Model):
         else:
             # Feature Encoding
             self.feature_layer = prebuilt_layers.feature_layer
-            self.gru = prebuilt_layers.gru
+            self.pi_layer = prebuilt_layers.pi_layer
 
             # Decoder
             self.action_dense1 = prebuilt_layers.action_dense1
@@ -105,7 +105,8 @@ class Decentral(tf.keras.Model):
         self.sf_q_weight = layers.Dense(units=action_space, activation='linear', use_bias=False,)
 
         # Actor
-        self.actor_dense1 = layers.Dense(action_space)
+        self.actor_dense1 = layers.Dense(128)
+        self.actor_dense2 = layers.Dense(action_space)
         self.softmax = layers.Activation('softmax')
         self.log_softmax = layers.Activation(tf.nn.log_softmax)
 
@@ -126,27 +127,22 @@ class Decentral(tf.keras.Model):
                 reduction=tf.keras.losses.Reduction.SUM)
 
         self._built = False
-    def get_initial_state(self,batch_size):
-        # a=tf.tile(tf.expand_dims(self.w,0),[batch_size,1])
-        # print(self.w)
-        # return a
-        return np.zeros([batch_size,self.gru_units])
 
     def print_summary(self):
         self.feature_layer.summary()
+
 
     def call(self, inputs): # Full Operation of the method
         # Run full network
         obs = inputs[0]
         action = inputs[1] # Action is included for decoder
         avail_actions = tf.cast(inputs[2], tf.float32)
-        initial_gru = tf.cast(inputs[3], tf.float32)
         num_sample = obs.shape[0]
         action_one_hot = tf.one_hot(action, self.action_space, dtype=tf.float32)
 
         # Feature Encoding SF-phi
         phi = self.feature_layer(obs)
-        phi,final_state=self.gru(phi,initial_state=initial_gru)
+        phi = self.LSTM(phi)
         phi = self.phi_dense1(phi)
         #phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
         #phi = tf.math.divide_no_nan(phi, phi_norm)
@@ -154,6 +150,7 @@ class Decentral(tf.keras.Model):
         # Actor
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
         net = self.actor_dense1(phi)
+        net = self.actor_dense2(net)
         inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
         net = inf_mask + net
         softmax_logits = self.softmax(net)
@@ -199,7 +196,6 @@ class Decentral(tf.keras.Model):
         _decoded_state = self.decoder(_net)
 
         actor = {'softmax': softmax_logits,
-                 'final_state': final_state,
                  'log_softmax': log_logits}
         SF = {'reward_predict': reward_predict,
               'phi': phi,
@@ -229,7 +225,9 @@ class Central(tf.keras.Model):
             layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
             #layers.GRU(64),
             layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-            layers.Flatten()
+            layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+            layers.LSTM(units=128, activation='elu'),
+            layers.Flatten(),
         ])
 
         # Critic
@@ -270,12 +268,12 @@ def loss_central(model, state, td_target_c, old_value):
 
 #@tf.function
 def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state, avail_actions,
-        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta, reward_beta,initial_state,final_state):
+        eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta, reward_beta):
     num_sample = state.shape[0]
 
     # Run Model
-    pi, v = model([state, action, avail_actions,initial_state])
-    pi_next, v_next = model([next_state, action, avail_actions,final_state]) # dummy action
+    pi, v = model([state, action, avail_actions])
+    pi_next, v_next = model([next_state, action, avail_actions]) # dummy action
     actor = pi['softmax']
     psi = v['psi']
     log_logits = pi['log_softmax']
