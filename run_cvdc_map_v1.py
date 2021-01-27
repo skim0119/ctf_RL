@@ -473,12 +473,10 @@ while global_episodes < total_episodes:
                             o1[idx],
                             vg0[idx],  # Advantage
                             log_logits0[idx],  # PPO
-                            # phi0[idx],  # phi: one-step ahead
-                            # psi0[idx],
                             phi0[idx].numpy(),  # phi: one-step ahead
                             psi0[idx].numpy(),
                             vg1[idx],
-                            psi1[idx],
+                            psi1[idx].numpy(),
                             reward,
                             #reward[env_idx]-(reward_pred1[idx] if reward[env_idx] else 0),
                             #reward[env_idx]-reward_pred1[idx],
