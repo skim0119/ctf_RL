@@ -492,7 +492,7 @@ while global_episodes < total_episodes:
 
         log_episodic_reward.append(episode_reward)
         log_looptime.append(etime_roll - stime_roll)
-        # log_winrate.append(info["battle_won"])
+        log_winrate.append(info["battle_won"])
 
         # Buffer
         dec_batch.extend(dec_trajs)
@@ -545,7 +545,7 @@ while global_episodes < total_episodes:
         with writer.as_default():
             tag = "baseline_training/"
             tf.summary.scalar(tag + "env_reward", log_episodic_reward(), step=global_episodes)
-            # tf.summary.scalar(tag + "winrate", log_winrate(), step=global_episodes)
+            tf.summary.scalar(tag + "winrate", log_winrate(), step=global_episodes)
             tf.summary.scalar(tag + "rollout_time", log_looptime(), step=global_episodes)
             tf.summary.scalar(tag + "train_time", log_traintime(), step=global_episodes)
             writer.flush()
