@@ -273,16 +273,16 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     log_logits = pi['log_softmax']
 
     # Reward Accuracy
-    reward_loss = model.mse_loss_sum(rewards, v['reward_predict'])
+    reward_loss = model.mse_loss_mean(rewards, v['reward_predict'])
     #reward_loss = 0.0
 
     # Decoder loss
-    generator_loss = model.mse_loss_sum(next_state[:,-1,:], v['decoded_state'])
+    generator_loss = model.mse_loss_mean(next_state[:,-1,:], v['decoded_state'])
     #generator_loss = 0.0
 
     # Entropy
     H = -tf.reduce_mean(actor * tf_log(actor), axis=-1) # Entropy H of each sample
-    mean_entropy = tf.reduce_sum(H)
+    mean_entropy = tf.reduce_mean(H)
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
@@ -294,7 +294,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     adaptive_entropy = (tf_log(actor)+1.0)/tf.clip_by_value(tf.tile(tf.stop_gradient(tf.expand_dims(H,axis=-1)),tf.constant([1,num_actions], tf.int32)),0.00001,1)*a_acts
     # exit()
-    adaptive_entropy = tf.reduce_sum(adaptive_entropy)
+    adaptive_entropy = tf.reduce_mean(adaptive_entropy)
 
     # KL Divergence
 
@@ -304,7 +304,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     critic_mse = tf.minimum(
         tf.square(v_pred - td_target_c),
         tf.square(v_pred_clipped - td_target_c))
-    critic_mse = tf.reduce_sum(critic_mse)
+    critic_mse = tf.reduce_mean(critic_mse)
     #critic_mse = tf.reduce_mean(critic_mse * tf.stop_gradient(smoothed_pseudo_H)) + tf.square(mean_pseudo_H-smoothed_pseudo_H)
     #critic_mse = tf.reduce_mean(tf.square(v_pred-td_target_c))
 
@@ -321,7 +321,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     surrogate = ratio * advantage # Clipped surrogate function
     clipped_surrogate = tf.clip_by_value(ratio, 1-eps, 1+eps) * advantage
     surrogate_loss = tf.minimum(surrogate, clipped_surrogate)
-    actor_loss = -tf.reduce_sum(surrogate_loss)
+    actor_loss = -tf.reduce_mean(surrogate_loss)
 
     # KL
     approx_kl = tf.reduce_mean(old_log_prob - log_prob)
