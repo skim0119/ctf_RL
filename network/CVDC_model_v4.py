@@ -152,6 +152,7 @@ class Decentral(tf.keras.Model):
         net = self.actor_dense2(net)
         inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
         net = inf_mask + net
+        net = tf.math.maximum(net,1E-9)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 

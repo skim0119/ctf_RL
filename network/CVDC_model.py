@@ -66,7 +66,6 @@ class Decentral(tf.keras.Model):
             # Decoder
             self.action_dense1 = layers.Dense(units=256, activation='elu')
             self.decoder_pre_dense1 = layers.Dense(units=256, activation='elu')
-            self.decoder_dense1 = layers.Dense(units=256, activation='elu')
             self.decoder = keras.Sequential([
                 layers.Dense(units=256, activation='elu'),
                 layers.Dense(units=256, activation='elu'),
@@ -150,6 +149,7 @@ class Decentral(tf.keras.Model):
         net = self.actor_dense2(net)
         inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
         net = inf_mask + net
+        net = tf.math.maximum(net,1E-9)
         softmax_logits = self.softmax(net)
         log_logits = self.log_softmax(net)
 
@@ -157,7 +157,6 @@ class Decentral(tf.keras.Model):
         dec_net = self.decoder_pre_dense1(phi)
         act_net = self.action_dense1(action_one_hot)
         net = tf.math.multiply(dec_net, act_net)
-        net = self.decoder_dense1(net)
         decoded_state = self.decoder(net)
 
         psi = self.psi_dense1(tf.stop_gradient(phi))
