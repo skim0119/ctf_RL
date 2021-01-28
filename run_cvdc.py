@@ -103,17 +103,19 @@ env = StarCraft2Env(
     # reward_scale_rate=20,
     replay_dir=SAVE_PATH
 )
-env_info = env.get_env_info()
-env = SMACWrapper(env)
-env = FrameStacking(env, numFrames=frame_stack, lstm=True)
 
+
+env_info = env.get_env_info()
+# env = SMACWrapper(env)
+# env = FrameStacking(env, numFrames=frame_stack, lstm=True)
 # Environment/Policy Settings
+print(env_info)
 action_space = env_info["n_actions"]
 num_agent = env_info["n_agents"]
-state_shape = [frame_stack, env.state_shape.shape[0]]#env_info["state_shape"] * frame_stack
-obs_shape = [frame_stack, env.observation_space.shape[0]]#env_info["obs_shape"] * frame_stack
+state_shape = [frame_stack, env_info["state_shape"]]#env_info["state_shape"] * frame_stack
+obs_shape = [frame_stack, env_info["obs_shape"]]#env_info["obs_shape"] * frame_stack
 episode_limit = env_info["episode_limit"]
-
+# exit()
 ## Batch Replay Settings
 minibatch_size = args.mbs
 epoch = args.epoch
@@ -146,6 +148,31 @@ network = Network(
 global_episodes = network.initiate()
 print(global_episodes)
 writer = tf.summary.create_file_writer(LOG_PATH)
+
+class Stacked_state:
+    def __init__(self, keep_frame, axis,lstm=False):
+        self.keep_frame = keep_frame
+        self.axis = axis
+        self.lstm=lstm
+        self.stack = []
+
+    def initiate(self, obj):
+        self.stack = [obj] * self.keep_frame
+
+    def __call__(self, obj=None):
+        if obj is None:
+            if self.lstm:
+                # print(np.stack(self.stack, axis=self.axis).shape)
+                return np.stack(self.stack, axis=self.axis)
+            else:
+                return np.concatenate(self.stack, axis=self.axis)
+        self.stack.append(obj)
+        self.stack.pop(0)
+        if self.lstm:
+            # print(np.stack(self.stack, axis=self.axis).shape)
+            return np.stack(self.stack, axis=self.axis)
+        else:
+            return np.concatenate(self.stack, axis=self.axis)
 
 # TRAINING
 def train_central(
@@ -425,23 +452,32 @@ def run_network(observations, env,greedy=False):
 
     return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions
 
+
 def TestNetwork(env,episodes):
+    stackedStates_obs_test = Stacked_state(frame_stack, 1,True)
     episode_rewards=[]
     episode_win=[]
     for i in range(episodes):
         env.reset()
-        done = np.array([False]*num_agent)
-        o1 = env.get_obs()
+        terminated=False
+        stackedStates_obs_test.initiate(np.vstack(env.get_obs()))
+        o1 = stackedStates_obs_test()
         episode_reward=0
-        while not done.all():
+        while not terminated:
             a1, _, _, _, _, _, _, _ = run_network(o1, env,greedy=True)
-            o1, reward, done, info, s1 = env.step(a1)
+            reward, terminated, info = env.step(a1)
+            o1 = stackedStates_obs_test(np.vstack(env.get_obs()))
             episode_reward += reward
+            if "battle_won" not in info:
+                info["battle_won"]=False
         episode_rewards.append(episode_reward)
         episode_win.append(float(info["battle_won"]))
     return np.mean(episode_rewards), np.mean(episode_win)
 
 
+stackedStates_obs = Stacked_state(frame_stack, 1,True)
+
+stackedStates_states = Stacked_state(frame_stack, 1,True)
 
 while global_episodes < total_episodes:
 #while True:
@@ -460,8 +496,11 @@ while global_episodes < total_episodes:
         episode_reward = 0
 
         # Bootstrap
-        s1 = env.get_state()
-        o1 = env.get_obs()
+        stackedStates_states.initiate(np.expand_dims(env.get_state().astype(np.float32),0))
+        stackedStates_obs.initiate(np.vstack(env.get_obs()))
+        s1 = stackedStates_states()
+        o1 = stackedStates_obs()
+
         a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
 
         # Rollout
@@ -481,12 +520,30 @@ while global_episodes < total_episodes:
 
             # Run environment
             #reward, done, _ = env.step(a0)
-            o1, reward, done, info, s1 = env.step(a0)
+            # print(a0)
+            reward, terminated, info = env.step(a0)
+
+            s1 = stackedStates_states(np.expand_dims(env.get_state().astype(np.float32),0))
+            o1 = stackedStates_obs(np.vstack(env.get_obs()))
+
             step += 1
             episode_reward += reward
 
             # Run network
             a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
+            # validAction = self.env.get_avail_actions()
+            if terminated:
+                done = np.asarray([terminated]*env.n_agents)
+            else:
+                done=[]
+                for validAction in _avail_actions:
+                    if validAction[0] == 1:
+                        done.append( True)
+                    else:
+                        done.append(False)
+                done = np.asarray(done)
+            if "battle_won" not in info:
+                info["battle_won"]=False
 
             # Experience recording
             for idx in range(num_agent):
