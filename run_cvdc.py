@@ -67,8 +67,9 @@ PROGBAR = args.silence
 PRINT = args.print
 
 ## Training Directory Reset
-TRAIN_NAME = "CVDC_PredPrey_{}_{:02d}".format(
+TRAIN_NAME = "CVDC_SC2_{}_{}_{:02d}".format(
     args.machine,
+    args.map,
     args.train_number,
 )
 #slack_assist = SlackAssist(training_name=TRAIN_NAME, channel_name="#nodes")
@@ -89,6 +90,7 @@ gamma = args.gamma  # GAE - discount
 lambd = 0.95  # GAE - lambda
 
 # Log
+test_interval = 2000
 save_network_frequency = 4096
 save_stat_frequency = 2000
 save_image_frequency = 2000
@@ -336,7 +338,7 @@ def train_decentral(
             writer.flush()
 
 
-def run_network(observations, env):
+def run_network(observations, env,greedy=False):
     # Get available actions
     avail_actions = []
     for i in range(num_agent):
@@ -353,17 +355,30 @@ def run_network(observations, env):
     probs = actor['softmax'].numpy()
     action_probs = probs * avail_actions
     try:
-        a1 = []
-        for idx, p in enumerate(action_probs):
-            if np.isclose(p.sum(), 0):
-                avail_actions = env.get_avail_agent_actions(idx)
-                avail_actions_ind = np.nonzero(avail_actions)[0]
-                action = np.random.choice(avail_actions_ind)
-                a1.append(action)
-            else:
-                p = p/p.sum()
-                action = np.random.choice(action_space, p=p)
-                a1.append(action)
+        if greedy:
+            a1 = []
+            for idx, p in enumerate(action_probs):
+                if np.isclose(p.sum(), 0):
+                    avail_actions = env.get_avail_agent_actions(idx)
+                    avail_actions_ind = np.nonzero(avail_actions)[0]
+                    action = np.random.choice(avail_actions_ind)
+                    a1.append(action)
+                else:
+                    p = p/p.sum()
+                    action = np.argmax(p)
+                    a1.append(action)
+        else:
+            a1 = []
+            for idx, p in enumerate(action_probs):
+                if np.isclose(p.sum(), 0):
+                    avail_actions = env.get_avail_agent_actions(idx)
+                    avail_actions_ind = np.nonzero(avail_actions)[0]
+                    action = np.random.choice(avail_actions_ind)
+                    a1.append(action)
+                else:
+                    p = p/p.sum()
+                    action = np.random.choice(action_space, p=p)
+                    a1.append(action)
     except ValueError:
         print(probs)
         print(action_probs)
@@ -408,6 +423,23 @@ def run_network(observations, env):
     reward_pred1 = critic["reward_predict"]
 
     return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions
+
+def TestNetwork(env,episodes):
+    episode_rewards=[]
+    episode_win=[]
+    for i in range(episodes):
+        env.reset()
+        done = np.array([False]*num_agent)
+        o1 = env.get_obs()
+        episode_reward=0
+        while not done.all():
+            a1, _, _, _, _, _, _, _ = run_network(o1, env,greedy=True)
+            o1, reward, done, info, s1 = env.step(a1)
+            episode_reward += reward
+        episode_rewards.append(episode_reward)
+        episode_win.append(float(info["battle_won"]))
+    return np.mean(episode_rewards), np.mean(episode_win)
+
 
 
 while global_episodes < total_episodes:
@@ -490,6 +522,8 @@ while global_episodes < total_episodes:
             ])
         etime_roll = time.time()
 
+
+
         log_episodic_reward.append(episode_reward)
         log_looptime.append(etime_roll - stime_roll)
         log_winrate.append(info["battle_won"])
@@ -540,6 +574,15 @@ while global_episodes < total_episodes:
     )
 
     # Log
+    test_on = interval_flag(global_episodes, test_interval, "test")
+    if test_on:
+        r_test,wr_test=TestNetwork(env,16)
+        with writer.as_default():
+            tag = "baseline_training/"
+            tf.summary.scalar(tag + "test_env_reward", r_test, step=global_episodes)
+            tf.summary.scalar(tag + "test_winrate", wr_test, step=global_episodes)
+            writer.flush()
+
     log_on = interval_flag(global_episodes, save_stat_frequency, "log")
     if log_on:
         with writer.as_default():
