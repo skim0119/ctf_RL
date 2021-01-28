@@ -100,6 +100,7 @@ moving_average_step = 2000 # MA for recording episode statistics
 frame_stack = args.frames
 env = StarCraft2Env(
     map_name=args.map,
+    # reward_scale_rate=20,
     replay_dir=SAVE_PATH
 )
 env_info = env.get_env_info()

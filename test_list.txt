@@ -32,17 +32,17 @@ python run_cvdc_map_v1.py --train_number 3 --machine lstm_v1_noCentralLSTM --lr 
 python run_cvdc_map_attention.py --train_number 2 --machine atten --lr 0.0001 --clr 0.0001 --ent 0.0 --epoch 1 --mb 128
 
 
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_map_v1.py --train_number 10 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --mb 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_map_v1.py --train_number 11 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --mb 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_map_v1.py --train_number 12 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --mb 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_map_v1.py --train_number 13 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --mb 128 &>/dev/null & disown
+export CUDA_VISIBLE_DEVICES=1; python run_cvdc_map_v1.py --train_number 10 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --bs 5000 --mb 32 &>/dev/null & disown
+export CUDA_VISIBLE_DEVICES=1; python run_cvdc_map_v1.py --train_number 11 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --bs 5000 --mb 32 &>/dev/null & disown
+export CUDA_VISIBLE_DEVICES=0; python run_cvdc_map_v1.py --train_number 12 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --bs 5000 --mb 32 &>/dev/null & disown
+export CUDA_VISIBLE_DEVICES=0; python run_cvdc_map_v1.py --train_number 13 --machine lstm_v1_lr1e4 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --bs 5000 --mb 32 &>/dev/null & disown
 
 
 
 
 
 
-python run_cvdc.py --train_number 1 --machine e0 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --mb 256 --map 2s3z
+python run_cvdc.py --train_number 4 --machine e0 --lr 0.00005 --clr 0.0001 --ent 0.0 --epoch 1 --map 2s3z --bs 5000 --mb 32
 
 
 
