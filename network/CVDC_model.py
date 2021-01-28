@@ -188,7 +188,7 @@ class Decentral(tf.keras.Model):
         _phi = phi*tf.transpose(beta)
         _dec_net = self.decoder_pre_dense1(_phi)
         _net = tf.math.multiply(_dec_net, act_net)
-        _net = self.decoder_dense1(_net)
+        # _net = self.decoder_dense1(_net)
         _decoded_state = self.decoder(_net)
 
         actor = {'softmax': softmax_logits,
