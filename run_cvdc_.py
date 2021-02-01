@@ -49,7 +49,7 @@ parser.add_argument("--gpu", action="store_false", help='Use of the GPU')
 parser.add_argument("--gamma", type=float, default=0.99, help='gamma')
 parser.add_argument("--lr", type=float, default=1E-4, help='lr')
 parser.add_argument("--clr", type=float, default=1E-4, help='clr')
-parser.add_argument("--ent", type=float, default=0.01, help='entropyBeta')
+parser.add_argument("--ent", type=float, default=0.0, help='entropyBeta')
 parser.add_argument("--rew", type=float, default=0.5, help='reward_beta')
 parser.add_argument("--dec", type=float, default=1.0, help='decoder_beta')
 parser.add_argument("--psi", type=float, default=0.1, help='psi_beta')
@@ -116,10 +116,21 @@ env_info = env.get_env_info()
 # env = FrameStacking(env, numFrames=frame_stack, lstm=True)
 # Environment/Policy Settings
 print(env_info)
+env.reset()
+agent_types = []
+for i in range(env_info["n_agents"]):
+    agent_types.append(env.agents[i].unit_type)
+num_agent_types = len(set(agent_types))
+agent_types_assign = list(set(agent_types))
+print(agent_types)
+
+# print(type(env.agents[1]))
+# print(dir(env.agents[1]))
+# exit()
 action_space = env_info["n_actions"]
 num_agent = env_info["n_agents"]
 state_shape = [frame_stack, env_info["state_shape"]]#env_info["state_shape"] * frame_stack
-obs_shape = [frame_stack, env_info["obs_shape"]]#env_info["obs_shape"] * frame_stack
+obs_shape = [frame_stack, env_info["obs_shape"]+num_agent+action_space]#env_info["obs_shape"] * frame_stack
 episode_limit = env_info["episode_limit"]
 # exit()
 ## Batch Replay Settings
@@ -146,6 +157,7 @@ network = Network(
     action_space=action_space,
     atoms=atoms,
     save_path=MODEL_PATH,
+    agent_types=agent_types,
     lr=args.lr,
     clr=args.clr,
     entropy=args.ent,
@@ -244,12 +256,12 @@ def train_decentral(
     step=None,
 ):
     # Agent trajectory processing
-    traj_buffer = defaultdict(list)
+    traj_buffer = [defaultdict(list) for i in range(num_agent_types)]
     advantage_lists = []
     f1_list = []
     f2_list = []
     fc_list = []
-    for traj in agent_trajs:
+    for i,traj in enumerate(agent_trajs):
         reward = traj[2]
         mask = traj[3]
         critic = traj[5]
@@ -322,39 +334,39 @@ def train_decentral(
         else:
             traj_length = traj_length[0]
         '''
-        traj_buffer["state"].extend(traj[0])
-        traj_buffer["next_state"].extend(traj[4])
-        traj_buffer["log_logit"].extend(traj[6])
-        traj_buffer["action"].extend(traj[1])
-        traj_buffer["old_value"].extend(critic)
-        traj_buffer["td_target_psi"].extend(td_target_psi)
-        traj_buffer["advantage"].extend(advantages_global)
-        traj_buffer["td_target_c"].extend(td_target_c)
-        traj_buffer["rewards"].extend(reward)
-        traj_buffer["avail_actions"].extend(traj[16])
+        j = agent_types_assign.index(agent_types[i%num_agent])
+        traj_buffer[j]["state"].extend(traj[0])
+        traj_buffer[j]["next_state"].extend(traj[4])
+        traj_buffer[j]["log_logit"].extend(traj[6])
+        traj_buffer[j]["action"].extend(traj[1])
+        traj_buffer[j]["old_value"].extend(critic)
+        traj_buffer[j]["td_target_psi"].extend(td_target_psi)
+        traj_buffer[j]["advantage"].extend(advantages_global)
+        traj_buffer[j]["td_target_c"].extend(td_target_c)
+        traj_buffer[j]["rewards"].extend(reward)
+        traj_buffer[j]["avail_actions"].extend(traj[16])
 
     train_datasets = []  # Each for type of agents
-    num_type = 1
-    for atype in range(num_type):
+    for atype in range(num_agent_types):
         #traj_buffer = traj_buffer_list[atype]
 
         # Normalize Advantage (global)
-        _adv = np.array(traj_buffer["advantage"]).astype(np.float32)
+        _adv = np.array(traj_buffer[atype]["advantage"]).astype(np.float32)
         _adv = (_adv - _adv.mean()) / (_adv.std()+1e-9)
 
         train_dataset = (
             tf.data.Dataset.from_tensor_slices(
                 {
-                    "state": np.stack(traj_buffer["state"]).astype(np.float32),
-                    "old_log_logit": np.stack(traj_buffer["log_logit"]).astype(np.float32),
-                    "action": np.stack(traj_buffer["action"]),
-                    "old_value": np.stack(traj_buffer["old_value"]).astype(np.float32),
-                    "td_target": np.stack(traj_buffer["td_target_psi"]).astype(np.float32),
+                    "state": np.stack(traj_buffer[atype]["state"]).astype(np.float32),
+                    "old_log_logit": np.stack(traj_buffer[atype]["log_logit"]).astype(np.float32),
+                    "action": np.stack(traj_buffer[atype]["action"]),
+                    "old_value": np.stack(traj_buffer[atype]["old_value"]).astype(np.float32),
+                    "td_target": np.stack(traj_buffer[atype]["td_target_psi"]).astype(np.float32),
                     "advantage": _adv,
-                    "td_target_c": np.stack(traj_buffer["td_target_c"]).astype(np.float32),
-                    "rewards": np.stack(traj_buffer["rewards"]).astype(np.float32),
-                    "next_state": np.stack(traj_buffer["next_state"]).astype(np.float32),
-                    "avail_actions": np.stack(traj_buffer["avail_actions"]).astype(np.bool)
+                    "td_target_c": np.stack(traj_buffer[atype]["td_target_c"]).astype(np.float32),
+                    "rewards": np.stack(traj_buffer[atype]["rewards"]).astype(np.float32),
+                    "next_state": np.stack(traj_buffer[atype]["next_state"]).astype(np.float32),
+                    "avail_actions": np.stack(traj_buffer[atype]["avail_actions"]).astype(np.bool)
                 }
             )
             .shuffle(64)
@@ -380,20 +392,45 @@ def train_decentral(
 
 def run_network(observations, env,greedy=False):
     # Get available actions
-    avail_actions = []
-    for i in range(num_agent):
-        avail_action = env.get_avail_agent_actions(i)
-        avail_actions.append(avail_action)
-    avail_actions = np.array(avail_actions)
 
     # Run decentral network
-    observations = np.asarray(observations)
-    actor, critic = network.run_network_decentral(observations, avail_actions)
-    # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
+    observation_lists = [[] for i in range(num_agent_types)]
+    avail_actions_lists = [[] for i in range(num_agent_types)]
+    avail_actions_array = []
+    for i,observation_i in enumerate(observations):
+        avail_action = env.get_avail_agent_actions(i)
+        type_assign = agent_types_assign.index(agent_types[i])
+        avail_actions_lists[type_assign].append(avail_action)
+        observation_lists[type_assign].append(observation_i)
+        avail_actions_array.append(avail_action)
 
+    observations = [np.array(observation_i) for observation_i in observation_lists]
+    avail_actions = [np.array(avail_actions_i) for avail_actions_i in avail_actions_lists]
+
+    actor_out, critic_out = network.run_network_decentral(observations, avail_actions)
+
+    actor = {}
+    for i in range(num_agent_types):
+        # print(actor_out[i].keys())
+        for key,value in actor_out[i].items():
+            if i == 0:
+                actor[key]=value
+            else:
+                actor[key] = tf.concat([actor[key],value],axis=0)
+
+    critic = {}
+    for i in range(num_agent_types):
+        for key,value in critic_out[i].items():
+            if i == 0:
+                critic[key]=value
+            else:
+                critic[key] = tf.concat([critic[key],value],axis=0)
+
+
+    # dec_results[0] --> actor. actor['log_softmax'] --> tf.random.categorical
     # Get action
-    probs = actor['softmax'].numpy()
-    action_probs = probs * avail_actions
+    probs = actor['softmax'].numpy().squeeze()
+    action_probs = probs * avail_actions_array
     try:
         if greedy:
             a1 = []
@@ -462,7 +499,7 @@ def run_network(observations, env,greedy=False):
     log_logits1 = actor["log_softmax"]
     reward_pred1 = critic["reward_predict"]
 
-    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions
+    return a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, avail_actions_array
 
 
 def TestNetwork(env,episodes):
@@ -473,12 +510,19 @@ def TestNetwork(env,episodes):
         env.reset()
         terminated=False
         stackedStates_obs_test.initiate(np.vstack(env.get_obs()))
-        o1 = stackedStates_obs_test()
+        o1_=np.vstack(env.get_obs())
+        o2_=np.concatenate([o1_,np.eye(num_agent),np.zeros((num_agent,action_space))],axis=1)
+        stackedStates_obs.initiate(o2_)
+        o1 = stackedStates_obs()
         episode_reward=0
         while not terminated:
             a1, _, _, _, _, _, _, _ = run_network(o1, env,greedy=True)
             reward, terminated, info = env.step(a1)
-            o1 = stackedStates_obs_test(np.vstack(env.get_obs()))
+            o1_=np.vstack(env.get_obs())
+            oh = np.zeros((np.asarray(a0).size, action_space))
+            oh[np.arange(np.asarray(a0).size),np.asarray(a0)] = 1
+            o2_=np.concatenate([o1_,np.eye(num_agent),oh],axis=1)
+            o1 = stackedStates_obs(o2_)
             episode_reward += reward
             if "battle_won" not in info:
                 info["battle_won"]=False
@@ -509,8 +553,11 @@ while global_episodes < total_episodes:
 
         # Bootstrap
         stackedStates_states.initiate(np.expand_dims(env.get_state().astype(np.float32),0))
-        stackedStates_obs.initiate(np.vstack(env.get_obs()))
         s1 = stackedStates_states()
+
+        o1_=np.vstack(env.get_obs())
+        o2_=np.concatenate([o1_,np.eye(num_agent),np.zeros((num_agent,action_space))],axis=1)
+        stackedStates_obs.initiate(o2_)
         o1 = stackedStates_obs()
 
         a1, vg1, vc1, phi1, psi1, log_logits1, reward_pred1, _avail_actions = run_network(o1, env)
@@ -536,7 +583,12 @@ while global_episodes < total_episodes:
             reward, terminated, info = env.step(a0)
 
             s1 = stackedStates_states(np.expand_dims(env.get_state().astype(np.float32),0))
-            o1 = stackedStates_obs(np.vstack(env.get_obs()))
+            # o1 = stackedStates_obs(np.vstack(env.get_obs()))
+            o1_=np.vstack(env.get_obs())
+            oh = np.zeros((np.asarray(a0).size, action_space))
+            oh[np.arange(np.asarray(a0).size),np.asarray(a0)] = 1
+            o2_=np.concatenate([o1_,np.eye(num_agent),oh],axis=1)
+            o1 = stackedStates_obs(o2_)
 
             step += 1
             episode_reward += reward

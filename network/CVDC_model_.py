@@ -23,7 +23,6 @@ class Decentral(tf.keras.Model):
             prebuilt_layers=None, trainable=True):
         super(Decentral, self).__init__()
         print("----v1------")
-
         if prebuilt_layers is None:
             # Feature Encoding
             self.feature_layer = keras.Sequential([
@@ -260,7 +259,7 @@ def loss_central(model, state, td_target_c, old_value):
 
     return total_loss, info
 
-@tf.function(experimental_relax_shapes=True)
+# @tf.function(experimental_relax_shapes=True)
 def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state, avail_actions,
         eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta, reward_beta):
     num_sample = state.shape[0]
@@ -387,9 +386,9 @@ def train(model, loss, optimizer, inputs, hyperparameters={}):
     info["grad_norm"] = grad_norm
     optimizer.apply_gradients([
         (
-            # tf.clip_by_norm(grad, 5.0),
+            tf.clip_by_norm(grad, 1.0),
             #tf.clip_by_value(grad, -5.0, 5.0),
-            grad,
+            # grad,
             var
         )
         for (grad,var) in zip(grads, model.trainable_variables)

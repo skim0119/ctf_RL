@@ -26,6 +26,7 @@ class SF_CVDC:
         obs_shape,
         action_space,
         save_path,
+        agent_types=None,
         atoms=256,
         lr=1e-4,
         clr=1e-4,
@@ -40,7 +41,12 @@ class SF_CVDC:
         **kwargs
     ):
         # Set Model
-        self.num_agent_type = 1 #(TODO) heterogeneous agent
+        if agent_types==None:
+            self.num_agent_type = 1 #(TODO) heterogeneous agent
+        else:
+            self.num_agent_type = len(set(agent_types))
+            self.agent_types=agent_types
+            self.agent_type_assign=set(agent_types)
         self.dec_models = []
         self.dec_optimizers = []
         self.dec_checkpoints = []
@@ -133,14 +139,18 @@ class SF_CVDC:
         env_critic, env_feature = self.model_central(states)
         return env_critic, env_feature
 
-    @tf.function(experimental_relax_shapes=True)
+    # @tf.function(experimental_relax_shapes=True)
     def run_network_decentral(self, observations, avail_actions):
         #(TODO) heterogeneous agent
-        model = self.dec_models[0]
-        num_sample = observations.shape[0]
-        temp_action = np.ones([num_sample], dtype=int)
-        actor, SF = model([observations, temp_action, avail_actions])
-        return actor, SF
+        i=0
+        actors=[];SFs=[]
+        for observations_i,avail_actions_i in zip(observations,avail_actions):
+            model = self.dec_models[i]
+            num_sample = observations_i.shape[0]
+            temp_action = np.ones([num_sample], dtype=int)
+            actor, SF = model([observations_i, temp_action, avail_actions_i])
+            actors.append(actor);SFs.append(SF)
+        return actors,SFs
         '''
         results = []
         for states, model in zip(observations, self.dec_models):
@@ -198,7 +208,6 @@ class SF_CVDC:
         grad_norms = []
         approx_kls = []
         approx_ents = []
-
         # Get gradients
         for i in range(self.num_agent_type):
             dataset = datasets[i]
