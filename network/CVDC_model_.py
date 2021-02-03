@@ -293,7 +293,7 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     adaptive_entropy = (tf_log(actor)+1.0)/tf.clip_by_value(tf.tile(tf.stop_gradient(tf.expand_dims(H,axis=-1)),tf.constant([1,num_actions], tf.int32)),0.00001,1)*a_acts
     # exit()
-    adaptive_entropy = tf.reduce_sum(adaptive_entropy)
+    adaptive_entropy = tf.reduce_mean(adaptive_entropy)
 
     # KL Divergence
 
@@ -386,8 +386,8 @@ def train(model, loss, optimizer, inputs, hyperparameters={}):
     info["grad_norm"] = grad_norm
     optimizer.apply_gradients([
         (
-            tf.clip_by_norm(grad, 1.0),
-            #tf.clip_by_value(grad, -5.0, 5.0),
+            # tf.clip_by_norm(grad, 1.0),
+            tf.clip_by_value(grad, -5.0, 5.0),
             # grad,
             var
         )

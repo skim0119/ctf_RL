@@ -60,6 +60,7 @@ parser.add_argument("--epoch", type=int, default=1, help='epoch')
 parser.add_argument("--bs", type=int, default=1024, help='buffer_size')
 parser.add_argument("--mbs", type=int, default=128, help='minibatch_size')
 parser.add_argument("--frames", type=int, default=4, help='frames')
+parser.add_argument("--lstm", type=str,default="LSTM", help='LSTM Type')
 args = parser.parse_args()
 
 if args.gpu:
@@ -117,6 +118,13 @@ env_info = env.get_env_info()
 # Environment/Policy Settings
 print(env_info)
 env.reset()
+done=False
+while not done:
+    avail_actions = env.get_avail_actions()
+    sampleAction = []
+    for avail_action_i in avail_actions:
+        sampleAction.append(np.random.choice(np.where(np.asarray(avail_action_i)==1)[0]))
+    r,done,_=env.step(sampleAction)
 agent_types = []
 for i in range(env_info["n_agents"]):
     agent_types.append(env.agents[i].unit_type)
@@ -167,7 +175,7 @@ network = Network(
     critic_beta=args.crit,
     q_beta=args.q,
     learnability_beta=args.learn,
-    network_type="LSTM"
+    network_type=args.lstm
 )
 global_episodes = network.initiate()
 print(global_episodes)
@@ -599,13 +607,15 @@ while global_episodes < total_episodes:
             if terminated:
                 done = np.asarray([terminated]*env.n_agents)
             else:
-                done=[]
-                for validAction in _avail_actions:
-                    if validAction[0] == 1:
-                        done.append( True)
-                    else:
-                        done.append(False)
-                done = np.asarray(done)
+                # done=[]
+                # for validAction in _avail_actions:
+                #     if validAction[0] == 1:
+                #         done.append( True)
+                #     else:
+                #         done.append(False)
+                # done = np.asarray(done)
+                done = np.asarray([terminated]*env.n_agents)
+
             if "battle_won" not in info:
                 info["battle_won"]=False
 
