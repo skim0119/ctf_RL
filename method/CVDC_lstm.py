@@ -28,7 +28,7 @@ class SF_CVDC:
         clr=1e-4,
         entropy=0.001,
         agent_types=None,
-        single=False
+        single=False,
         **kwargs
     ):
         # Set Model
@@ -137,7 +137,7 @@ class SF_CVDC:
                 model = self.dec_models[0]
                 num_sample = observations_i.shape[0]
                 temp_action = np.ones([num_sample], dtype=int)
-                actor, SF = model([observations_i, temp_action, avail_actions_i, initial_state_i])
+                actor, SF = self.run_decentral_i(model,observations_i, temp_action, avail_actions_i,initial_state_i)
                 actors.append(actor);SFs.append(SF)
         else:
             i=0
@@ -146,7 +146,7 @@ class SF_CVDC:
                 model = self.dec_models[i]
                 num_sample = observations_i.shape[0]
                 temp_action = np.ones([num_sample], dtype=int)
-                actor, SF = model([observations_i, temp_action, avail_actions_i, initial_state_i])
+                actor, SF = self.run_decentral_i(model,observations_i, temp_action, avail_actions_i,initial_state_i)
                 actors.append(actor);SFs.append(SF)
         return actors,SFs
         '''
@@ -162,6 +162,11 @@ class SF_CVDC:
             results.append([actions, actor, SF])
         return results
         '''
+
+    @tf.function(experimental_relax_shapes=True)
+    def run_decentral_i(self,model,observations,tmp_action,avail_actions,initial_state):
+        return model([observations,tmp_action,avail_actions,initial_state])
+
     def get_initial_state(self,batch_size):
         return self.dec_models[0].get_initial_state(batch_size)
 
