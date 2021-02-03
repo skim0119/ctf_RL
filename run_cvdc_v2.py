@@ -60,6 +60,7 @@ parser.add_argument("--epoch", type=int, default=1, help='epoch')
 parser.add_argument("--bs", type=int, default=1024, help='buffer_size')
 parser.add_argument("--mbs", type=int, default=128, help='minibatch_size')
 parser.add_argument("--frames", type=int, default=4, help='frames')
+parser.add_argument("--single", type=bool,default=False, help='Single Shared Network...')
 args = parser.parse_args()
 
 if args.gpu:
@@ -174,6 +175,7 @@ network = Network(
     critic_beta=args.crit,
     q_beta=args.q,
     learnability_beta=args.learn,
+    single=args.single
 )
 global_episodes = network.initiate()
 print(global_episodes)

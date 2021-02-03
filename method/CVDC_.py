@@ -38,9 +38,13 @@ class SF_CVDC:
         q_beta=0.5,
         learnability_beta=0.1,
         network_type="LSTM",
+        single=False
         **kwargs
     ):
         # Set Model
+        self.single = single
+        if single:
+            agent_types=None
         if agent_types==None:
             self.num_agent_type = 1 #(TODO) heterogeneous agent
         else:
@@ -142,14 +146,24 @@ class SF_CVDC:
     # @tf.function(experimental_relax_shapes=True)
     def run_network_decentral(self, observations, avail_actions):
         #(TODO) heterogeneous agent
-        i=0
-        actors=[];SFs=[]
-        for observations_i,avail_actions_i in zip(observations,avail_actions):
-            model = self.dec_models[i]
-            num_sample = observations_i.shape[0]
-            temp_action = np.ones([num_sample], dtype=int)
-            actor, SF = model([observations_i, temp_action, avail_actions_i])
-            actors.append(actor);SFs.append(SF)
+        if self.single:
+            i=0
+            actors=[];SFs=[]
+            for observations_i,avail_actions_i in zip(observations,avail_actions):
+                model = self.dec_models[0]
+                num_sample = observations_i.shape[0]
+                temp_action = np.ones([num_sample], dtype=int)
+                actor, SF = model([observations_i, temp_action, avail_actions_i])
+                actors.append(actor);SFs.append(SF)
+        else:
+            i=0
+            actors=[];SFs=[]
+            for observations_i,avail_actions_i in zip(observations,avail_actions):
+                model = self.dec_models[i]
+                num_sample = observations_i.shape[0]
+                temp_action = np.ones([num_sample], dtype=int)
+                actor, SF = model([observations_i, temp_action, avail_actions_i])
+                actors.append(actor);SFs.append(SF)
         return actors,SFs
         '''
         results = []
@@ -211,8 +225,12 @@ class SF_CVDC:
         # Get gradients
         for i in range(self.num_agent_type):
             dataset = datasets[i]
-            model = self.dec_models[i]
-            optimizer = self.dec_optimizers[i]
+            if self.single:
+                model = self.dec_models[0]
+                optimizer = self.dec_optimizers[0]
+            else:
+                model = self.dec_models[i]
+                optimizer = self.dec_optimizers[i]
             for _ in range(epoch):
                 kls = []
                 for inputs in dataset:
