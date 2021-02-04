@@ -38,7 +38,7 @@ class SF_CVDC:
         q_beta=0.5,
         learnability_beta=0.1,
         network_type="LSTM",
-        single=False
+        single=False,
         **kwargs
     ):
         # Set Model
@@ -153,7 +153,7 @@ class SF_CVDC:
                 model = self.dec_models[0]
                 num_sample = observations_i.shape[0]
                 temp_action = np.ones([num_sample], dtype=int)
-                actor, SF = model([observations_i, temp_action, avail_actions_i])
+                actor, SF = self.run_decentral_i(model,observations_i, temp_action, avail_actions_i)
                 actors.append(actor);SFs.append(SF)
         else:
             i=0
@@ -162,7 +162,7 @@ class SF_CVDC:
                 model = self.dec_models[i]
                 num_sample = observations_i.shape[0]
                 temp_action = np.ones([num_sample], dtype=int)
-                actor, SF = model([observations_i, temp_action, avail_actions_i])
+                actor, SF = self.run_decentral_i(model,observations_i, temp_action, avail_actions_i)
                 actors.append(actor);SFs.append(SF)
         return actors,SFs
         '''
@@ -178,6 +178,9 @@ class SF_CVDC:
             results.append([actions, actor, SF])
         return results
         '''
+    @tf.function(experimental_relax_shapes=True)
+    def run_decentral_i(self,model,observations,tmp_action,avail_actions):
+        return model([observations,tmp_action,avail_actions])
 
     # Centralize updater
     # @tf.function
