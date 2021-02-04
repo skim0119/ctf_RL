@@ -63,7 +63,7 @@ parser.add_argument("--frames", type=int, default=4, help='frames')
 parser.add_argument("--lstm", type=str,default="LSTM", help='LSTM Type')
 parser.add_argument("--single", type=bool,default=False, help='Single Shared Network...')
 args = parser.parse_args()
-
+tf.random.set_seed(args.seed)
 if args.gpu:
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
