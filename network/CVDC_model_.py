@@ -28,8 +28,13 @@ class Decentral(tf.keras.Model):
             self.feature_layer = keras.Sequential([
                 layers.Input(shape=input_shape),
                 layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+                layers.GRU(units=128, activation='elu')
             ])
-            self.LSTM=layers.GRU(units=128, activation='elu')
+            self.pi_layer = keras.Sequential([
+                layers.Input(shape=input_shape),
+                layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
+                layers.GRU(units=128, activation='elu')
+            ])
 
             '''
             self.feature_layer2= keras.Sequential([
@@ -138,14 +143,13 @@ class Decentral(tf.keras.Model):
 
         # Feature Encoding SF-phi
         phi = self.feature_layer(obs)
-        phi = self.LSTM(phi)
         phi = self.phi_dense1(phi)
         #phi_norm = tf.norm(phi, ord=1, axis=1, keepdims=True)
         #phi = tf.math.divide_no_nan(phi, phi_norm)
 
         # Actor
         #net = tf.concat([net, tf.stop_gradient(phi)], axis=1)
-        net = self.actor_dense1(phi)
+        net = self.pi_layer(obs)
         net = self.actor_dense2(net)
         inf_mask = tf.maximum(tf.math.log(avail_actions), tf.float32.min)
         net = inf_mask + net
@@ -219,8 +223,8 @@ class Central(tf.keras.Model):
             layers.Input(shape=input_shape),
             layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
             layers.TimeDistributed(layers.Dense(units=256, activation='elu')),
-            # layers.LSTM(units=128, activation='elu'),
-            layers.Flatten(),
+            layers.LSTM(units=128, activation='elu'),
+            # layers.Flatten(),
         ])
 
         # Critic
@@ -279,9 +283,11 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
     generator_loss = model.mse_loss_mean(next_state[:,-1,:], v['decoded_state'])
     #generator_loss = 0.0
 
+    a_acts = tf.cast(avail_actions, tf.float32)
     # Entropy
-    H = -tf.reduce_mean(actor * tf_log(actor), axis=-1) # Entropy H of each sample
+    H = -tf.reduce_sum(actor * tf_log(actor)*a_acts, axis=-1) # Entropy H of each sample
     mean_entropy = tf.reduce_mean(H)
+    mean_entropy_norm = tf.reduce_mean(H/tf_log(tf.reduce_sum(a_acts,-1)))
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
     mean_pseudo_H = tf.reduce_mean(pseudo_H)
@@ -289,11 +295,11 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantag
 
     #Adaptive_Entropy from LICA
     num_actions = actor.shape[1]
-    a_acts = tf.cast(avail_actions, tf.float32)
 
-    adaptive_entropy = (tf_log(actor)+1.0)/tf.clip_by_value(tf.tile(tf.stop_gradient(tf.expand_dims(H,axis=-1)),tf.constant([1,num_actions], tf.int32)),0.00001,1)*a_acts
+    adaptive_entropy = tf.reduce_sum((tf_log(actor)+1.0)/tf.clip_by_value(tf.tile(tf.stop_gradient(tf.expand_dims(H,axis=-1)),tf.constant([1,num_actions], tf.int32)),0.00001,1)*a_acts,-1)
     # exit()
     adaptive_entropy = tf.reduce_mean(adaptive_entropy)
+    adaptive_entropy_norm = tf.reduce_mean(adaptive_entropy/tf_log(tf.reduce_sum(a_acts,-1)))
 
     # KL Divergence
 
