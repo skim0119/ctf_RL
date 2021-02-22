@@ -98,14 +98,14 @@ export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine 
 export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep10_1_5_ent5e4 --lr 0.0001 --clr 0.00005 --ent 0.0005 --epoch 10 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
 
 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z 
