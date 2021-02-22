@@ -1,111 +1,33 @@
-
-#Hyper Parameter Tuning
-
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_base --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_e1E3 --lr 0.00005 --clr 0.00005 --ent 0.001 --epoch 1 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_e1E2 --lr 0.00005 --clr 0.00005 --ent 0.01 --epoch 1 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_clr1E4 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_clr1E4_lr1E4 --lr 0.0001 --clr 0.0001 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_bs1024 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 1024 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_bs5000 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 5000 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_mbs64 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 64 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_mbs128 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 2 --machine hpt_ep2 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 2 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_ep3 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 3 --map 8m --bs 2048 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_learn1E1 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 --learn 0.1 --q 0.05 --crit 0.05 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_q1E1 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 --learn 0.01 --q 0.1 --crit 0.05 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_crit1E1 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 --learn 0.01 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 2 --machine hpt_psi5E1 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 --learn 0.01 --q 0.05 --crit 0.05 --psi 0.5 --dec 1.0 --rew 0.5 &>/dev/null & disown
-
-
-python run_cvdc.py --train_number 1 --machine hpt_l --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32 --learn 0.01 --q 0.05 --crit 0.05 --psi 0.1 --dec 1.0 --rew 0.5
-python run_cvdc.py --train_number 1 --machine hpt_base --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 1 --map 8m --bs 2048 --mbs 32
-
-
-
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 11 --machine  standard --training_episodes 2000000 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 2s3z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 11 --machine  standard --training_episodes 2000000 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 3s5z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 11 --machine  standard --training_episodes 2000000 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 1c3s5z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 11 --machine  standard --training_episodes 2000000 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 3s5z_vs_3s6z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 11 --machine  standard --training_episodes 2000000 --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 2s_vs_1sc &>/dev/null & disown
-
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 10 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map MMM2 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 2c_vs_64zg &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 5m_vs_6m &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 6h_vs_8z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 3s_vs_5z &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map corridor &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_.py --train_number 6 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map bane_vs_bane &>/dev/null & disown
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc.py --train_number 1 --machine  standard --lr 0.00005 --clr 0.0001 --ent 0.0001 --epoch 1 --mbs 128 --map 27m_vs_30m &>/dev/null & disown
-
-
-python run_cvdc_.py --train_number 1 --machine mean --lr 0.00005 --clr 0.00005 --ent 0.001 --epoch 1 --map 2s3z --bs 1024 --mbs 128
-python run_cvdc_.py --train_number 2 --machine mean --lr 0.00005 --clr 0.00005 --ent 0.001 --epoch 1 --map 2s3z --bs 1024 --mbs 128
-python run_cvdc_.py --train_number 2 --machine mean --lr 0.00005 --clr 0.00005 --ent 0.001 --epoch 1 --map 8m --bs 1024 --mbs 128
-python run_cvdc_.py --train_number 2 --machine mean --lr 0.00005 --clr 0.00005 --ent 0.0 --epoch 1 --map 5m_vs_6m --bs 1024 --mbs 128
-
-
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 3 --machine hpt_psi5E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.05 --crit 0.05 --psi 0.5 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 3 --machine hpt_learn1E3 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.001 --q 0.05 --crit 0.05 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 3 --machine hpt_learn1E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.05 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 3 --machine hpt_crit1E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 3 --machine hpt_crit5E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.05 --crit 0.5 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 3 --machine hpt_q1E2 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.01 --crit 0.5 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 3 --machine hpt_q1E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.1 --crit 0.5 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 3 --machine hpt_q5E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.01 --q 0.5 --crit 0.5 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 4 --machine hpt_e5E2 --lr 0.00005 --clr 0.00005 --ent 0.05 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 4 --machine hpt_e1E1 --lr 0.00005 --clr 0.00005 --ent 0.1 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 4 --machine hpt_e2E1 --lr 0.00005 --clr 0.00005 --ent 0.2 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 4 --machine hpt_e3E1 --lr 0.00005 --clr 0.00005 --ent 0.3 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 4 --machine hpt_e4E1 --lr 0.00005 --clr 0.00005 --ent 0.4 --epoch 1 --map 8m --bs 1024 --mbs 32 --learn 0.1 --q 0.05 --crit 0.1 --psi 0.1 --dec 1.0 --rew 0.5 &>/dev/null & disown
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 1 --machine mean_e5E3 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 1 --map 2c_vs_64zg --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 1 --machine mean_e1E3 --lr 0.0001 --clr 0.0001 --ent 0.001 --epoch 1 --map 2c_vs_64zg --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 1 --machine mean_e5E3 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 1 --map MMM2 --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v1.py --train_number 1 --machine mean_e1E3 --lr 0.0001 --clr 0.0001 --ent 0.001 --epoch 1 --map MMM2 --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 1 --machine mean_e5E3 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 1 --map bane_vs_bane --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 1 --machine mean_e1E3 --lr 0.0001 --clr 0.0001 --ent 0.001 --epoch 1 --map bane_vs_bane --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 1 --machine mean_e5E3 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 1 --map 3s_vs_5z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v1.py --train_number 1 --machine mean_e1E3 --lr 0.0001 --clr 0.0001 --ent 0.001 --epoch 1 --map 3s_vs_5z --bs 1024 --mbs 128 &>/dev/null & disown
-
-
-
-
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v3.py --train_number 2 --machine beta_e0 --lr 0.00005 --clr 0.00005 --ent 0.0 --epoch 1 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v3.py --train_number 2 --machine beta_bs2k --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 1 --map 2s3z --bs 2048 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v3.py --train_number 2 --machine beta_mb62 --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 1 --map 2s3z --bs 1024 --mbs 64 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=0; python run_cvdc_v3.py --train_number 2 --machine beta_mb32 --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 1 --map 2s3z --bs 1024 --mbs 32 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep2 --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 2 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 5 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_e1E3 --lr 0.00005 --clr 0.00005 --ent 0.001 --epoch 1 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_clr1e4 --lr 0.00005 --clr 0.0001 --ent 0.005 --epoch 1 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_lr1e4 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 1 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep5_5_5 --lr 0.00005 --clr 0.00005 --ent 0.005 --epoch 5 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep5_1_5 --lr 0.0001 --clr 0.00005 --ent 0.005 --epoch 5 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep5_1_1 --lr 0.0001 --clr 0.0001 --ent 0.005 --epoch 5 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep5_5_1 --lr 0.00005 --clr 0.0001 --ent 0.005 --epoch 5 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep10_5_5_ent1e4 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 10 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep10_1_5_ent1e4 --lr 0.0001 --clr 0.00005 --ent 0.0001 --epoch 10 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep10_5_5_ent5e4 --lr 0.00005 --clr 0.00005 --ent 0.0005 --epoch 10 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-export CUDA_VISIBLE_DEVICES=1; python run_cvdc_v3.py --train_number 2 --machine beta_ep10_1_5_ent5e4 --lr 0.0001 --clr 0.00005 --ent 0.0005 --epoch 10 --map 2s3z --bs 1024 --mbs 128 &>/dev/null & disown
-
-
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m 
-python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z 
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m
+python run_cvdc_v3.py --train_number 1 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m
+python run_cvdc_v3.py --train_number 2 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2s3z
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map MMM2
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map corridor
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 5m_vs_6m
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s_vs_5z
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map bane_vs_bane
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 2c_vs_64zg
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 3s5z_vs_3s6z
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 27m_vs_30m 
+python run_cvdc_v3.py --train_number 3 --machine beta_ep5 --lr 0.00005 --clr 0.00005 --ent 0.0001 --epoch 5 --bs 1024 --mbs 128 --map 6h_vs8z
