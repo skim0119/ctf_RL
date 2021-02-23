@@ -268,7 +268,7 @@ def loss_central(model, state, td_target_c, old_value):
 
     return total_loss, info
 
-@tf.function(experimental_relax_shapes=True)
+# @tf.function(experimental_relax_shapes=True)
 def loss_ppo(model, state, old_log_logit, action, old_value, td_target, advantage, td_target_c, rewards, next_state, avail_actions,
         eps, entropy_beta, q_beta, psi_beta, decoder_beta, critic_beta, learnability_beta, reward_beta,type_assign):
     num_sample = state.shape[0]
