@@ -31,6 +31,7 @@ class SF_CVDC:
         reward_beta=.05,
         decoder_beta=0.0001,
         network_type="LSTM",
+        agent_types=1,
         **kwargs
     ):
         # Set Model
@@ -58,7 +59,8 @@ class SF_CVDC:
                     obs_shape,
                     action_space=action_space,
                     atoms=atoms,
-                    prebuilt_layers=None)
+                    prebuilt_layers=None,
+                    num_agent_types=agent_types)
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
             optimizer = tf.keras.optimizers.RMSprop(lr, rho=0.99, epsilon=1e-5)#Adam(lr)
             checkpoint = tf.train.Checkpoint(

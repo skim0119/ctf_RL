@@ -158,7 +158,8 @@ network = Network(
     lr=args.lr,
     clr=args.clr,
     entropy=args.ent,
-    network_type="LSTM"
+    network_type="LSTM",
+    agent_types =num_agent_types
 )
 global_episodes = network.initiate()
 print(global_episodes)
