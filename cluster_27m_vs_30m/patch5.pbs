@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=eng-research
-#SBATCH --job-name=sc2_batch3
+#SBATCH --job-name=sc2_batch5
 #SBATCH --time=48:00:00
 #SBATCH --mail-user=skim449@illinois.edu
 #SBATCH --output=sc2_27m_vs_30m.out
@@ -22,4 +22,4 @@ which python
 which pip
 pwd
 
-python run_cvdc.py --train_number 3 --machine cluster --map 27m_vs_30m --silence --entropy_beta 0.00001
+python run_cvdc.py --train_number 4 --machine cluster --map 27m_vs_30m --silence --entropy_beta -0.0001
