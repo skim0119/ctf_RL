@@ -22,12 +22,18 @@ class SF_CVDC:
         state_shape,
         obs_shape,
         action_space,
+        num_agent,
+        num_action,
         save_path,
         atoms=256,
-        lr=1e-4,
-        clr=1e-4,
+        param=None,
         **kwargs
     ):
+        assert param is not None
+
+        lr = param['decentral learning rate']
+        clr = param['central learning rate']
+
         # Set Model
         self.num_agent_type = 1 #(TODO) heterogeneous agent
         self.dec_models = []
@@ -36,7 +42,7 @@ class SF_CVDC:
         self.dec_managers = []
 
         # Build Network (Central)
-        self.model_central = Central(state_shape, atoms=atoms)
+        self.model_central = Central([num_agent], state_shape, atoms=atoms, critic_encoder=param['central critic encoder'])
         self.save_directory_central = os.path.join(save_path, 'central')
         self.optimizer_central = tf.keras.optimizers.RMSprop(clr, rho=0.99, epsilon=1e-5)#Adam(clr)
         self.checkpoint_central = tf.train.Checkpoint(
@@ -47,13 +53,26 @@ class SF_CVDC:
                 max_to_keep=3,
                 keep_checkpoint_every_n_hours=1)
 
+        # Build Network (Central Target)
+        self.model_central_target = Central([num_agent], state_shape, atoms=atoms, critic_encoder=param['central critic encoder'])
+        self.save_directory_central_target = os.path.join(save_path, 'central_target')
+        self.checkpoint_central_target = tf.train.Checkpoint(model=self.model_central_target)
+        self.manager_central_target = tf.train.CheckpointManager(
+                checkpoint=self.checkpoint_central_target,
+                directory=self.save_directory_central_target,
+                max_to_keep=3,
+                keep_checkpoint_every_n_hours=1)
+
         # Build Network (Decentral)
         for i in range(self.num_agent_type): 
             model = Decentral(
-                    obs_shape,
-                    action_space=action_space,
-                    atoms=atoms,
-                    prebuilt_layers=None)
+                obs_shape,
+                action_space=action_space,
+                atoms=atoms,
+                prebuilt_layers=None,
+                critic_encoder=param['decentral critic encoder'],
+                pi_encoder=param['decentral pi encoder'],
+            )
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
             optimizer = tf.keras.optimizers.RMSprop(lr, rho=0.99, epsilon=1e-5)#Adam(lr)
             checkpoint = tf.train.Checkpoint(
@@ -69,16 +88,16 @@ class SF_CVDC:
             self.dec_managers.append(manager)
 
         # PPO Configuration
-        self.target_kl = 0.015
+        self.target_kl = param['target_kl']
         self.ppo_config = {
-                'eps': tf.constant(0.20, dtype=tf.float32),
-                'entropy_beta': tf.constant(0.001, dtype=tf.float32),
-                'psi_beta': tf.constant(0.50, dtype=tf.float32),
-                'reward_beta': tf.constant(.05, dtype=tf.float32),
-                'decoder_beta': tf.constant(0.0001, dtype=tf.float32),
-                'critic_beta': tf.constant(0.5, dtype=tf.float32),
-                'q_beta': tf.constant(0.05, dtype=tf.float32),
-                'learnability_beta': tf.constant(0.001, dtype=tf.float32),
+                'eps': tf.constant(param['eps'], dtype=tf.float32),
+                'entropy_beta': tf.constant(param['entropy beta'], dtype=tf.float32),
+                'psi_beta': tf.constant(param['psi beta'], dtype=tf.float32),
+                'reward_beta': tf.constant(param['reward beta'], dtype=tf.float32),
+                'decoder_beta': tf.constant(param['decoder beta'], dtype=tf.float32),
+                'critic_beta': tf.constant(param['critic beta'], dtype=tf.float32),
+                'q_beta': tf.constant(param['q beta'], dtype=tf.float32),
+                'learnability_beta': tf.constant(param['learnability beta'], dtype=tf.float32),
                 }
 
     def log(self, step, log_weights=True, logs=None):
@@ -109,10 +128,12 @@ class SF_CVDC:
             for name, val in logs.items():
                 tf.summary.scalar(name, val, step=step)
 
-    def run_network_central(self, states):
-        # states: environment state
-        # observations: individual (centered) observation
-        env_critic, env_feature = self.model_central(states)
+    def run_network_central(self, inputs, states):
+        env_critic, env_feature = self.model_central(inputs, states)
+        return env_critic, env_feature 
+
+    def run_network_central_target(self, inputs, states):
+        env_critic, env_feature = self.model_central_target(inputs, states)
         return env_critic, env_feature 
 
     def run_network_decentral(self, observations, avail_actions):
@@ -137,14 +158,14 @@ class SF_CVDC:
         '''
 
     # Centralize updater
-    def update_central(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update_central(self, datasets, writer=None, log=False, step=None, tag=None, param=None):
         critic_losses = []
         
         # Get gradients
         model = self.model_central
         optimizer = self.optimizer_central
         for inputs in datasets:
-            _, info = train(model, loss_central, optimizer, inputs)
+            _, info = train(model, loss_central, optimizer, inputs, param['central gradient global norm'])
             critic_losses.append(info["critic_mse"])
         print(np.mean(critic_losses))
         if log:
@@ -158,7 +179,7 @@ class SF_CVDC:
                 writer.flush()
     
     # Decentralize updater
-    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None):
+    def update_decentral(self, datasets, writer=None, log=False, step=None, tag=None, param=None):
         if log:
             assert writer is not None
             assert step is not None
@@ -183,7 +204,7 @@ class SF_CVDC:
             model = self.dec_models[i]
             optimizer = self.dec_optimizers[i]
             for inputs in dataset:
-                _, info = train(model, loss_ppo, optimizer, inputs, self.ppo_config)
+                _, info = train(model, loss_ppo, optimizer, inputs, param['decentral gradient global norm'], self.ppo_config)
                 if log:
                     actor_losses.append(info['actor_loss'])
                     dec_psi_losses.append(info['psi_loss'])
@@ -215,6 +236,9 @@ class SF_CVDC:
                 self.log(step, logs=logs)
                 writer.flush()
 
+    def update_target(self):
+        self.model_central_target.set_weights(self.model_central.get_weights())
+
     # Save and Load
     def initiate(self, verbose=1):
         cent_path = self.manager_central.restore_or_initialize()
@@ -233,6 +257,7 @@ class SF_CVDC:
 
     def restore(self):
         status = self.checkpoint_central.restore(self.manager_central.latest_checkpoint)
+        status = self.checkpoint_central_target.restore(self.manager_central_target.latest_checkpoint)
         for i in range(self.num_agent_type):
             checpoint = self.dec_checkpoints[i]
             manager = self.dec_managers[i]
@@ -240,6 +265,7 @@ class SF_CVDC:
 
     def save(self, checkpoint_number):
         self.manager_central.save(checkpoint_number)
+        self.manager_central_target.save(checkpoint_number)
         for i in range(self.num_agent_type):
             manager = self.dec_managers[i]
             manager.save(checkpoint_number)

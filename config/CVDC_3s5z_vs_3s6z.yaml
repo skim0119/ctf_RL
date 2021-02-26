@@ -1,6 +1,6 @@
 # Save Configuration
 moving average step: 2000
-save model frequency: 4096
+save model frequency: 40960
 save statistic frequency: 2000
 save image frequency: 2000
 
@@ -46,3 +46,4 @@ central critic encoder: 'hyper1'
 decentral critic encoder: 'hyper1'
 decentral pi encoder: 'basic'
 
+update target interval: 200

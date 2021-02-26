@@ -68,4 +68,4 @@ def gae(
     if normalize:
         advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-9)
 
-    return td_target.tolist(), advantages.tolist()
+    return list(td_target), list(advantages)

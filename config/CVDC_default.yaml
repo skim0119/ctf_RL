@@ -1,8 +1,10 @@
 # Save Configuration
 moving average step: 2000
-save model frequency: 4096
+save model frequency: 40960
 save statistic frequency: 2000
 save image frequency: 2000
+test interval: 2000
+test episode: 20
 
 # Model Configuration
 frame stack: 4
@@ -13,14 +15,14 @@ shared SF: False
 gamma: 0.99
 lambda: 0.95
 minibatch size: 128
-epoch: 4
-buffer size: 2048
+epoch: 1
+buffer size: 512
 drop remainder: True
-decentral learning rate: 0.0001
+decentral learning rate: 0.00001
 central learning rate: 0.0001
 eps: 0.20
 target_kl: 0.015
-entropy beta: 0.001
+entropy beta: 0.00001
 psi beta: 0.5
 reward beta: 0.05
 decoder beta: 0.0001
@@ -29,8 +31,8 @@ q beta: 0.05
 learnability beta: 0.001
 
 # Gradient
-decentral gradient global norm: 10
-central gradient global norm: 10
+decentral gradient global norm: 1
+central gradient global norm: 1
 
 # Network Configuration
 atoms: 128
@@ -38,11 +40,12 @@ central critic td lambda: True
 central critic td standardize: False
 decentral critic td lambda: True
 decentral critic td standardize: True
-advantage global norm: True
+advantage global norm: False 
 
 # Misc
 reduction_sum: True
-central critic encoder: 'hyper1'
+central critic encoder: 'hyper2'
 decentral critic encoder: 'hyper1'
-decentral pi encoder: 'basic'
+decentral pi encoder: 'recurse'
 
+update target interval: 200
