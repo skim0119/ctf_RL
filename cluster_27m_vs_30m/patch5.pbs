@@ -22,4 +22,4 @@ which python
 which pip
 pwd
 
-python run_cvdc.py --train_number 4 --machine cluster --map 27m_vs_30m --silence --entropy_beta -0.0001
+python run_cvdc.py --train_number 15 --machine cluster --map 27m_vs_30m --silence
