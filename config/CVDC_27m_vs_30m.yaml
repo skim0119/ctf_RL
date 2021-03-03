@@ -3,6 +3,7 @@ moving average step: 2000
 save statistic frequency: 2000
 save image frequency: 2000
 save model frequency: 40960
+rollout episodes: 8
 
 # Model Configuration
 frame stack: 4
@@ -20,7 +21,7 @@ decentral learning rate: 0.000100
 central learning rate: 0.00100
 eps: 0.20
 target_kl: 0.015
-entropy beta: 0.000100
+entropy beta: 0.05
 psi beta: 0.50
 reward beta: 0.05
 decoder beta: 0.0001
@@ -29,8 +30,8 @@ q beta: 0.0005
 learnability beta: 0.000
 
 # Gradient
-decentral gradient global norm: 10
-central gradient global norm: 10
+decentral gradient global norm: 100
+central gradient global norm: 100
 
 # Network Configuration
 atoms: 128

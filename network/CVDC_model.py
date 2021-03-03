@@ -275,10 +275,12 @@ def loss_ppo(model, state, old_log_logit, action, old_value, td_target_psi, adva
     #generator_loss = 0.0
 
     # Entropy
-    H = -tf.reduce_mean(actor * tf_log(actor), axis=-1) # Entropy H of each sample
-    avail_actions_count = tf.reduce_sum(tf.cast(avail_actions, tf.float32), axis=1, keepdims=True)
-    H_norm = -tf_log(avail_actions_count)/avail_actions_count
-    mean_entropy = tf.reduce_mean(tf.math.divide_no_nan(H, H_norm))
+    H = -tf.reduce_sum(actor * tf_log(actor), axis=-1) # Entropy H of each sample
+    avail_actions_count = tf.reduce_sum(tf.cast(avail_actions, tf.float32), axis=1)
+    H = H / avail_actions_count
+    mean_entropy = tf.reduce_mean(H)
+    #H_norm = -tf_log(avail_actions_count)/avail_actions_count
+    #mean_entropy = tf.reduce_mean(tf.math.divide_no_nan(H, H_norm))
     pseudo_H = tf.stop_gradient(
             tf.reduce_sum(actor*(1-actor), axis=-1))
     mean_pseudo_H = tf.reduce_mean(pseudo_H)

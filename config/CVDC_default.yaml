@@ -5,6 +5,7 @@ save statistic frequency: 2000
 save image frequency: 2000
 test interval: 2000
 test episode: 20
+rollout episodes: 8
 
 # Model Configuration
 frame stack: 4

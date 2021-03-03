@@ -141,6 +141,7 @@ state_shape = [env_info['state_shape']]
 episode_limit = env_info["episode_limit"]
 
 ## Batch Replay Settings
+rollout_episodes = param['rollout episodes']
 minibatch_size = param['minibatch size']
 epoch = param['epoch'] 
 buffer_size = param['buffer size']
@@ -491,7 +492,7 @@ while global_steps < total_steps:
     episode = 0
     _rollout_rewards = []
     #while dec_batch_size < buffer_size and episode < 8:
-    while episode < 8:
+    while episode < rollout_episodes:
         global_episodes += 1
         episode += 1
 
@@ -632,7 +633,7 @@ while global_steps < total_steps:
         if PRINT:
             print('Reward in test batch = {}, winrate: {}'.format(test_rewards.mean(), test_winrates.mean()))
         with writer.as_default():
-            tag = "test"
+            tag = "test/"
             tf.summary.scalar(tag + "reward_mean", test_rewards.mean(), step=global_steps)
             tf.summary.scalar(tag + "reward_std", test_rewards.std(), step=global_steps)
             tf.summary.scalar(tag + "winrate_mean", test_winrates.mean(), step=global_steps)
