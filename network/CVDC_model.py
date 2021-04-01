@@ -170,7 +170,7 @@ class Decentral(tf.keras.Model):
         psi = self.psi_dense2(psi)
         #net = self.psi_dense1(phi)
         #net = self.psi_dense2(net)
-        net = phi
+        net = psi
         critic = self.sf_v_weight(net)
         critic = tf.reshape(critic, [-1])
         q = self.sf_q_weight(net)
