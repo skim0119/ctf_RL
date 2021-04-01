@@ -67,6 +67,9 @@ class SMACWrapper:
             avail_actions.append(self.env.get_avail_agent_actions(agent_id))
         return np.vstack(avail_actions)
 
+    def save_replay(self):
+        self.env.save_replay()
+
 
 class Stacked_state:
     def __init__(self, keep_frame, axis,lstm=False):
