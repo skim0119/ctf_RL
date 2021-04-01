@@ -34,6 +34,9 @@ class SF_CVDC:
         lr = param['decentral learning rate']
         clr = param['central learning rate']
 
+            
+
+
         # Set Model
         self.num_agent_type = 1 #(TODO) heterogeneous agent
         self.dec_models = []
@@ -44,7 +47,10 @@ class SF_CVDC:
         # Build Network (Central)
         self.model_central = Central([num_agent], state_shape, atoms=atoms, critic_encoder=param['central critic encoder'])
         self.save_directory_central = os.path.join(save_path, 'central')
-        self.optimizer_central = tf.keras.optimizers.RMSprop(clr, rho=0.99, epsilon=1e-5)#Adam(clr)
+        if param['central optimizer'] == 'RMSprop':
+            self.optimizer_central = tf.keras.optimizers.RMSprop(clr, rho=0.99, epsilon=1e-5)
+        elif param['central optimizer'] == 'Adam':
+            self.optimizer_central = tf.keras.optimizers.Adam(clr)
         self.checkpoint_central = tf.train.Checkpoint(
                 optimizer=self.optimizer_central, model=self.model_central)
         self.manager_central = tf.train.CheckpointManager(
@@ -74,7 +80,10 @@ class SF_CVDC:
                 pi_encoder=param['decentral pi encoder'],
             )
             save_directory = os.path.join(save_path, 'decentral{}'.format(i))
-            optimizer = tf.keras.optimizers.RMSprop(lr, rho=0.99, epsilon=1e-5)#Adam(lr)
+            if param['decentral optimizer'] == 'RMSprop':
+                optimizer = tf.keras.optimizers.RMSprop(lr, rho=0.99, epsilon=1e-5)#Adam(lr)
+            elif param['decentral optimizer'] == 'Adam':
+                optimizer = tf.keras.optimizers.Adam(lr)
             checkpoint = tf.train.Checkpoint(
                    optimizer=optimizer, model=model)
             manager = tf.train.CheckpointManager(
