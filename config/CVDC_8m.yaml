@@ -1,49 +1,43 @@
-# Save Configuration
+advantage global norm: true
+atoms: 128
+buffer size: 512
+central critic encoder: hyper2
+central critic td lambda: true
+central critic td standardize: false
+central gradient global norm: 1
+central learning rate: 0.001
+central optimizer: RMSprop
+critic beta: 0.5
+decentral critic encoder: hyper1
+decentral critic td lambda: true
+decentral critic td standardize: true
+decentral gradient global norm: 1
+decentral learning rate: 0.0001
+decentral optimizer: RMSprop
+decentral pi encoder: recurse
+decoder beta: 0.0001
+drop remainder: true
+entropy beta: 0.0001
+epoch: 4
+eps: 0.2
+frame stack: 4
+gamma: 0.98
+lambda: 0.96
+learnability beta: 0.0
+minibatch size: 128
 moving average step: 2000
+psi beta: 0.5
+q beta: 0.0005
+reduction_sum: true
+reward beta: 0.05
+rollout episodeis: 8
+rollout episodes: 8
+save image frequency: 2000
 save model frequency: 40960
 save statistic frequency: 2000
-save image frequency: 2000
-
-# Model Configuration
-frame stack: 4
-single network: True
-shared SF: False
-
-# Training Configuration
-gamma: 0.98
-lambda: 0.97
-minibatch size: 128
-epoch: 4
-buffer size: 4096
-drop remainder: True
-decentral learning rate: 0.0001
-central learning rate: 0.0010
-eps: 0.20
+shared SF: false
+single network: true
 target_kl: 0.015
-entropy beta: 0.05
-psi beta: 0.0
-reward beta: 0.0000
-decoder beta: 0.0000
-critic beta: 0.5
-q beta: 0.005
-learnability beta: 0.000
-
-# Gradient
-decentral gradient global norm: 50
-central gradient global norm: 50
-
-# Network Configuration
-atoms: 128
-central critic td lambda: True
-central critic td standardize: True
-decentral critic td lambda: True
-decentral critic td standardize: True
-advantage global norm: True
-
-# Misc
-reduction_sum: True
-central critic encoder: 'hyper1'
-decentral critic encoder: 'hyper1'
-decentral pi encoder: 'basic'
-
-update target interval: 200
+test episode: 20
+test interval: 2000
+update target interval: 100
