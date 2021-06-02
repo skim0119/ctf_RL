@@ -1,0 +1,49 @@
+# Save Configuration
+moving average step: 2000
+save statistic frequency: 2000
+save image frequency: 2000
+save model frequency: 40960
+rollout episodeis: 8
+
+# Model Configuration
+frame stack: 4
+single network: True
+shared SF: False
+
+# Training Configuration
+gamma: 0.98
+lambda: 0.96
+minibatch size: 128
+epoch: 1
+buffer size: 1024
+drop remainder: True
+decentral learning rate: 0.000100
+central learning rate: 0.00100
+eps: 0.20
+target_kl: 0.015
+entropy beta: 0.000010
+psi beta: 0.50
+reward beta: 0.05
+decoder beta: 0.0001
+critic beta: 0.5
+q beta: 0.0005
+learnability beta: 0.000
+
+# Gradient
+decentral gradient global norm: 1
+central gradient global norm: 1
+
+# Network Configuration
+atoms: 128
+central critic td lambda: True
+central critic td standardize: False
+decentral critic td lambda: True
+decentral critic td standardize: True
+advantage global norm: False
+
+# Misc
+reduction_sum: True
+central critic encoder: 'hyper2'
+decentral critic encoder: 'hyper1'
+decentral pi encoder: 'recurse'
+update target interval: 100
